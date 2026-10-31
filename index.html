@@ -1346,7 +1346,7 @@ function App(){
   }
   scoreGoalRef.current=scoreGoal;
 
-  useEffect(function(){if(!running||goalFlash||replayActive||isPractice||paused||ot||onRoleRef.current==='guest')return;if(tl<=0)return;var id=setInterval(function(){setTl(function(p){return p<=1?0:p-1;});},1000);return function(){clearInterval(id);};},[running,goalFlash,replayActive,isPractice,paused,ot]);
+  useEffect(function(){if(!running||goalFlash||replayActive||isPractice||paused||ot||netMsg||onRoleRef.current==='guest')return;if(tl<=0)return;var id=setInterval(function(){setTl(function(p){return p<=1?0:p-1;});},1000);return function(){clearInterval(id);};},[running,goalFlash,replayActive,isPractice,paused,ot,netMsg]);
   useEffect(function(){if(tl!==0||!running||ot||isPractice||onRoleRef.current==='guest')return;setOt(true);otRef.current=true;otReadyRef.current=false;},[tl]);
 
   function startGame(duration,mode,cols,nms,pside,pmode,pid1,pid2){
