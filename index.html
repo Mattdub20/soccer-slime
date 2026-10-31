@@ -803,11 +803,11 @@ function IntroScreen(props){
   },[]);
   useEffect(function(){
     var cv=cvRef.current;if(!cv)return;
-    var ctx=cv.getContext('2d'),alive=true,start=performance.now(),duration=9000,dpr=Math.min(window.devicePixelRatio||1,2),sceneCache={};
+    var ctx=cv.getContext('2d'),alive=true,start=performance.now(),duration=9000,dpr=Math.min(window.devicePixelRatio||1,3),sceneCache={};
     var r=35,gnd=330,sc=['#1a6bcc','#e8192c','#2e7d32','#6a1b9a','#e65100','#00838f','#ad1457','#4527a0','#ff6f00','#1b5e20','#880e4f','#0d47a1','#bf360c','#1a237e','#558b2f','#4e342e','#1a6bcc','#e8192c'];
     var slimes=[];
     for(var i=0;i<18;i++)slimes.push({x:-r-i*r*2.3,y:gnd,vy:-(8+Math.random()*4),vx:5+i*0.04,color:sc[i%sc.length],accent:darken(sc[i%sc.length])});
-    function resize(){var w=window.innerWidth,h=window.innerHeight;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);cv.style.width=w+'px';cv.style.height=h+'px';}
+    function resize(){var w=window.innerWidth,h=window.innerHeight;cv.width=Math.max(1200,Math.round(w*dpr));cv.height=Math.max(700,Math.round(h*dpr));cv.style.width=w+'px';cv.style.height=h+'px';ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';}
     function scene(theme,time){
       if(theme==='night'){
         var ng=ctx.createLinearGradient(0,0,0,400);ng.addColorStop(0,'#071024');ng.addColorStop(0.58,'#172347');ng.addColorStop(1,'#402b54');ctx.fillStyle=ng;ctx.fillRect(0,0,800,400);
@@ -855,7 +855,9 @@ function IntroScreen(props){
       if(elapsed>=duration){skip();return;}
       var w=window.innerWidth,h=window.innerHeight;
       if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr))resize();
-      ctx.setTransform(dpr*w/800,0,0,dpr*h/400,0,0);
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0,0,cv.width,cv.height);
+      ctx.setTransform(cv.width/800,0,0,cv.height/400,0,0);
       var sceneTime=elapsed%3000,sceneIndex=Math.floor(elapsed/3000),themes=['day','night','japan'],current=themes[sceneIndex];
       var fade=0;
       drawScene(current,1);
