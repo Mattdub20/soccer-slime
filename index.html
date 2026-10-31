@@ -954,6 +954,12 @@ function GuideScreenshot(props){
   var cvRef=useRef(null);
   useEffect(function(){
     var cv=cvRef.current;if(!cv)return;
+    var isNight=props.theme==='night',isJapan=props.theme==='japan';
+    var hudBg=isJapan?'rgba(48,17,37,0.84)':isNight?'rgba(4,10,26,0.82)':'rgba(8,42,76,0.8)';
+    var labelBg=isJapan?'rgba(58,22,42,0.82)':isNight?'rgba(3,10,28,0.78)':'rgba(8,48,82,0.78)';
+    var leftHud=isJapan?'#ffd3e1':isNight?'#93c5fd':'#bfdbfe';
+    var rightHud=isJapan?'#ff9bb5':'#fca5a5';
+    var highlight=isJapan?'#f9a8d4':isNight?'#fbbf24':'#fde68a';
     var ctx=cv.getContext('2d'),left=mkSlime(270),right=mkSlime(550),ball={x:410,y:GH-GRND-28,vx:3,vy:-2,ang:0},kind=props.kind;
     if(kind==='objective'){ball.x=730;ball.y=GH-GRND-40;right.x=670;}
     else if(kind==='p1'){left.x=340;left.y=GH-GRND-52;left.vy=-5;ball.x=400;ball.y=GH-GRND-93;}
@@ -964,18 +970,18 @@ function GuideScreenshot(props){
     else if(kind==='replay'){left.x=350;left.y=GH-GRND-36;right.x=515;right.y=GH-GRND-30;ball.x=742;ball.y=GH-GRND-49;}
     else if(kind==='practice'){right.x=320;right.y=GH-GRND-35;ball.x=402;ball.y=GH-GRND-46;}
     else if(kind==='camping'){left.x=27;ball.x=143;ball.y=GH-GRND-32;right.x=585;}
-    drawScene(ctx,left,right,ball,DC,kind==='practice'?'practice':'multi','right',false,Array.from({length:CROWD_N},function(){return 0.2;}),false,null,true,false);
-    ctx.save();ctx.fillStyle='rgba(4,10,26,0.82)';ctx.fillRect(12,10,184,30);ctx.fillRect(GW-196,10,184,30);ctx.fillRect(GW/2-48,10,96,30);
-    ctx.textBaseline='middle';ctx.font='16px "Lilita One",sans-serif';ctx.textAlign='left';ctx.fillStyle='#93c5fd';ctx.fillText(kind==='practice'?'PRACTICE':kind==='ai'?'YOU':'P1',24,25);ctx.fillStyle='#fff';ctx.fillText(kind==='practice'?'':kind==='ai'?'0':'1',70,25);ctx.textAlign='right';ctx.fillStyle='#fca5a5';ctx.fillText(kind==='practice'?'YOU':kind==='ai'?'AI':'P2',GW-24,25);ctx.fillStyle='#fff';ctx.fillText(kind==='practice'?'':kind==='objective'?'2':'0',GW-72,25);ctx.textAlign='center';ctx.fillStyle=kind==='overtime'?'#fca5a5':'#fff';ctx.fillText(kind==='overtime'?'00:00':'01:23',GW/2,25);ctx.restore();
+    drawScene(ctx,left,right,ball,DC,kind==='practice'?'practice':'multi','right',false,Array.from({length:CROWD_N},function(){return 0.2;}),false,null,isNight,isJapan);
+    ctx.save();ctx.fillStyle=hudBg;ctx.fillRect(12,10,184,30);ctx.fillRect(GW-196,10,184,30);ctx.fillRect(GW/2-48,10,96,30);
+    ctx.textBaseline='middle';ctx.font='16px "Lilita One",sans-serif';ctx.textAlign='left';ctx.fillStyle=leftHud;ctx.fillText(kind==='practice'?'PRACTICE':kind==='ai'?'YOU':'P1',24,25);ctx.fillStyle='#fff';ctx.fillText(kind==='practice'?'':kind==='ai'?'0':'1',70,25);ctx.textAlign='right';ctx.fillStyle=rightHud;ctx.fillText(kind==='practice'?'YOU':kind==='ai'?'AI':'P2',GW-24,25);ctx.fillStyle='#fff';ctx.fillText(kind==='practice'?'':kind==='objective'?'2':'0',GW-72,25);ctx.textAlign='center';ctx.fillStyle=kind==='overtime'?rightHud:'#fff';ctx.fillText(kind==='overtime'?'00:00':'01:23',GW/2,25);ctx.restore();
     ctx.save();ctx.font='bold 14px "Lilita One",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
     var label=kind==='objective'?'SCORE!':kind==='p1'?'JUMP + MOVE':kind==='p2'?'P2 CONTROLS':kind==='keys'?'KEYBOARD SHORTCUTS':kind==='ai'?'AI POSITIONS FOR THE BALL':kind==='overtime'?'GOLDEN GOAL':kind==='replay'?'INSTANT REPLAY':kind==='practice'?'FREE PRACTICE':kind==='camping'?'GOAL-LINE WARNING':'';
-    ctx.fillStyle='rgba(3,10,28,0.78)';ctx.fillRect(GW/2-115,GH-37,230,25);ctx.fillStyle='#fff';ctx.fillText(label,GW/2,GH-25);
-    if(kind==='overtime'){ctx.font='bold 22px "Lilita One",sans-serif';ctx.fillStyle='#f87171';ctx.shadowColor='#ef4444';ctx.shadowBlur=14;ctx.fillText('GOLDEN GOAL',GW/2,95);}
-    else if(kind==='replay'){ctx.fillStyle='rgba(0,0,0,0.66)';ctx.fillRect(0,48,GW,24);ctx.fillStyle='#fbbf24';ctx.textAlign='left';ctx.fillText('INSTANT REPLAY',12,60);ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,GH-8,GW,4);ctx.fillStyle='#38bdf8';ctx.fillRect(0,GH-8,GW*0.68,4);}
-    else if(kind==='camping'){ctx.strokeStyle='#fb7185';ctx.lineWidth=4;ctx.strokeRect(0,GH-GRND-70,GOALW,GH-(GH-GRND-70));ctx.fillStyle='#fda4af';ctx.fillText('1.0s',52,GH-GRND-82);}
+    ctx.fillStyle=labelBg;ctx.fillRect(GW/2-115,GH-37,230,25);ctx.fillStyle='#fff';ctx.fillText(label,GW/2,GH-25);
+    if(kind==='overtime'){ctx.font='bold 22px "Lilita One",sans-serif';ctx.fillStyle=rightHud;ctx.shadowColor=rightHud;ctx.shadowBlur=14;ctx.fillText('GOLDEN GOAL',GW/2,95);}
+    else if(kind==='replay'){ctx.fillStyle=hudBg;ctx.fillRect(0,48,GW,24);ctx.fillStyle=highlight;ctx.textAlign='left';ctx.fillText('INSTANT REPLAY',12,60);ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,GH-8,GW,4);ctx.fillStyle=highlight;ctx.fillRect(0,GH-8,GW*0.68,4);}
+    else if(kind==='camping'){ctx.strokeStyle=rightHud;ctx.lineWidth=4;ctx.strokeRect(0,GH-GRND-70,GOALW,GH-(GH-GRND-70));ctx.fillStyle=rightHud;ctx.fillText('1.0s',52,GH-GRND-82);}
     else if(kind==='p1'||kind==='p2'||kind==='keys'){ctx.fillStyle='rgba(255,255,255,0.94)';ctx.font='bold 12px "Lilita One",sans-serif';ctx.fillText(kind==='p1'?'A / D  ·  W  ·  S':kind==='p2'?'← / →  ·  ↑  ·  ↓':'J  ·  P  ·  SPACE',GW/2,GH-54);}
     ctx.restore();
-  },[props.kind]);
+  },[props.kind,props.theme]);
   return React.createElement('canvas',{ref:cvRef,width:800,height:400,role:'img','aria-label':props.label,style:{display:'block',width:'100%',height:'auto',aspectRatio:'2 / 1',borderRadius:9,border:'1px solid rgba(255,255,255,0.12)'}});
 }
 
@@ -983,12 +989,12 @@ function GuideScreen(props){
   var onBack=props.onBack;
   useEffect(function(){function h(e){if(e.key==='Escape')onBack();}window.addEventListener('keydown',h);return function(){window.removeEventListener('keydown',h);};},[onBack]);
   var S=[{t:'Objective',b:'Score more goals before time runs out. Then the clock stops and overtime rules apply, and the next goal wins.',shot:'objective'},{t:'P1 Controls',b:'Move: A/D  Jump: W (double jump in air)  Dash: S',shot:'p1'},{t:'P2 Controls',b:'Move: arrows  Jump: up  Dash: down',shot:'p2'},{t:'Extra keys',b:'J: toggle unlimited jump in Practice only. P/Space: pause outside Practice.',shot:'keys'},{t:'AI difficulty',b:'Easy is relaxed. Hard uses varied tactics, cuts off angles and defends high balls. Impossible also learns from every goal and studies how you score.',shot:'ai'},{t:'Golden Goal (0:00)',b:'At 0:00 the clock stops, whatever the score. The next time the ball touches the ground the match ends. If it is tied, there is a new kickoff and the next goal wins.',shot:'overtime'},{t:'Replay',b:'After each goal in multiplayer. Scorer skips with jump key.',shot:'replay'},{t:'Practice',b:'No opponent, no timer. R to reset. Toggle unlimited jump with J or the ∞ Jump button.',shot:'practice'},{t:'Camping Penalty',b:'Stay in your own goal 1s = opponent gets free goal.',shot:'camping'}];
-  return React.createElement('div',{style:{maxWidth:500,width:'100%',margin:'0 auto',padding:'20px 0',display:'flex',flexDirection:'column',alignItems:'center'}},
-    React.createElement('h2',{style:{fontFamily:'var(--font-display)',color:'#fff',fontSize:34,fontWeight:700,margin:'0 0 20px',textShadow:'0 0 20px rgba(56,189,248,0.6)',letterSpacing:'0.04em',textAlign:'center'}},'How to Play'),
-    React.createElement('div',{style:{maxHeight:'min(68vh,720px)',overflowY:'auto',display:'flex',flexDirection:'column',gap:10,padding:'0 6px',width:'100%',boxSizing:'border-box'}},
-      S.map(function(s,i){return React.createElement('div',{key:i,style:{background:'rgba(5,12,35,0.75)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:12,padding:12}},React.createElement('div',{style:{color:'#fbbf24',fontWeight:700,fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:4}},s.t),React.createElement('div',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,lineHeight:1.55,marginBottom:10}},s.b),React.createElement(GuideScreenshot,{kind:s.shot,label:s.t+' gameplay visualization'}));})
+  return React.createElement('div',{style:{maxWidth:500,width:'100%',height:'100%',minHeight:0,margin:'0 auto',padding:'4px 0',boxSizing:'border-box',display:'flex',flexDirection:'column',alignItems:'center',overflow:'hidden'}},
+    React.createElement('h2',{style:{flex:'0 0 auto',fontFamily:'var(--font-display)',color:'#fff',fontSize:34,fontWeight:700,margin:'0 0 8px',textShadow:'0 0 20px rgba(56,189,248,0.6)',letterSpacing:'0.04em',textAlign:'center'}},'How to Play'),
+    React.createElement('div',{style:{flex:'1 1 0',minHeight:0,overflowY:'auto',overscrollBehavior:'contain',display:'flex',flexDirection:'column',gap:10,padding:'0 6px',width:'100%',boxSizing:'border-box'}},
+      S.map(function(s,i){return React.createElement('div',{key:i,style:{background:'rgba(5,12,35,0.75)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:12,padding:12}},React.createElement('div',{style:{color:'#fbbf24',fontWeight:700,fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:4}},s.t),React.createElement('div',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,lineHeight:1.55,marginBottom:10}},s.b),React.createElement(GuideScreenshot,{kind:s.shot,theme:props.theme,label:s.t+' gameplay visualization'}));})
     ),
-    React.createElement('button',{onClick:onBack,style:Object.assign({marginTop:16,padding:'12px 36px',background:'linear-gradient(135deg,#64748b,#334155)',border:'none',borderRadius:50,color:'#fff',fontWeight:700,fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase',cursor:'pointer',boxShadow:'0 4px 15px rgba(0,0,0,0.35)'},props.focusSty?props.focusSty('back'):{})},'Back')
+    React.createElement('button',{onClick:onBack,style:Object.assign({flex:'0 0 auto',marginTop:8,padding:'10px 36px',background:'linear-gradient(135deg,#64748b,#334155)',border:'none',borderRadius:50,color:'#fff',fontWeight:700,fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase',cursor:'pointer',boxShadow:'0 4px 15px rgba(0,0,0,0.35)'},props.focusSty?props.focusSty('back'):{})},'Back')
   );
 }
 
@@ -1410,7 +1416,7 @@ function App(){
   useEffect(function(){colRef.current=colors;},[colors]);
   useEffect(function(){practModeRef.current=practMode;},[practMode]);
   useEffect(function(){themeModeRef.current=themeMode;try{document.documentElement.style.setProperty('--ghost',themeMode==='night'?'rgba(255,255,255,0.12)':themeMode==='japan'?'rgba(70,28,58,0.46)':'rgba(8,42,92,0.42)');}catch(e){}},[themeMode]);
-  useEffect(function(){setFocusIdx(0);setThemeOpen(false);},[screen]);
+  useEffect(function(){setFocusIdx(0);setThemeOpen(false);},[screen,onl.view,onl.peerOn]);
   useEffect(function(){if(chatListRef.current)chatListRef.current.scrollTop=chatListRef.current.scrollHeight;},[chatMessages]);
   var s_fit=useState(1),fit=s_fit[0],setFit=s_fit[1];
   var s_rs=useState(1),rs=s_rs[0],setRs=s_rs[1],s_uz=useState(1),uiZ=s_uz[0],setUiZ=s_uz[1],s_uk=useState(1),uiK=s_uk[0],setUiK=s_uk[1],rsRef=useRef(1);
@@ -1421,6 +1427,12 @@ function App(){
   function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(6);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
   function getNavGrid(){
     if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['online','guide','playerdata','theme']];
+    if(screen==='online'){
+      if(onl.view==='choose')return[['online_create'],['online_join'],['online_name'],['online_back']];
+      if(onl.view==='join')return[['online_code0','online_code1','online_code2','online_code3'],['online_submit'],['online_cancel']];
+      if(onl.view==='host'&&onl.peerOn)return[['online_dur1','online_dur2','online_dur4'],['online_start'],['online_cancel']];
+      return[['online_cancel']];
+    }
     if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right','diff_easy','diff_hard','diff_impossible']);else g.push(['side_left','side_right']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
     if(screen==='practice_select')return[['prac_regular','prac_air','prac_ground'],['side_left','side_right'],['back']];
     if(screen==='player_select')return[['p1_guest','p2_guest'],['continue','back']];
@@ -1450,6 +1462,22 @@ function App(){
       p1_guest:function(){setSelP1(null);},p2_guest:function(){setSelP2(null);},
       continue:function(){setScreen('customise');}
     };
+    if(screen==='online'){
+      acts.online_create=function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);};
+      acts.online_join=function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});};
+      acts.online_name=function(){if(onlineNameInputRef.current)onlineNameInputRef.current.focus();};
+      acts.online_code0=function(){if(joinInputRefs[0].current)joinInputRefs[0].current.focus();};
+      acts.online_code1=function(){if(joinInputRefs[1].current)joinInputRefs[1].current.focus();};
+      acts.online_code2=function(){if(joinInputRefs[2].current)joinInputRefs[2].current.focus();};
+      acts.online_code3=function(){if(joinInputRefs[3].current)joinInputRefs[3].current.focus();};
+      acts.online_submit=function(){if((onl.joinCode||'').length===4)openRoom('g',onl.joinCode);};
+      acts.online_dur1=function(){setOnl(function(o){return Object.assign({},o,{dur:'1min'});});};
+      acts.online_dur2=function(){setOnl(function(o){return Object.assign({},o,{dur:'2min'});});};
+      acts.online_dur4=function(){setOnl(function(o){return Object.assign({},o,{dur:'4min'});});};
+      acts.online_start=function(){var gpn=netFind('g');startGame(onl.dur,'online',DC,{left:cleanName(myName)||'Host',right:cleanName(gpn&&gpn.n)||'Guest'},'left','regular',null,null);};
+      acts.online_back=function(){onlineCleanup();setScreen('menu');};
+      acts.online_cancel=function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});};
+    }
     var grid=getNavGrid(),flat=[];
     for(var ri=0;ri<grid.length;ri++)for(var ci=0;ci<grid[ri].length;ci++)flat.push({id:grid[ri][ci],act:acts[grid[ri][ci]]||function(){}});
     return flat;
@@ -1464,22 +1492,24 @@ function App(){
     var btns=getMenuButtons(),grid=getNavGrid();
     if(!btns.length)return;
     function onNav(e){
-      if(e.target.tagName==='INPUT')return;
       var key=e.key.toLowerCase();
+      if(e.target.tagName==='INPUT'&&(screen!=='online'||(key!=='arrowup'&&key!=='arrowdown'&&key!=='escape')))return;
       if(key==='enter'||key===' '){e.preventDefault();var b=btns[focusIdx];if(b)b.act();return;}
       if(themeOpen&&key!=='enter'&&key!==' '&&key!=='escape'){e.preventDefault();var td=(key==='arrowright'||key==='d'||key==='arrowdown'||key==='s')?1:(key==='arrowleft'||key==='a'||key==='arrowup'||key==='w')?-1:0;if(td)setFocusIdx((focusIdx+td+3)%3);return;}
-      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(6);return;}if(screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');return;}
+      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(6);return;}if(screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
       var pos=getFocusPos(grid,focusIdx),r=pos[0],c=pos[1],nr=r,nc=c;
       if(key==='arrowdown'||key==='s'){nr=(r+1)%grid.length;}
       else if(key==='arrowup'||key==='w'){nr=(r-1+grid.length)%grid.length;}
       else if(key==='arrowright'||key==='d'){nc=(c+1)%grid[r].length;}
       else if(key==='arrowleft'||key==='a'){nc=(c-1+grid[r].length)%grid[r].length;}
       else return;
-      e.preventDefault();setFocusIdx(getIdxFromPos(grid,nr,nc));
+      e.preventDefault();
+      if(screen==='online'&&e.target.tagName==='INPUT')e.target.blur();
+      setFocusIdx(getIdxFromPos(grid,nr,nc));
     }
     window.addEventListener('keydown',onNav);
     return function(){window.removeEventListener('keydown',onNav);};
-  },[screen,introDone,focusIdx,pendDur,diff,side,selP1,selP2,themeOpen]);
+  },[screen,introDone,focusIdx,pendDur,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName]);
 
   function resetPos(defMove){
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
@@ -1804,8 +1834,8 @@ function App(){
           })
         ),
         React.createElement('p',{style:{margin:0,fontSize:13,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
-          React.createElement('span',{className:'kbd'},'W'),React.createElement('span',{className:'kbd'},'A'),React.createElement('span',{className:'kbd'},'S'),React.createElement('span',{className:'kbd'},'D'),' or arrow keys to move, ',React.createElement('span',{className:'kbd'},'Enter'),' to choose'),
-        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.0.3')
+          React.createElement('span',{className:'kbd'},'W'),React.createElement('span',{className:'kbd'},'A'),React.createElement('span',{className:'kbd'},'S'),React.createElement('span',{className:'kbd'},'D'),' or arrow keys to move, ',React.createElement('span',{className:'kbd'},'Enter'),' or ',React.createElement('span',{className:'kbd'},'Space'),' to choose'),
+        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.0.5')
       )
     );
   }
@@ -1818,11 +1848,11 @@ function App(){
     var oBody=[];
     if(oV==='choose'){
       oBody.push(React.createElement('div',{key:'t',style:oTxt},'Play a friend on a different computer. One of you creates a room, the other types in the code.'));
-      oBody.push(React.createElement('button',{key:'c',onClick:function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);},style:pill(btnPrimary,{width:240})},'Create room'));
-      oBody.push(React.createElement('button',{key:'j',onClick:function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});},style:pill('linear-gradient(135deg,#059669,#047857)',{width:240})},'Join room'));
+      oBody.push(React.createElement('button',{key:'c',onClick:function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);},style:Object.assign(pill(btnPrimary,{width:240}),focusSty('online_create'))},'Create room'));
+      oBody.push(React.createElement('button',{key:'j',onClick:function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});},style:Object.assign(pill('linear-gradient(135deg,#059669,#047857)',{width:240}),focusSty('online_join'))},'Join room'));
       oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6,marginTop:4}},
         React.createElement('div',{style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Your name'),
-        React.createElement('input',{ref:onlineNameInputRef,value:myName,maxLength:12,placeholder:'Enter a name',onChange:function(e){setMyName(e.target.value);if(cleanName(e.target.value))setOnl(function(o){return o.err?Object.assign({},o,{err:''}):o;});},onKeyDown:function(e){e.stopPropagation();},style:{fontFamily:DISP,fontSize:20,textAlign:'center',width:220,padding:'7px 10px',borderRadius:14,border:'2px solid rgba(255,255,255,0.3)',background:'rgba(0,0,0,0.35)',color:'#fff',outline:'none'}})));
+        React.createElement('input',{ref:onlineNameInputRef,value:myName,maxLength:12,placeholder:'Enter a name',onFocus:function(){setFocusIdx(2);},onChange:function(e){setMyName(e.target.value);if(cleanName(e.target.value))setOnl(function(o){return o.err?Object.assign({},o,{err:''}):o;});},onKeyDown:function(e){if(e.key!=='ArrowUp'&&e.key!=='ArrowDown'&&e.key!=='Escape')e.stopPropagation();},style:Object.assign({fontFamily:DISP,fontSize:20,textAlign:'center',width:220,padding:'7px 10px',borderRadius:14,border:'2px solid rgba(255,255,255,0.3)',background:'rgba(0,0,0,0.35)',color:'#fff',outline:'none'},focusSty('online_name'))})));
     }else if(oV==='join'){
       oBody.push(React.createElement('div',{key:'t',style:oTxt},'Type the room code from your friend'));
       oBody.push(React.createElement('div',{key:'codeinputs',style:{display:'flex',gap:10,justifyContent:'center',alignItems:'center'}},[0,1,2,3].map(function(idx){
@@ -1837,6 +1867,7 @@ function App(){
           autoCapitalize:'characters',
           spellCheck:false,
           'aria-label':'Room code character '+(idx+1),
+          onFocus:function(){setFocusIdx(idx);},
           onChange:function(e){
             var raw=String(e.target.value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
             if(!raw)return;
@@ -1845,18 +1876,18 @@ function App(){
             cur[idx]=v;
             var code=cur.join('').slice(0,4);
             setOnl(function(o){return Object.assign({},o,{joinCode:code,err:''});});
-            if(idx<3){setTimeout(function(){var el=joinInputRefs[idx+1].current;if(el){el.focus();el.select();}},0);}
+            if(idx<3){setFocusIdx(idx+1);setTimeout(function(){var el=joinInputRefs[idx+1].current;if(el){el.focus();el.select();}},0);}
           },
           onKeyDown:function(e){
-            e.stopPropagation();
+            if(e.key!=='ArrowUp'&&e.key!=='ArrowDown'&&e.key!=='Escape')e.stopPropagation();
             if(e.key==='Enter'){if((onl.joinCode||'').length===4)openRoom('g',onl.joinCode);return;}
             if(e.key==='Backspace'&&!ch&&idx>0){
               var cur=(onl.joinCode||'').split('');while(cur.length<4)cur.push('');cur[idx-1]='';
               var code=cur.join('').replace(/\s+$/g,'');
               setOnl(function(o){return Object.assign({},o,{joinCode:code,err:''});});
-              setTimeout(function(){var el=joinInputRefs[idx-1].current;if(el){el.focus();el.select();}},0);
-            }else if(e.key==='ArrowLeft'&&idx>0){var l=joinInputRefs[idx-1].current;if(l)l.focus();}
-            else if(e.key==='ArrowRight'&&idx<3){var r=joinInputRefs[idx+1].current;if(r)r.focus();}
+              setFocusIdx(idx-1);setTimeout(function(){var el=joinInputRefs[idx-1].current;if(el){el.focus();el.select();}},0);
+            }else if(e.key==='ArrowLeft'&&idx>0){setFocusIdx(idx-1);var l=joinInputRefs[idx-1].current;if(l)l.focus();}
+            else if(e.key==='ArrowRight'&&idx<3){setFocusIdx(idx+1);var r=joinInputRefs[idx+1].current;if(r)r.focus();}
           },
           onPaste:function(e){
             e.preventDefault();
@@ -1866,30 +1897,31 @@ function App(){
             for(var pi=0;pi<raw.length&&idx+pi<4;pi++)cur[idx+pi]=raw.charAt(pi);
             var code=cur.join('').slice(0,4);
             setOnl(function(o){return Object.assign({},o,{joinCode:code,err:''});});
-            setTimeout(function(){var ni=Math.min(3,idx+raw.length),el=joinInputRefs[ni].current;if(el){el.focus();el.select();}},0);
+            var ni=Math.min(3,idx+raw.length);setFocusIdx(ni);setTimeout(function(){var el=joinInputRefs[ni].current;if(el){el.focus();el.select();}},0);
           },
-          style:{fontFamily:DISP,fontSize:34,fontWeight:900,textAlign:'center',width:52,height:60,padding:'0',borderRadius:14,border:'2px solid rgba(255,255,255,0.3)',background:'rgba(0,0,0,0.35)',color:'#fff',outline:'none',boxSizing:'border-box'}
+          style:Object.assign({fontFamily:DISP,fontSize:34,fontWeight:900,textAlign:'center',width:52,height:60,padding:'0',borderRadius:14,border:'2px solid rgba(255,255,255,0.3)',background:'rgba(0,0,0,0.35)',color:'#fff',outline:'none',boxSizing:'border-box'},focusSty('online_code'+idx))
         });
       })));
-      oBody.push(React.createElement('button',{key:'go',onClick:function(){if((onl.joinCode||'').length===4)openRoom('g',onl.joinCode);},style:pill(btnPrimary,{width:240,opacity:(onl.joinCode||'').length===4?1:0.5})},'Join'));
+      oBody.push(React.createElement('button',{key:'go',onClick:function(){if((onl.joinCode||'').length===4)openRoom('g',onl.joinCode);},style:Object.assign(pill(btnPrimary,{width:240,opacity:(onl.joinCode||'').length===4?1:0.5}),focusSty('online_submit'))},'Join'));
     }else if(oV==='host'){
       oBody.push(React.createElement('div',{key:'l',style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Room code'));
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:56,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.peerOn?'Your friend is in! Pick a length and start.':(onl.status==='Connected'?'Waiting for your friend to join…':onl.status)));
       if(onl.peerOn){
-        oBody.push(React.createElement('div',{key:'d',style:{display:'flex',gap:8}},['1min','2min','4min'].map(function(dv){return React.createElement('button',{key:dv,onClick:function(){setOnl(function(o){return Object.assign({},o,{dur:dv});});},style:hudChip(false,{padding:'6px 14px',fontSize:12,background:onl.dur===dv?btnPrimary:'rgba(255,255,255,0.12)'})},dv.replace('min',' min'));})));
-        oBody.push(React.createElement('button',{key:'st',onClick:function(){var gpn=netFind('g');startGame(onl.dur,'online',DC,{left:cleanName(myName)||'Host',right:cleanName(gpn&&gpn.n)||'Guest'},'left','regular',null,null);},style:pill('linear-gradient(135deg,#16a34a,#15803d)',{width:240})},'Start match'));
+        oBody.push(React.createElement('div',{key:'d',style:{display:'flex',gap:8}},['1min','2min','4min'].map(function(dv){var navId='online_dur'+dv.replace('min','');return React.createElement('button',{key:dv,onClick:function(){setOnl(function(o){return Object.assign({},o,{dur:dv});});},style:Object.assign(hudChip(false,{padding:'6px 14px',fontSize:12,background:onl.dur===dv?btnPrimary:'rgba(255,255,255,0.12)'}),focusSty(navId))},dv.replace('min',' min'));})));
+        oBody.push(React.createElement('button',{key:'st',onClick:function(){var gpn=netFind('g');startGame(onl.dur,'online',DC,{left:cleanName(myName)||'Host',right:cleanName(gpn&&gpn.n)||'Guest'},'left','regular',null,null);},style:Object.assign(pill('linear-gradient(135deg,#16a34a,#15803d)',{width:240}),focusSty('online_start'))},'Start match'));
       }
     }else{
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:44,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.status!=='Connected'?onl.status:(onl.peerOn?'Connected! Waiting for the host to start the match…':'Connected. Looking for the host…')));
     }
     if(onl.err)oBody.push(React.createElement('div',{key:'e',style:{color:'#fecaca',fontSize:12,textAlign:'center',maxWidth:300,lineHeight:1.45,background:'rgba(239,68,68,0.18)',border:'1px solid rgba(248,113,113,0.4)',borderRadius:12,padding:'8px 12px'}},onl.err));
-    oBody.push(React.createElement('button',{key:'b',onClick:oV==='choose'?oBack:(oV==='join'?oBackToChoose:oBackToChoose),style:pill('rgba(255,255,255,0.12)',{fontSize:13,padding:'9px 22px',textTransform:'none',letterSpacing:0})},oV==='choose'?'Back':'Cancel'));
+    var backId=oV==='choose'?'online_back':'online_cancel';
+    oBody.push(React.createElement('button',{key:'b',onClick:oV==='choose'?oBack:oBackToChoose,style:Object.assign(pill('rgba(255,255,255,0.12)',{fontSize:13,padding:'9px 22px',textTransform:'none',letterSpacing:0}),focusSty(backId))},oV==='choose'?'Back':'Cancel'));
     return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18})},heading('Play Online','Two players · one room code'),React.createElement('div',{style:oCard},oBody)));
   }
 
-  if(screen==='guide')return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),React.createElement('div',{className:'rise',style:wrapStyle},React.createElement(GuideScreen,{onBack:function(){setScreen('menu');},focusSty:focusSty})));
+  if(screen==='guide')return React.createElement('div',{className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{theme:themeMode,onBack:function(){setScreen('menu');},focusSty:focusSty})));
 
   // ── PLAYER SELECT ────────────────────────────────────────────────────
   if(screen==='player_select')return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),
