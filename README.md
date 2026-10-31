@@ -9,3 +9,4 @@ Open `index.html` in a browser, or use VS Code with the Live Server extension fo
 ## GitHub Pages
 
 Upload this folder to a GitHub repository and enable GitHub Pages using the `main` branch and `/ (root)` folder.
+Use git add .; git commit -m "Updated website"; git push to update website.pu
