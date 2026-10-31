@@ -428,7 +428,7 @@ function drawSkylineLights(ctx,tNow){
 }
 
 // ─── Cached static layers: painted once, blitted every frame ───────────────
-var STAND_CACHE={},JAPAN_CACHE=null,FLAG_CACHE=null,VIG_CACHE={};
+var STAND_CACHE={},JAPAN_CACHE=null,FLAG_CACHE=null;
 // RS = backing-store pixels per game unit (>1 on big / hi-dpi screens). Static layers are re-baked at this density so they stay sharp.
 var RS=1;function setRS(r){if(r===RS)return;RS=r;BACKDROP_CACHE={};STAND_CACHE={};JAPAN_CACHE=null;FLAG_CACHE=null;}
 var CROWD_BP=['#fff','#f39c12','#27ae60','#8e44ad','#e67e22','#1abc9c','#ff69b4','#8B4513','#FFD700','#c0c0c0'];
@@ -456,16 +456,6 @@ function getStands(cols,night){
   var ps=c.createLinearGradient(0,sBot,0,sBot+GRND);ps.addColorStop(0,'rgba(255,255,255,0.07)');ps.addColorStop(1,'rgba(0,0,0,0.1)');c.fillStyle=ps;c.fillRect(0,sBot,GW,GRND);
   if(night){var fl=[[60,sTop-8],[GW-60,sTop-8],[GW/2,sTop-12]];for(i=0;i<3;i++){var lg=c.createRadialGradient(fl[i][0],fl[i][1],2,fl[i][0],fl[i][1]+2,55);lg.addColorStop(0,'rgba(255,255,200,0.22)');lg.addColorStop(1,'rgba(255,255,200,0)');c.fillStyle=lg;c.beginPath();c.arc(fl[i][0],fl[i][1]+2,55,0,Math.PI*2);c.fill();c.fillStyle='#fffde7';c.beginPath();c.arc(fl[i][0],fl[i][1],3,0,Math.PI*2);c.fill();}}
   return STAND_CACHE[key]=cv;
-}
-function getVig(cols,day){
-  var key=(day?'d':'n')+cols.left.body+cols.right.body,hit=VIG_CACHE[key];if(hit)return hit;
-  VIG_CACHE={};
-  var cv=document.createElement('canvas');cv.width=GW;cv.height=GH;var c=cv.getContext('2d'),l=hexRgb(cols.left.body),r=hexRgb(cols.right.body);
-  var a=c.createRadialGradient(0,GH/2,0,0,GH/2,GW*0.5);a.addColorStop(0,'rgba('+l[0]+','+l[1]+','+l[2]+','+(day?0.1:0.2)+')');a.addColorStop(1,'rgba(0,0,0,0)');
-  var b=c.createRadialGradient(GW,GH/2,0,GW,GH/2,GW*0.5);b.addColorStop(0,'rgba('+r[0]+','+r[1]+','+r[2]+','+(day?0.1:0.2)+')');b.addColorStop(1,'rgba(0,0,0,0)');
-  var v=c.createRadialGradient(GW/2,GH/2,GH*0.28,GW/2,GH/2,GW*0.7);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,day?'rgba(20,40,80,0.06)':'rgba(0,0,0,0.35)');
-  c.fillStyle=a;c.fillRect(0,0,GW,GH);c.fillStyle=b;c.fillRect(0,0,GW,GH);c.fillStyle=v;c.fillRect(0,0,GW,GH);
-  return VIG_CACHE[key]=cv;
 }
 // Cherry tree: tapered leaning trunk, curved branches, layered muted-pink canopy
 function paintSakuraTree(c,x,base,s,R,far){
@@ -1655,7 +1645,6 @@ function App(){
           var gcv=cvRef.current;
           if(gcv){var gctx=gcv.getContext('2d');gctx.setTransform(RSn,0,0,RSn,0,0);gctx.save();var gshk=shakeRef.current;if(gshk>0.4){gctx.translate((Math.random()-0.5)*gshk,(Math.random()-0.5)*gshk);shakeRef.current=gshk*0.86;}else shakeRef.current=0;
             drawScene(gctx,ls,rs,ball,cols,'online','right',false,fanRef.current,replayActiveRef.current?false:goalFlashRef.current,netGlRef.current,tm==='night',tm==='japan');
-            gctx.drawImage(getVig(cols,tm==='day'),0,0);
             if(goalFlashRef.current){var gfn=netGfRef.current,gfa2=Math.max(0,0.5*(1-gfn/55));gctx.fillStyle='rgba(0,0,0,'+gfa2+')';gctx.fillRect(0,0,GW,GH);var gfs2=Math.min(112,72+gfn*3),gfp2=0.88+0.12*Math.sin(gfn*0.35);gctx.save();gctx.textAlign='center';gctx.textBaseline='middle';gctx.font=Math.round(gfs2*gfp2)+'px "Lilita One",sans-serif';gctx.strokeStyle='rgba(0,0,0,0.5)';gctx.lineWidth=8;gctx.strokeText('GOAL!',GW/2,GH/2-30);gctx.fillStyle='#FFD700';gctx.shadowColor='#FFD700';gctx.shadowBlur=40;gctx.fillText('GOAL!',GW/2,GH/2-30);gctx.restore();}
             if(replayActiveRef.current){var grt=replayFrRef.current.length,grp=grt?replayIdxRef.current/grt:0;gctx.fillStyle='rgba(0,0,0,0.55)';gctx.fillRect(0,0,GW,32);gctx.save();gctx.font='16px "Lilita One",sans-serif';gctx.textAlign='left';gctx.textBaseline='middle';gctx.fillStyle='#fbbf24';gctx.shadowColor='#fbbf24';gctx.shadowBlur=8;gctx.fillText('INSTANT REPLAY',10,16);gctx.restore();gctx.fillStyle='rgba(255,255,255,0.15)';gctx.fillRect(0,28,GW,4);gctx.fillStyle='#38bdf8';gctx.fillRect(0,28,GW*grp,4);}
             if(!replayActiveRef.current&&netRfRef.current>-999&&netRfRef.current<62&&!goRef.current)drawReady(gctx,netRfRef.current,statsRef.current.lG,statsRef.current.rG,cols);
@@ -1743,7 +1732,6 @@ function App(){
           var tr=ballTrailRef.current;
           for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.4;ctx.fillStyle=tr[tri].isJapan?'#cc0000':'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
           drawParticles(ctx,particlesRef.current);
-          ctx.drawImage(getVig(cols2,tm2==='day'),0,0);
           var rd=readyRef.current;if(rd&&!goRef.current){if(!pausedRef.current)rd.fr++;if(rd.fr===30){shakeRef.current=Math.max(shakeRef.current,6);if(!pausedRef.current&&!goRef.current)frozenRef.current=false;}if(rd.fr>=62)readyRef.current=null;else drawReady(ctx,rd.fr,statsRef.current.lG,statsRef.current.rG,cols2);}
           var tlv=tlRef.current;
           if((tlv>0&&tlv<=10||(tlv===0&&!(otRef.current&&otReadyRef.current)))&&!goRef.current&&!practRef.current){ctx.save();ctx.font='88px "Lilita One",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=tlv===0?'rgba(255,80,80,0.95)':'rgba(255,255,255,0.95)';ctx.shadowColor=tlv===0?'#ff4444':'rgba(0,0,0,0.6)';ctx.shadowBlur=tlv===0?30:12;ctx.fillText(tlv===0?'0':String(tlv),GW/2,GH/2-80);ctx.restore();}
@@ -1835,7 +1823,7 @@ function App(){
         ),
         React.createElement('p',{style:{margin:0,fontSize:13,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
           React.createElement('span',{className:'kbd'},'W'),React.createElement('span',{className:'kbd'},'A'),React.createElement('span',{className:'kbd'},'S'),React.createElement('span',{className:'kbd'},'D'),' or arrow keys to move, ',React.createElement('span',{className:'kbd'},'Enter'),' or ',React.createElement('span',{className:'kbd'},'Space'),' to choose'),
-        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.0.5')
+        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.0.6')
       )
     );
   }
