@@ -12,7 +12,7 @@ button{font-family:inherit}
 @keyframes screenIn{from{opacity:0}to{opacity:1}}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes introTitle{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes introWelcome{0%{opacity:0;transform:translateY(8px)}18%{opacity:1;transform:translateY(0)}68%{opacity:1}100%{opacity:0}}
+@keyframes introWelcome{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #7dd3fc;outline-offset:2px}
 button:active{filter:brightness(.92)}
 .kbd{display:inline-block;min-width:20px;padding:1px 6px;margin:0 3px;border-radius:6px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-bottom-width:3px;font-size:11px;font-weight:800;line-height:1.35;text-align:center;color:#fff;text-shadow:none}
@@ -54,6 +54,28 @@ var REPLAY_CHUNK_FRAMES=16;
 var SPIN_F=Math.round(14/TS),DASH_F=Math.round(8/TS),DASH_SPD=SPD*1.8,GDASH_SPD=SPD*4.5,CD_F=180;
 var CEILING_Y=SR+2;
 var REPLAY_SECS=3,REPLAY_FPS=60,REPLAY_MAX=REPLAY_SECS*REPLAY_FPS;
+var ONLINE_STICKERS=[
+  {id:'stephen-curry',name:'Curry',src:'stickers/stephen-curry-steph-curry.gif'},
+  {id:'lego-batman',name:'Batman',src:'stickers/lego-batman-falls-in-love.gif'},
+  {id:'jaylin-williams',name:'Jaylin',src:'stickers/jaylin-williams-lightskin-duke-dennis.gif'},
+  {id:'nba-clips',name:'NBA',src:'stickers/gdfactoryclips-nba.gif'},
+  {id:'happy',name:'Happy',src:'stickers/yes-happy.gif'},
+  {id:'basket',name:'Basket',src:'stickers/basket.gif'},
+  {id:'coater',name:'Coater',src:'stickers/coater.gif'},
+  {id:'damian-lillard',name:'Damian Lillard',src:'stickers/portland-trail-blazers-damian-lillard.gif'},
+  {id:'tony-snell',name:'Tony Snell',src:'stickers/tony-snell-0-0-0.gif'},
+  {id:'giannis',name:'Giannis',src:'stickers/giannis-antetokounmpo.gif'},
+  {id:'nba-dancing',name:'NBA Dancing',src:'stickers/nba-dancing.gif'},
+  {id:'westbrook',name:'Westbrook',src:'stickers/nba-meme-russell-westbrook.gif'},
+];
+function findOnlineSticker(id){for(var i=0;i<ONLINE_STICKERS.length;i++)if(ONLINE_STICKERS[i].id===id)return ONLINE_STICKERS[i];return null;}
+function loadOnlineStickerSlots(){
+  try{
+    var saved=JSON.parse(window.localStorage.getItem('slime_sticker_slots')||'null');
+    if(Array.isArray(saved)&&saved.length===5&&saved.every(function(id,i){return !!findOnlineSticker(id)&&saved.indexOf(id)===i;}))return saved;
+  }catch(e){}
+  return ONLINE_STICKERS.slice(0,5).map(function(sticker){return sticker.id;});
+}
 var DC={left:{body:'#1a6bcc',accent:'#0a3d7a'},right:{body:'#e8192c',accent:'#8b0000'}};
 var NETMAP={arrowleft:'a',arrowright:'d',arrowup:'w',arrowdown:'s'};
 var SF=['x','y','vx','vy','spinAngle','isSpinning','spinDipY','spinPhase','spinTarget','spinSnapBack','dashFrames','dashDir','groundDash','dashCooldown','ballRefreshJump','ballRefreshTimer','hasDoubleJumped','squash'];
@@ -327,18 +349,36 @@ function pineTree(c,x,base,h,col){
   for(var i=0;i<4;i++){var w=h*(0.46-i*0.08),y=base-h*(0.2+i*0.18);c.beginPath();c.moveTo(x-w/2,y);c.quadraticCurveTo(x,y-h*0.22,x+w/2,y);c.quadraticCurveTo(x,y+h*0.04,x-w/2,y);c.fill();}
 }
 function paintTorii(c,base){
-  // layered far hills
-  var layers=[['rgba(150,178,214,0.42)',64,0.0],['rgba(120,156,190,0.5)',40,1.7]];
-  layers.forEach(function(L){c.fillStyle=L[0];c.beginPath();c.moveTo(0,base);for(var x=0;x<=GW;x+=20){var y=base-L[1]*(0.55+0.45*Math.sin(x*0.0125+L[2]))-L[1]*0.25*Math.sin(x*0.034+L[2]*2);c.lineTo(x,y);}c.lineTo(GW,base);c.closePath();c.fill();});
-  // pines on the near hill
-  pineTree(c,60,base-4,56,'rgba(52,96,92,0.8)');pineTree(c,92,base-2,42,'rgba(60,108,102,0.75)');pineTree(c,742,base-3,60,'rgba(52,96,92,0.8)');pineTree(c,712,base-1,44,'rgba(60,108,102,0.75)');pineTree(c,500,base-2,34,'rgba(70,116,112,0.6)');
-  // the procession: far gates first, each one nearer and larger, walking left to right
-  var gates=[[610,58,0.5],[540,72,0.42],[470,88,0.33],[394,108,0.24],[312,132,0.14],[218,160,0.06]];
-  for(var i=0;i<gates.length;i++)toriiGate(c,gates[i][0],base+2,gates[i][1],gates[i][2]);
-  // a stone path leading to the gates
-  c.fillStyle='rgba(206,214,226,0.55)';c.beginPath();c.moveTo(208,base+2);c.lineTo(628,base+2);c.lineTo(615,base-4);c.lineTo(220,base-4);c.closePath();c.fill();
-  // haze at the foot so it melts into the stands
-  var hz=c.createLinearGradient(0,base-60,0,base+2);hz.addColorStop(0,'rgba(205,225,250,0)');hz.addColorStop(1,'rgba(205,225,250,0.55)');c.fillStyle=hz;c.fillRect(0,base-60,GW,62);
+  var sky=c.createLinearGradient(0,0,0,base);sky.addColorStop(0,'#348fe1');sky.addColorStop(0.62,'#4ca9e9');sky.addColorStop(1,'#83cff4');
+  c.fillStyle=sky;c.fillRect(0,0,GW,base);
+  function cloud(x,y,w,h){
+    c.save();c.fillStyle='rgba(213,237,255,0.86)';c.beginPath();c.moveTo(x-w/2,y+h*0.34);
+    c.bezierCurveTo(x-w*0.47,y+h*0.04,x-w*0.32,y+h*0.02,x-w*0.2,y+h*0.16);
+    c.bezierCurveTo(x-w*0.13,y-h*0.34,x+w*0.08,y-h*0.32,x+w*0.17,y+h*0.05);
+    c.bezierCurveTo(x+w*0.3,y-h*0.12,x+w*0.45,y-h*0.02,x+w*0.5,y+h*0.25);
+    c.lineTo(x+w*0.43,y+h*0.34);c.quadraticCurveTo(x,y+h*0.52,x-w/2,y+h*0.34);c.fill();
+    c.fillStyle='rgba(239,248,255,0.34)';c.beginPath();c.ellipse(x-w*0.12,y+h*0.18,w*0.22,h*0.16,0,0,Math.PI*2);c.ellipse(x+w*0.23,y+h*0.18,w*0.19,h*0.13,0,0,Math.PI*2);c.fill();c.restore();
+  }
+  cloud(87,base*0.32,205,32);cloud(286,base*0.77,128,20);cloud(620,base*0.66,174,25);cloud(772,base*0.34,158,24);cloud(70,base*0.9,112,17);
+  function mountain(points,fill){
+    c.fillStyle=fill;c.beginPath();c.moveTo(points[0][0]*GW,points[0][1]*base);
+    for(var i=1;i<points.length-1;i++){
+      var p=points[i],n=points[i+1],mx=(p[0]+n[0])*GW/2,my=(p[1]+n[1])*base/2;
+      c.quadraticCurveTo(p[0]*GW,p[1]*base,mx,my);
+    }
+    var last=points[points.length-1];c.lineTo(last[0]*GW,last[1]*base);c.lineTo(GW,base);c.lineTo(0,base);c.closePath();c.fill();
+  }
+  mountain([[0,0.62],[0.06,0.58],[0.17,0.73],[0.25,0.70],[0.37,0.76],[0.50,0.56],[0.63,0.72],[0.77,0.75],[0.90,0.61],[1,0.69]],'#9bcf9b');
+  mountain([[0,0.77],[0.09,0.67],[0.19,0.76],[0.31,0.84],[0.42,0.75],[0.53,0.66],[0.67,0.75],[0.81,0.84],[0.93,0.72],[1,0.75]],'#72b778');
+  mountain([[0,0.91],[0.10,0.80],[0.24,0.84],[0.37,0.94],[0.51,0.84],[0.65,0.77],[0.78,0.86],[0.91,0.94],[1,0.83]],'#4d965e');
+  mountain([[0,0.98],[0.09,0.88],[0.21,0.92],[0.34,1.01],[0.49,0.93],[0.64,0.87],[0.78,0.94],[0.91,1.01],[1,0.90]],'#36784b');
+  var mist=c.createLinearGradient(0,base*0.69,0,base*0.93);mist.addColorStop(0,'rgba(205,235,202,0)');mist.addColorStop(0.55,'rgba(188,226,183,0.38)');mist.addColorStop(1,'rgba(188,226,183,0)');c.fillStyle=mist;c.fillRect(0,base*0.69,GW,base*0.24);
+  var gates=[
+    [74,0.76,10],[160,0.81,10],[260,0.90,11],[315,0.73,10],
+    [399,0.59,11],[454,0.65,10],[540,0.76,10],[625,0.82,10],
+    [720,0.77,11],[755,0.87,10]
+  ];
+  for(var gi=0;gi<gates.length;gi++)toriiGate(c,gates[gi][0],base*gates[gi][1],gates[gi][2],0.08);
 }
 
 function paintFuji(c,base,sakura){
@@ -518,7 +558,6 @@ function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNig
   var tNow=performance.now();
   if(!isJapan&&!isNight){
     drawBackdrop(ctx,'torii');
-    for(var cli=0;cli<4;cli++){var ccx=((tNow*0.006*(0.6+cli*0.25)+cli*230)%(GW+260))-130,ccy=26+cli*17+(cli%2)*8;ctx.fillStyle='rgba(255,255,255,'+(0.5+cli*0.07)+')';ctx.beginPath();ctx.ellipse(ccx,ccy,34,10,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(ccx+18,ccy-6,22,9,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(ccx-20,ccy-3,20,8,0,0,Math.PI*2);ctx.fill();}
   }else if(isNight){
     for(var sti=0;sti<30;sti++){var stx=(sti*97+13)%GW,sty=((sti*53)%150)+6,tw=0.3+0.7*Math.abs(Math.sin(tNow*0.001*(0.6+(sti%5)*0.3)+sti));ctx.fillStyle='rgba(255,255,255,'+(tw*0.85)+')';ctx.fillRect(stx,sty,sti%3===0?2:1.5,sti%3===0?2:1.5);}
     var mg=ctx.createRadialGradient(GW-90,46,2,GW-90,46,50);mg.addColorStop(0,'rgba(255,248,210,0.95)');mg.addColorStop(0.3,'rgba(255,240,170,0.45)');mg.addColorStop(1,'rgba(255,240,170,0)');ctx.fillStyle=mg;ctx.fillRect(GW-150,0,120,110);ctx.fillStyle='#fff6d0';ctx.beginPath();ctx.arc(GW-90,46,14,0,Math.PI*2);ctx.fill();
@@ -786,11 +825,35 @@ function IntroScreen(props){
   },[]);
   useEffect(function(){
     var cv=cvRef.current;if(!cv)return;
-    var ctx=cv.getContext('2d'),alive=true,start=performance.now(),duration=9000,dpr=Math.min(window.devicePixelRatio||1,3),sceneCache={};
-    var r=35,gnd=330,sc=['#1a6bcc','#e8192c','#2e7d32','#6a1b9a','#e65100','#00838f','#ad1457','#4527a0','#ff6f00','#1b5e20','#880e4f','#0d47a1','#bf360c','#1a237e','#558b2f','#4e342e','#1a6bcc','#e8192c'];
+    var ctx=cv.getContext('2d'),alive=true,start=performance.now(),duration=9000,dpr=Math.min(Math.max(window.devicePixelRatio||1,2),4),sceneCache={};
+    var r=35,gnd=330,ground=GH-GRND,slimeSpeed=4.5*60,slimeGap=r*2.3,bouncePeriod=0.82,bounceFlight=0.48,bounceHeight=25,sc=['#1a6bcc','#e8192c','#2e7d32','#6a1b9a','#e65100','#00838f','#ad1457','#4527a0','#ff6f00','#1b5e20','#880e4f','#0d47a1','#bf360c','#1a237e','#558b2f','#4e342e','#1a6bcc','#e8192c'];
     var slimes=[];
-    for(var i=0;i<18;i++)slimes.push({x:-r-i*r*2.3,y:gnd,vy:-(8+Math.random()*4),vx:5+i*0.04,color:sc[i%sc.length],accent:darken(sc[i%sc.length])});
-    function resize(){var w=window.innerWidth,h=window.innerHeight;cv.width=Math.max(1200,Math.round(w*dpr));cv.height=Math.max(700,Math.round(h*dpr));cv.style.width=w+'px';cv.style.height=h+'px';ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';}
+    for(var i=0;i<18;i++){var slimeColor=sc[i%sc.length];slimes.push({x:0,y:ground,vy:0,color:slimeColor,accent:darken(slimeColor),squash:0,bounceOffset:i*0.11});}
+    function slimeX(index,time){var travel=slimeSpeed*time,span=GW+slimeGap;return(((-r-index*slimeGap+travel+r)%span+span)%span)-r;}
+    function slimeY(slime,time){
+      var phase=(time+slime.bounceOffset)%bouncePeriod;
+      if(phase<bounceFlight){var angle=Math.PI*phase/bounceFlight;slime.vy=-12*Math.cos(angle);slime.squash=0;return ground-bounceHeight*Math.sin(angle);}
+      slime.vy=0;slime.squash=phase<bounceFlight+0.12?0.58*(1-(phase-bounceFlight)/0.12):0;return ground;
+    }
+    var ballPath=[],ball={x:110,y:190,vx:250,vy:0,ang:0},ballStep=1/60,ballSteps=Math.ceil(duration/1000/ballStep),ballGravity=500,ballBounce=-220;
+    for(var bi=0;bi<=ballSteps;bi++){
+      var bt=bi*ballStep;
+      if(bi>0){
+        ball.x+=ball.vx*ballStep;
+        if(ball.x<BR+8){ball.x=BR+8;ball.vx=Math.abs(ball.vx);}
+        else if(ball.x>GW-BR-8){ball.x=GW-BR-8;ball.vx=-Math.abs(ball.vx);}
+        ball.vy+=ballGravity*ballStep;ball.y+=ball.vy*ballStep;
+        if(ball.vy>0){
+          var nearest=0,nearestDistance=Infinity;
+          for(var ni=0;ni<slimes.length;ni++){var distance=Math.abs(slimeX(ni,bt)-ball.x);if(distance<nearestDistance){nearest=ni;nearestDistance=distance;}}
+          var surface=slimeY(slimes[nearest],bt)-SR-BR;
+          if(ball.y>=surface){ball.y=surface;ball.vy=ballBounce+(slimes[nearest].vy<-5?-35:0);}
+        }
+        ball.ang+=ball.vx*ballStep/BR;
+      }
+      ballPath.push({x:ball.x,y:ball.y,ang:ball.ang});
+    }
+    function resize(){var w=window.innerWidth,h=window.innerHeight;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);cv.style.width=w+'px';cv.style.height=h+'px';ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';}
     function scene(theme,time){
       if(theme==='night'){
         var ng=ctx.createLinearGradient(0,0,0,400);ng.addColorStop(0,'#071024');ng.addColorStop(0.58,'#172347');ng.addColorStop(1,'#402b54');ctx.fillStyle=ng;ctx.fillRect(0,0,800,400);
@@ -799,32 +862,33 @@ function IntroScreen(props){
         paintSkyline(ctx,gnd);
         var ngnd=ctx.createLinearGradient(0,gnd,0,400);ngnd.addColorStop(0,'#243047');ngnd.addColorStop(1,'#101827');ctx.fillStyle=ngnd;ctx.fillRect(0,gnd,800,70);
       }else if(theme==='japan'){
-        var jg=ctx.createLinearGradient(0,0,0,400);jg.addColorStop(0,'#819bc4');jg.addColorStop(0.48,'#d7b6cd');jg.addColorStop(1,'#f6d8d5');ctx.fillStyle=jg;ctx.fillRect(0,0,800,400);
-        var sun=ctx.createRadialGradient(630,92,3,630,92,115);sun.addColorStop(0,'rgba(255,248,235,0.95)');sun.addColorStop(0.34,'rgba(255,211,218,0.48)');sun.addColorStop(1,'rgba(255,180,210,0)');ctx.fillStyle=sun;ctx.fillRect(510,0,240,220);
-        ctx.fillStyle='rgba(255,241,231,0.88)';ctx.beginPath();ctx.arc(630,92,19,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='rgba(117,132,165,0.36)';ctx.beginPath();ctx.moveTo(0,292);ctx.quadraticCurveTo(160,252,310,287);ctx.quadraticCurveTo(475,318,610,275);ctx.quadraticCurveTo(720,248,800,280);ctx.lineTo(800,340);ctx.lineTo(0,340);ctx.closePath();ctx.fill();
-        ctx.fillStyle='rgba(255,234,240,0.72)';ctx.beginPath();ctx.moveTo(275,326);ctx.lineTo(360,224);ctx.lineTo(380,210);ctx.lineTo(400,218);ctx.lineTo(493,326);ctx.closePath();ctx.fill();
-        ctx.fillStyle='rgba(139,151,183,0.48)';ctx.beginPath();ctx.moveTo(275,326);ctx.lineTo(360,224);ctx.lineTo(378,211);ctx.lineTo(380,326);ctx.closePath();ctx.fill();
-        ctx.fillStyle='rgba(255,255,255,0.82)';ctx.beginPath();ctx.moveTo(360,224);ctx.lineTo(380,210);ctx.lineTo(400,218);ctx.lineTo(389,226);ctx.lineTo(380,222);ctx.lineTo(372,231);ctx.closePath();ctx.fill();
-        ctx.save();ctx.lineCap='round';ctx.strokeStyle='rgba(92,59,85,0.62)';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(-12,311);ctx.quadraticCurveTo(54,268,67,194);ctx.quadraticCurveTo(76,135,26,91);ctx.moveTo(42,233);ctx.quadraticCurveTo(117,214,158,151);ctx.moveTo(66,194);ctx.quadraticCurveTo(126,182,193,113);ctx.moveTo(812,309);ctx.quadraticCurveTo(746,258,739,188);ctx.quadraticCurveTo(734,126,785,81);ctx.moveTo(758,226);ctx.quadraticCurveTo(694,196,652,143);ctx.moveTo(741,187);ctx.quadraticCurveTo(683,164,617,104);ctx.stroke();ctx.restore();
-        var bloomGroups=[[24,86,1],[84,133,0],[158,108,1],[210,119,0],[785,78,1],[721,125,0],[644,104,1],[596,115,0]];
-        for(var bgp=0;bgp<bloomGroups.length;bgp++){var group=bloomGroups[bgp],cx=group[0],cy=group[1],size=group[2]?1:0.78;ctx.save();ctx.globalAlpha=0.8;for(var pet=0;pet<9;pet++){var angle=pet*2.399,dist=(pet%3)*10*size,px=cx+Math.cos(angle)*dist,py=cy+Math.sin(angle)*dist*0.68;ctx.fillStyle=pet%3===0?'#fff0f4':pet%3===1?'#f6bfd3':'#eaa4c0';ctx.beginPath();ctx.ellipse(px,py,12*size,8*size,angle*0.35,0,Math.PI*2);ctx.fill();}ctx.fillStyle='#ffe9a8';ctx.beginPath();ctx.arc(cx,cy,2.2*size,0,Math.PI*2);ctx.fill();ctx.restore();}
-        var hill=ctx.createLinearGradient(0,326,0,400);hill.addColorStop(0,'#74829e');hill.addColorStop(1,'#4e607d');ctx.fillStyle=hill;ctx.fillRect(0,326,800,74);
+        var jg=ctx.createLinearGradient(0,0,0,GH-GRND);jg.addColorStop(0,'#3f8fd8');jg.addColorStop(0.55,'#7dbbea');jg.addColorStop(1,'#cfe7f6');ctx.fillStyle=jg;ctx.fillRect(0,0,GW,GH);
+        paintFuji(ctx,310,true);
+        var sBot=GH-GRND,jR=rng32(808),hz=ctx.createLinearGradient(0,190,0,sBot);hz.addColorStop(0,'rgba(214,230,246,0)');hz.addColorStop(0.24,'rgba(214,230,246,0.88)');hz.addColorStop(1,'#bcd3bd');ctx.fillStyle=hz;ctx.fillRect(0,190,GW,sBot-190);
+        ctx.fillStyle='rgba(160,188,176,0.5)';ctx.beginPath();ctx.moveTo(0,sBot);ctx.lineTo(0,268);ctx.quadraticCurveTo(110,236,230,262);ctx.quadraticCurveTo(330,280,430,256);ctx.quadraticCurveTo(560,228,690,262);ctx.quadraticCurveTo(750,274,GW,258);ctx.lineTo(GW,sBot);ctx.closePath();ctx.fill();
+        ctx.fillStyle='rgba(170,198,176,0.65)';ctx.beginPath();ctx.moveTo(0,sBot);ctx.lineTo(0,290);ctx.quadraticCurveTo(160,268,320,290);ctx.quadraticCurveTo(520,310,640,282);ctx.quadraticCurveTo(740,262,GW,286);ctx.lineTo(GW,sBot);ctx.closePath();ctx.fill();
+        var treeXs=[60,170,280,390,500,610,720];
+        for(var ti=1;ti<treeXs.length;ti+=2)paintSakuraTree(ctx,treeXs[ti]+(jR()-0.5)*14,sBot-6,0.78+jR()*0.1,jR,true);
+        for(var tj=0;tj<treeXs.length;tj+=2)paintSakuraTree(ctx,treeXs[tj]+(jR()-0.5)*14,sBot+1,0.98+jR()*0.16,jR,false);
+        var poleX=GW/2,poleTop=sBot-180;ctx.fillStyle='rgba(0,0,0,0.12)';ctx.fillRect(poleX+2,poleTop+4,5,sBot-poleTop);
+        var poleGrad=ctx.createLinearGradient(poleX-3,0,poleX+3,0);poleGrad.addColorStop(0,'#b5b5b5');poleGrad.addColorStop(0.4,'#fafafa');poleGrad.addColorStop(1,'#9a9a9a');ctx.fillStyle=poleGrad;ctx.fillRect(poleX-3,poleTop,6,sBot-poleTop);
+        ctx.fillStyle='#fff';ctx.fillRect(poleX+3,poleTop+10,52,35);ctx.fillStyle='#bc002d';ctx.beginPath();ctx.arc(poleX+29,poleTop+27.5,10,0,Math.PI*2);ctx.fill();
+        var field=ctx.createLinearGradient(0,sBot,0,GH);field.addColorStop(0,'#a9c6a2');field.addColorStop(1,'#9bbb93');ctx.fillStyle=field;ctx.fillRect(0,sBot,GW,GH-sBot);
+        for(var fi=0;fi<8;fi++){ctx.fillStyle=fi%2===0?'rgba(255,255,255,0.035)':'rgba(80,115,75,0.035)';ctx.fillRect(fi*GW/8,sBot,GW/16,GH-sBot);}
       }else{
-        var dg=ctx.createLinearGradient(0,0,0,400);dg.addColorStop(0,'#2484cf');dg.addColorStop(0.55,'#8dcdf0');dg.addColorStop(1,'#f5e3bf');ctx.fillStyle=dg;ctx.fillRect(0,0,800,400);
-        var sunGlow=ctx.createRadialGradient(115,85,4,115,85,100);sunGlow.addColorStop(0,'rgba(255,255,218,0.95)');sunGlow.addColorStop(0.32,'rgba(255,223,142,0.56)');sunGlow.addColorStop(1,'rgba(255,215,120,0)');ctx.fillStyle=sunGlow;ctx.fillRect(0,0,250,205);ctx.fillStyle='#fff4c4';ctx.beginPath();ctx.arc(115,85,20,0,Math.PI*2);ctx.fill();
-        paintTorii(ctx,310);
-        var field=ctx.createLinearGradient(0,310,0,400);field.addColorStop(0,'#62a85b');field.addColorStop(1,'#347747');ctx.fillStyle=field;ctx.fillRect(0,310,800,90);
-        for(var fi=0;fi<8;fi++){ctx.fillStyle=fi%2?'rgba(255,255,255,0.035)':'rgba(0,45,20,0.04)';ctx.fillRect(fi*100,310,50,90);}
+        paintTorii(ctx,gnd);
+        var dayFloor=ctx.createLinearGradient(0,gnd,0,GH);dayFloor.addColorStop(0,'#62a85b');dayFloor.addColorStop(1,'#347747');ctx.fillStyle=dayFloor;ctx.fillRect(0,gnd,GW,GH-gnd);
+        for(var fi=0;fi<8;fi++){ctx.fillStyle=fi%2?'rgba(255,255,255,0.035)':'rgba(0,45,20,0.04)';ctx.fillRect(fi*GW/8,gnd,GW/16,GH-gnd);}
+        ctx.fillStyle='rgba(255,255,255,0.58)';ctx.fillRect(0,gnd,GW,2);
       }
-      ctx.fillStyle=theme==='night'?'rgba(165,213,255,0.55)':theme==='japan'?'rgba(255,245,248,0.72)':'rgba(255,255,255,0.7)';ctx.fillRect(0,gnd,800,2);
+      if(theme!=='day'){ctx.fillStyle=theme==='night'?'rgba(165,213,255,0.55)':'rgba(255,245,248,0.72)';ctx.fillRect(0,gnd,800,2);}
     }
     function getScene(theme){
       if(sceneCache[theme])return sceneCache[theme];
-      var previous=ctx,back=document.createElement('canvas');back.width=800;back.height=400;ctx=back.getContext('2d');scene(theme,0);sceneCache[theme]=back;ctx=previous;return back;
+      var previous=ctx,back=document.createElement('canvas');back.width=Math.round(GW*dpr);back.height=Math.round(GH*dpr);ctx=back.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);scene(theme,0);sceneCache[theme]=back;ctx=previous;return back;
     }
     function drawScene(theme,alpha){
-      ctx.save();ctx.globalAlpha=alpha;ctx.drawImage(getScene(theme),0,0);ctx.restore();
+      ctx.save();ctx.globalAlpha=alpha;ctx.drawImage(getScene(theme),0,0,GW,GH);ctx.restore();
     }
     function drawPetals(time,alpha){
       if(alpha<=0)return;
@@ -846,12 +910,17 @@ function IntroScreen(props){
       drawScene(current,1);
       if(sceneTime>2400&&sceneIndex<2){fade=Math.max(0,Math.min(1,(sceneTime-2400)/600));fade=fade*fade*(3-2*fade);drawScene(themes[sceneIndex+1],fade);}
       drawPetals(elapsed,sceneIndex===2?1:sceneIndex===1?fade:0);
+      ctx.save();ctx.translate(0,gnd-ground);
+      var introTime=elapsed/1000;
       for(var j=0;j<slimes.length;j++){
-        var s=slimes[j];s.vy+=0.42;s.y+=s.vy;s.x+=s.vx;
-        if(s.y>=gnd){s.y=gnd;s.vy=-Math.abs(s.vy)*0.72;}
-        ctx.save();ctx.globalAlpha=0.22;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(s.x,gnd+3,r*Math.max(0.4,1-(gnd-s.y)/200),r*0.14,0,0,Math.PI*2);ctx.fill();ctx.restore();
-        miniSlime(ctx,s.x,s.y,r,s.color,s.accent,false,current==='japan');
+        var s=slimes[j];s.x=slimeX(j,introTime);s.y=slimeY(s,introTime);
+        drawSlime(ctx,s,false,s.color,s.accent,false,current==='japan');
       }
+      var ballIndex=Math.max(0,Math.min(ballPath.length-1,elapsed/(1000*ballStep))),ballLo=Math.floor(ballIndex),ballMix=ballIndex-ballLo;
+      var ballFrom=ballPath[ballLo]||ballPath[0],ballTo=ballPath[Math.min(ballPath.length-1,ballLo+1)]||ballFrom;
+      var introBall={x:ballFrom.x+(ballTo.x-ballFrom.x)*ballMix,y:ballFrom.y+(ballTo.y-ballFrom.y)*ballMix,ang:ballFrom.ang+(ballTo.ang-ballFrom.ang)*ballMix};
+      drawBall(ctx,introBall,current==='night',current==='japan');
+      ctx.restore();
       animRef.current=requestAnimationFrame(loop);
     }
     resize();animRef.current=requestAnimationFrame(loop);
@@ -859,8 +928,8 @@ function IntroScreen(props){
     return function(){alive=false;window.removeEventListener('resize',resize);if(animRef.current)cancelAnimationFrame(animRef.current);};
   },[]);
   var skipHint=React.createElement('p',{style:{position:'absolute',bottom:20,left:0,right:0,textAlign:'center',color:'rgba(255,255,255,0.72)',fontSize:13,margin:0,letterSpacing:'0.08em',textShadow:'0 2px 6px rgba(0,0,0,0.7)'}},'Press Space to skip');
-  var welcome=React.createElement('div',{style:{position:'absolute',left:0,right:0,top:'36%',textAlign:'center',fontFamily:'var(--font-title)',fontSize:'clamp(24px,5vw,42px)',fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase',color:'#fff',textShadow:'0 3px 14px rgba(0,35,90,0.65)',animation:'introWelcome 2.8s ease-in-out both',pointerEvents:'none'}},'Welcome to');
-  var title=React.createElement('div',{style:{position:'absolute',left:0,right:0,top:'34%',textAlign:'center',fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#fff',lineHeight:1,textShadow:'0 0 34px rgba(56,189,248,0.8),0 5px 0 rgba(0,40,100,0.45)',animation:'introTitle 0.9s ease-out 3s both',pointerEvents:'none'}},'Soccer Slime');
+  var welcome=React.createElement('div',{style:{position:'absolute',left:0,right:0,top:'17%',textAlign:'center',fontFamily:'var(--font-title)',fontSize:'clamp(24px,5vw,42px)',fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase',color:'#fff',textShadow:'0 3px 14px rgba(0,35,90,0.65)',animation:'introWelcome 0.9s ease-out 0.3s both',pointerEvents:'none'}},'Welcome to');
+  var title=React.createElement('div',{style:{position:'absolute',left:0,right:0,top:'23%',textAlign:'center',fontFamily:'var(--font-title)',fontSize:'clamp(64px,14vw,132px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#fff',lineHeight:1,textShadow:'0 0 34px rgba(56,189,248,0.8),0 5px 0 rgba(0,40,100,0.45)',animation:'introTitle 0.9s ease-out 3s both',pointerEvents:'none'}},'Soccer Slime');
   return React.createElement('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,cursor:'pointer',overflow:'hidden',background:'#10213c'},onClick:skip},React.createElement('canvas',{ref:cvRef,style:{width:'100%',height:'100%',display:'block'}}),welcome,title,skipHint);
 }
 
@@ -1047,6 +1116,115 @@ function MatchReplayScreen(props){
 }
 
 var THEME_BG={day:'linear-gradient(135deg,#0284c7,#075985)',night:'linear-gradient(135deg,#3730a3,#1e1b4b)',japan:'linear-gradient(135deg,#a8627f,#7a3f5b)'};
+function defaultAccountAvatar(){return{kind:'slime',color:'#e8192c',theme:'night'};}
+function cleanAccountAvatar(value){
+  var theme=value&&['day','night','japan'].indexOf(value.theme)>=0?value.theme:'night';
+  if(value&&value.kind==='photo'&&typeof value.image==='string'&&value.image.indexOf('data:image/jpeg;base64,')===0&&value.image.length<=180000)return{kind:'photo',image:value.image,theme:theme};
+  return{kind:'slime',color:value?normHex(value.color):'#e8192c',theme:theme};
+}
+function loadAccountProfile(){
+  try{
+    var saved=JSON.parse(window.localStorage.getItem('slime_account')||'null');
+    if(saved&&typeof saved==='object')return{name:String(saved.name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12),avatar:cleanAccountAvatar(saved.avatar)};
+  }catch(e){}
+  return{name:'',avatar:defaultAccountAvatar()};
+}
+function ProfileAvatar(props){
+  var profile=cleanAccountAvatar(props.profile),size=props.size||44,canvasRef=useRef(null);
+  useEffect(function(){
+    if(profile.kind!=='slime'||!canvasRef.current)return;
+    var canvas=canvasRef.current,ctx=canvas.getContext('2d'),scale=2;
+    if(!ctx)return;
+    canvas.width=size*scale;canvas.height=size*scale;ctx.setTransform(scale,0,0,scale,0,0);
+    ctx.clearRect(0,0,size,size);
+    var hsl=hexToHsl(profile.color),accent=hslToHex(hsl[0],Math.min(100,hsl[1]+8),Math.max(5,hsl[2]-20));
+    ctx.save();ctx.beginPath();ctx.arc(size/2,size/2,size/2,0,Math.PI*2);ctx.clip();
+    ctx.fillStyle='rgba(49,126,69,0.95)';ctx.fillRect(0,size*0.79,size,size*0.21);
+    ctx.fillStyle='rgba(255,255,255,0.78)';ctx.fillRect(0,size*0.78,size,Math.max(1,size*0.025));
+    ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(size*0.18,size*0.82,size*0.16,size*0.18);ctx.fillRect(size*0.66,size*0.82,size*0.16,size*0.18);
+    miniSlime(ctx,size/2,size*0.79,size*0.4,profile.color,accent,true,false);
+    ctx.restore();
+  },[profile.kind,profile.color,size]);
+  return React.createElement('div',{role:'img','aria-label':profile.kind==='photo'?'Player avatar photo':'Player slime avatar',style:{position:'relative',width:size,height:size,flex:'0 0 auto',borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',background:THEME_BG[profile.theme],border:'2px solid rgba(255,255,255,0.82)',boxShadow:'0 2px 9px rgba(0,0,0,0.35)',boxSizing:'border-box'}},
+    profile.kind==='photo'?React.createElement('img',{src:profile.image,alt:'',style:{width:'100%',height:'100%',objectFit:'cover',display:'block'}}):
+      React.createElement('canvas',{ref:canvasRef,'aria-hidden':'true',style:{display:'block',width:'100%',height:'100%'}}));
+}
+function AccountScreen(props){
+  var initial=props.profile;
+  var s_pr=useState(initial.name),name=s_pr[0],setName=s_pr[1];
+  var s_av=useState(cleanAccountAvatar(initial.avatar)),avatar=s_av[0],setAvatar=s_av[1];
+  var s_ph=useState(null),photo=s_ph[0],setPhoto=s_ph[1];
+  var s_z=useState(1.15),zoom=s_z[0],setZoom=s_z[1];
+  var s_x=useState(50),cropX=s_x[0],setCropX=s_x[1];
+  var s_y=useState(50),cropY=s_y[0],setCropY=s_y[1];
+  var s_er=useState(''),error=s_er[0],setError=s_er[1];
+  var s_ok=useState(''),notice=s_ok[0],setNotice=s_ok[1];
+  var fileRef=useRef(null);
+  useEffect(function(){function handle(e){if(e.key==='Escape')props.onBack();}window.addEventListener('keydown',handle);return function(){window.removeEventListener('keydown',handle);};},[props.onBack]);
+  function updateAvatar(patch){setAvatar(function(current){return cleanAccountAvatar(Object.assign({},current,patch));});setNotice('');}
+  function selectPhoto(e){
+    var file=e.target.files&&e.target.files[0];e.target.value='';
+    if(!file)return;
+    if(!/^image\/(jpeg|png|webp|gif|svg\+xml)$/.test(file.type)){setError('Choose a JPG, PNG, WebP, GIF, or SVG image.');return;}
+    if(file.size>12*1024*1024){setError('Choose an image smaller than 12 MB.');return;}
+    var reader=new FileReader();
+    reader.onload=function(){var image=new Image();image.onload=function(){setPhoto({src:String(reader.result),width:image.naturalWidth,height:image.naturalHeight});setZoom(1);setCropX(50);setCropY(50);setError('');setNotice('Adjust the crop, then select Apply crop.');};image.onerror=function(){setError('That image could not be opened. Try another file.');};image.src=String(reader.result);};
+    reader.onerror=function(){setError('The selected image could not be read. Try another file.');};
+    reader.readAsDataURL(file);
+  }
+  function applyCrop(){
+    if(!photo)return;
+    var image=new Image();
+    image.onload=function(){
+      var canvas=document.createElement('canvas'),size=256,ctx;
+      canvas.width=size;canvas.height=size;ctx=canvas.getContext('2d');
+      if(!ctx){setError('This browser could not prepare the avatar image.');return;}
+      var scale=Math.max(size/photo.width,size/photo.height)*zoom,w=photo.width*scale,h=photo.height*scale;
+      ctx.drawImage(image,(size-w)*cropX/100,(size-h)*cropY/100,w,h);
+      var result=canvas.toDataURL('image/jpeg',0.82);
+      if(result.length>180000){setError('This image is too detailed to save as an avatar. Try a smaller image.');return;}
+      updateAvatar({kind:'photo',image:result});setPhoto(null);setError('');setNotice('Photo crop applied. Save account to keep it.');
+    };
+    image.onerror=function(){setError('That image could not be opened. Try another file.');};
+    image.src=photo.src;
+  }
+  function save(){
+    var clean=String(name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12);
+    if(name.trim()&&!clean){setError('Use letters, numbers, spaces, or - _ . ! characters in your name.');return;}
+    var result=props.onSave({name:clean,avatar:cleanAccountAvatar(avatar)});
+    if(result){setError(result);return;}
+    props.onBack();
+  }
+  var cropSize=190,cropScale=photo?Math.max(cropSize/photo.width,cropSize/photo.height)*zoom:cropSize;
+  var cropW=photo?photo.width*cropScale:cropSize,cropH=photo?photo.height*cropScale:cropSize;
+  var panel={width:'min(560px,92vw)',maxHeight:'calc(100dvh - 32px)',overflowY:'auto',overscrollBehavior:'contain',boxSizing:'border-box',padding:22,borderRadius:22,background:'rgba(5,12,35,0.84)',border:'1px solid rgba(255,255,255,0.18)',boxShadow:'0 20px 60px rgba(0,0,0,0.45)',display:'flex',flexDirection:'column',alignItems:'center',gap:15};
+  return React.createElement('div',{style:{width:'100%',height:'100%',minHeight:'100%',display:'flex',alignItems:'center',justifyContent:'center',padding:16,boxSizing:'border-box'}},
+    React.createElement('div',{style:panel},
+      React.createElement('h1',{style:{fontFamily:'var(--font-display)',fontSize:34,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.55)'}},'Your Account'),
+      React.createElement('label',{style:{display:'flex',flexDirection:'column',gap:6,width:'100%',fontSize:12,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase'}},'Player name',
+        React.createElement('input',{value:name,maxLength:12,placeholder:'Optional name for online play',onChange:function(e){setName(e.target.value);setError('');},style:{fontFamily:'var(--font-body)',fontSize:17,padding:'10px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,0.28)',background:'rgba(0,0,0,0.3)',color:'#fff',boxSizing:'border-box'}})),
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:14,width:'100%',padding:'12px 0',borderTop:'1px solid rgba(255,255,255,0.12)',borderBottom:'1px solid rgba(255,255,255,0.12)'}},
+        React.createElement(ProfileAvatar,{profile:avatar,size:76}),
+        React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.78)',lineHeight:1.45}},React.createElement('strong',{style:{display:'block',fontSize:15,color:'#fff',marginBottom:3}},'Avatar'),'Choose a slime colour and backdrop, or upload and crop a photo.')),
+      React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:14,flexWrap:'wrap',width:'100%'}},
+        avatar.kind==='slime'&&React.createElement('label',{style:{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800}},'Slime colour',React.createElement('input',{type:'color',value:avatar.color,onChange:function(e){updateAvatar({color:e.target.value});},style:{width:38,height:38,borderRadius:'50%',border:'2px solid rgba(255,255,255,0.7)',background:'transparent',cursor:'pointer'}})),
+        React.createElement('label',{style:{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800}},'Backdrop',
+          React.createElement('select',{value:avatar.theme,onChange:function(e){updateAvatar({theme:e.target.value});},style:{padding:'9px 12px',borderRadius:10,background:'#18243c',border:'1px solid rgba(255,255,255,0.26)',color:'#fff',fontFamily:'inherit'}},
+            React.createElement('option',{value:'day'},'Day'),React.createElement('option',{value:'night'},'Night'),React.createElement('option',{value:'japan'},'Sakura')))),
+      React.createElement('button',{onClick:function(){if(fileRef.current)fileRef.current.click();},style:{padding:'9px 18px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.13)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Upload photo'),
+      React.createElement('input',{ref:fileRef,type:'file',accept:'image/jpeg,image/png,image/webp,image/gif,image/svg+xml',onChange:selectPhoto,style:{display:'none'}}),
+      photo&&React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,borderRadius:14,background:'rgba(0,0,0,0.2)'}},
+        React.createElement('div',{style:{fontSize:12,fontWeight:900}},'Frame your photo'),
+        React.createElement('div',{style:{position:'relative',width:cropSize,height:cropSize,borderRadius:'50%',overflow:'hidden',border:'3px solid #fff',background:THEME_BG[avatar.theme]}},
+          React.createElement('img',{src:photo.src,alt:'Avatar crop preview',draggable:false,style:{position:'absolute',width:cropW,height:cropH,maxWidth:'none',maxHeight:'none',left:(cropSize-cropW)*cropX/100,top:(cropSize-cropH)*cropY/100,objectFit:'fill'}})),
+        [['Zoom',zoom,1,3,function(v){setZoom(v);}],['Horizontal',cropX,0,100,function(v){setCropX(v);}],['Vertical',cropY,0,100,function(v){setCropY(v);}]].map(function(item){return React.createElement('label',{key:item[0],style:{display:'grid',gridTemplateColumns:'82px 1fr 42px',alignItems:'center',gap:8,width:'100%',fontSize:11,fontWeight:800}},item[0],React.createElement('input',{type:'range',min:item[2],max:item[3],step:item[0]==='Zoom'?0.05:1,value:item[1],onChange:function(e){item[4](Number(e.target.value));}}),item[0]==='Zoom'?Math.round(item[1]*100)+'%':Math.round(item[1])+'%');}),
+        React.createElement('button',{onClick:applyCrop,style:{padding:'9px 18px',borderRadius:50,border:'1px solid rgba(255,255,255,0.55)',background:'linear-gradient(135deg,#0ea5e9,#0369a1)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Apply crop')),
+      error&&React.createElement('div',{role:'alert',style:{width:'100%',boxSizing:'border-box',padding:'8px 11px',borderRadius:10,color:'#fecaca',background:'rgba(239,68,68,0.2)',fontSize:12,lineHeight:1.4}},error),
+      notice&&React.createElement('div',{role:'status',style:{width:'100%',textAlign:'center',color:'rgba(255,255,255,0.78)',fontSize:12}},notice),
+      React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}},
+        React.createElement('button',{onClick:save,style:{padding:'11px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.6)',background:'linear-gradient(135deg,#059669,#047857)',color:'#fff',fontWeight:900,fontSize:14,letterSpacing:'0.05em',cursor:'pointer',boxShadow:'0 5px 18px rgba(5,150,105,0.38)'}},'Save account'),
+        React.createElement('button',{onClick:props.onBack,style:{padding:'10px 22px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Cancel'))));
+}
 function App(){
   var s_done=useState(false),introDone=s_done[0],setIntroDone=s_done[1];
   var cvRef=useRef(null),animRef=useRef(null),lfRef=useRef(0);
@@ -1079,6 +1257,9 @@ function App(){
 
   var onRoleRef=useRef(null),roomRef=useRef(null),onTokRef=useRef(0),winRef=useRef(null),netInRef=useRef({m:0,jc:0,dc:0,rc:0}),netPrevRef=useRef({jc:0,dc:0,rc:0,pu:0,pd:0}),netBufRef=useRef([]),netSeqRef=useRef(0),netLastSendRef=useRef(0),netMidRef=useRef(0),netCtrRef=useRef({jc:0,dc:0,rc:0}),netRxRef=useRef(0),netGfRef=useRef(0),netGlRef=useRef([0,0]),netLastInRef=useRef(0),netLostRef=useRef(false),netOutSigRef=useRef(''),netOutAtRef=useRef(0),netLastMetaRef=useRef({sc:'',tl:-1,ot:false});
   var s_onl=useState({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'}),onl=s_onl[0],setOnl=s_onl[1];
+  var s_stickerSlots=useState(loadOnlineStickerSlots),stickerSlots=s_stickerSlots[0],setStickerSlots=s_stickerSlots[1];
+  var onlineStickerButtonRefs=useRef({});
+  var onlineStickerGridRef=useRef(null);
   var joinInputRefs=[useRef(null),useRef(null),useRef(null),useRef(null)];
   var s_nm=useState(''),netMsg=s_nm[0],setNetMsg=s_nm[1];
   var s_chat=useState([]),chatMessages=s_chat[0],setChatMessages=s_chat[1];
@@ -1087,10 +1268,53 @@ function App(){
   var chatInputRef=useRef(null),chatListRef=useRef(null);
   var onlineNameInputRef=useRef(null);
   var s_my=useState(function(){try{return window.localStorage.getItem('slime_myname')||'';}catch(e){return '';}}),myName=s_my[0],setMyName=s_my[1];
-  var myNameRef=useRef('');myNameRef.current=myName;
+  var s_account=useState(loadAccountProfile),account=s_account[0],setAccount=s_account[1];
   function cleanName(v){return String(v||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12);}
+  function onlinePlayerName(){return cleanName(account.name)||cleanName(myName);}
+  function saveAccountProfile(profile){
+    var next={name:cleanName(profile.name),avatar:cleanAccountAvatar(profile.avatar)};
+    try{window.localStorage.setItem('slime_account',JSON.stringify(next));}
+    catch(e){return'Could not save your account in this browser. Check available site storage and try again.';}
+    setAccount(next);
+    if(next.name){setMyName(next.name);try{window.localStorage.setItem('slime_myname',next.name);}catch(e){}}
+    else{setMyName('');try{window.localStorage.removeItem('slime_myname');}catch(e){}}
+    return'';
+  }
+  function chooseOnlineSticker(id){
+    if(!findOnlineSticker(id))return;
+    var next=stickerSlots.slice(),at=next.indexOf(id);
+    if(at>=0)next.splice(at,1);
+    else if(next.length<5)next.push(id);
+    else{setOnl(function(o){return Object.assign({},o,{err:'All five sticker keys are assigned. Remove one first.'});});return;}
+    setStickerSlots(next);
+    try{window.localStorage.setItem('slime_sticker_slots',JSON.stringify(next));}
+    catch(e){setOnl(function(o){return Object.assign({},o,{err:'Sticker keys could not be saved in this browser, but your current choices will still work.'});});return;}
+    setOnl(function(o){return o.err?Object.assign({},o,{err:''}):o;});
+  }
+  function sendOnlineSticker(id){
+    var sticker=findOnlineSticker(id),rm=roomRef.current&&roomRef.current.room;
+    if(!sticker||stickerSlots.indexOf(id)<0)return false;
+    if(!rm||!rm.sendChat({n:onlinePlayerName()||'Player',m:'',s:sticker.id})){
+      setChatError('Sticker chat is unavailable while disconnected.');
+      return false;
+    }
+    setChatMessages(function(messages){return messages.concat([{mine:true,n:onlinePlayerName()||'Player',m:'',s:sticker.id}]).slice(-60);});
+    setChatError('');
+    return true;
+  }
+  function finishOnlineStickerPicker(){
+    if(stickerSlots.length!==5){setOnl(function(o){return Object.assign({},o,{err:'Choose exactly five stickers to continue.'});});return;}
+    setOnl(function(o){return Object.assign({},o,{view:'choose',err:''});});
+  }
+  function cancelOnlineStickerPicker(){
+    setOnl(function(o){return Object.assign({},o,{view:'choose',err:''});});
+  }
+  function openOnlineStickerPicker(){
+    setFocusIdx(0);
+    setOnl(function(o){return Object.assign({},o,{view:'stickers',err:''});});
+  }
   function hasOnlineName(){
-    if(cleanName(myName))return true;
+    if(onlinePlayerName())return true;
     setOnl(function(o){return Object.assign({},o,{view:'choose',err:'Please enter your name before creating or joining a room.'});});
     setTimeout(function(){if(onlineNameInputRef.current)onlineNameInputRef.current.focus();},0);
     return false;
@@ -1154,9 +1378,10 @@ function App(){
       conn.on('data',function(msg){
         if(!msg||!msg.p)return;
         if(msg.t==='chat'){
-          if(typeof msg.p.m!=='string')return;
-          var chatText=msg.p.m.trim().slice(0,200);
-          if(chatText&&room._onChat)room._onChat({n:cleanName(msg.p.n)||'Opponent',m:chatText});
+          var chatText=typeof msg.p.m==='string'?msg.p.m.trim().slice(0,200):'';
+          var sticker=typeof msg.p.s==='string'?findOnlineSticker(msg.p.s):null;
+          if(!chatText&&!sticker)return;
+          if(room._onChat)room._onChat({n:cleanName(msg.p.n)||'Opponent',m:chatText,s:sticker?sticker.id:null});
           return;
         }
         if(msg.t==='replay'){
@@ -1164,8 +1389,10 @@ function App(){
           return;
         }
         if(msg.t!=='presence')return;
-        Object.assign(room.remotePresence||{},msg.p);
-        if(!room.remotePresence)room.remotePresence=Object.assign({},msg.p);
+        var presencePatch=Object.assign({},msg.p);
+        if(Object.prototype.hasOwnProperty.call(presencePatch,'a'))presencePatch.a=cleanAccountAvatar(presencePatch.a);
+        if(Object.prototype.hasOwnProperty.call(presencePatch,'n'))presencePatch.n=cleanName(presencePatch.n);
+        room.remotePresence=Object.assign(room.remotePresence||{},presencePatch);
         if(msg.p.r===null||msg.p.r===undefined&&msg.p.st===null)room.remotePresence=null;
       });
       conn.on('open',function(){
@@ -1220,7 +1447,7 @@ function App(){
   function guestStep(){
     var pnow=performance.now(),hp=netFind('h');
     if(!hp){if(pnow-netRxRef.current>4000&&!netLostRef.current){netLostRef.current=true;setNetMsg('The host left the match');}return;}
-    if(hp.st==='play'&&hp.mid!==netMidRef.current){netMidRef.current=hp.mid;startGame(hp.dur||'2min','online',DC,{left:cleanName(hp.n)||'Host',right:cleanName(myNameRef.current)||'You'},'right','regular',null,null);return;}
+    if(hp.st==='play'&&hp.mid!==netMidRef.current){netMidRef.current=hp.mid;startGame(hp.dur||'2min','online',DC,{left:cleanName(hp.n)||'Host',right:onlinePlayerName()||'You'},'right','regular',null,null);return;}
     var p=hp.p;
     if(p&&p.m===netMidRef.current&&p.n>netSeqRef.current){
       netSeqRef.current=p.n;netRxRef.current=pnow;if(netLostRef.current){netLostRef.current=false;setNetMsg('');}
@@ -1309,8 +1536,8 @@ function App(){
         }
       };
       roomRef.current={room:room};onRoleRef.current=role==='h'?'host':'guest';netMidRef.current=0;
-      var nmv=cleanName(myNameRef.current);try{window.localStorage.setItem('slime_myname',nmv);}catch(e){}
-      room.presence(role==='h'?{r:'h',st:'lobby',mid:0,n:nmv||'Host'}:{r:'g',st:'lobby',n:nmv||'Guest'});
+      var nmv=onlinePlayerName();try{window.localStorage.setItem('slime_myname',nmv);}catch(e){}
+      room.presence(role==='h'?{r:'h',st:'lobby',mid:0,n:nmv||'Host',a:account.avatar}:{r:'g',st:'lobby',n:nmv||'Guest',a:account.avatar});
       room._onOpen=connected;
       room._onClose=function(){
         if(!finished&&onTokRef.current===tok){
@@ -1396,7 +1623,7 @@ function App(){
   var s_hov=useState(null),hovCard=s_hov[0],setHovCard=s_hov[1];
   var s_th=useState('night'),themeMode=s_th[0],setThemeMode=s_th[1];
   var s_tdd=useState(false),themeOpen=s_tdd[0],setThemeOpen=s_tdd[1];
-  useEffect(function(){if(!themeOpen)return;function away(e){if(!(e.target.closest&&e.target.closest('[data-theme-dd]'))){setThemeOpen(false);setFocusIdx(6);}}document.addEventListener('mousedown',away);return function(){document.removeEventListener('mousedown',away);};},[themeOpen]);
+  useEffect(function(){if(!themeOpen)return;function away(e){if(!(e.target.closest&&e.target.closest('[data-theme-dd]'))){setThemeOpen(false);setFocusIdx(7);}}document.addEventListener('mousedown',away);return function(){document.removeEventListener('mousedown',away);};},[themeOpen]);
   var s_foc=useState(0),focusIdx=s_foc[0],setFocusIdx=s_foc[1];
 
   useEffect(function(){tlRef.current=tl;},[tl]);
@@ -1407,6 +1634,17 @@ function App(){
   useEffect(function(){practModeRef.current=practMode;},[practMode]);
   useEffect(function(){themeModeRef.current=themeMode;try{document.documentElement.style.setProperty('--ghost',themeMode==='night'?'rgba(255,255,255,0.12)':themeMode==='japan'?'rgba(70,28,58,0.46)':'rgba(8,42,92,0.42)');}catch(e){}},[themeMode]);
   useEffect(function(){setFocusIdx(0);setThemeOpen(false);},[screen,onl.view,onl.peerOn]);
+  useEffect(function(){
+    if(screen!=='online'||onl.view!=='stickers')return;
+    var focusedSticker=onlineStickerButtonRefs.current['sticker_'+focusIdx];
+    var grid=onlineStickerGridRef.current;
+    if(!focusedSticker||!grid)return;
+    var focusedRect=focusedSticker.getBoundingClientRect(),gridRect=grid.getBoundingClientRect();
+    var top=focusedRect.top-gridRect.top+grid.scrollTop,bottom=top+focusedRect.height,scrollTop=grid.scrollTop;
+    var inset=12,behavior=window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
+    if(top<scrollTop+inset)grid.scrollTo({top:Math.max(0,top-inset),behavior:behavior});
+    else if(bottom>scrollTop+grid.clientHeight-inset)grid.scrollTo({top:bottom-grid.clientHeight+inset,behavior:behavior});
+  },[screen,onl.view,focusIdx]);
   useEffect(function(){if(chatListRef.current)chatListRef.current.scrollTop=chatListRef.current.scrollHeight;},[chatMessages]);
   var s_fit=useState(1),fit=s_fit[0],setFit=s_fit[1];
   var s_rs=useState(1),rs=s_rs[0],setRs=s_rs[1],s_uz=useState(1),uiZ=s_uz[0],setUiZ=s_uz[1],s_uk=useState(1),uiK=s_uk[0],setUiK=s_uk[1],rsRef=useRef(1);
@@ -1414,11 +1652,21 @@ function App(){
   useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?GW+8+18+300:GW+8,minFit=online?0.25:0.4,f=Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=Math.round(Math.max(1,Math.min(2.2,window.innerWidth/900,window.innerHeight/720))*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(4,Math.max(1,Math.ceil(z*d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode]);
   useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad();},[]);
 
-  function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(6);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
+  function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(7);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
   function getNavGrid(){
-    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['online','guide','playerdata','theme']];
+    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','online','guide','playerdata','theme']];
     if(screen==='online'){
-      if(onl.view==='choose')return[['online_create'],['online_join'],['online_name'],['online_back']];
+      if(onl.view==='choose')return cleanName(account.name)?[['online_create'],['online_join'],['online_stickers'],['online_back']]:[['online_create'],['online_join'],['online_name'],['online_stickers'],['online_back']];
+      if(onl.view==='stickers'){
+        var stickerGrid=[];
+        for(var si=0;si<ONLINE_STICKERS.length;si+=3){
+          var stickerRow=[];
+          for(var sj=si;sj<Math.min(si+3,ONLINE_STICKERS.length);sj++)stickerRow.push('sticker_'+sj);
+          stickerGrid.push(stickerRow);
+        }
+        stickerGrid.push(['sticker_done','sticker_cancel']);
+        return stickerGrid;
+      }
       if(onl.view==='join')return[['online_code0','online_code1','online_code2','online_code3'],['online_submit'],['online_cancel']];
       if(onl.view==='host'&&onl.peerOn)return[['online_dur1','online_dur2','online_dur4'],['online_start'],['online_cancel']];
       return[['online_cancel']];
@@ -1435,11 +1683,12 @@ function App(){
       single:function(){pmRef.current='single';setGmode('single');setScreen('duration');},
       multi:function(){pmRef.current='multi';setGmode('multi');setScreen('player_select');},
       practice:function(){setScreen('practice_select');},
+      accounts:function(){setScreen('accounts');},
       online:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');},
       guide:function(){setScreen('guide');},
       playerdata:function(){setShowPD(true);},
       theme:toggleTheme,
-      theme_day:function(){setThemeMode('day');setThemeOpen(false);setFocusIdx(6);},theme_night:function(){setThemeMode('night');setThemeOpen(false);setFocusIdx(6);},theme_japan:function(){setThemeMode('japan');setThemeOpen(false);setFocusIdx(6);},
+      theme_day:function(){setThemeMode('day');setThemeOpen(false);setFocusIdx(7);},theme_night:function(){setThemeMode('night');setThemeOpen(false);setFocusIdx(7);},theme_japan:function(){setThemeMode('japan');setThemeOpen(false);setFocusIdx(7);},
       dur_up:function(){var opts=['1min','2min','4min','8min','worldcup'],i=opts.indexOf(pendDur);setPendDur(opts[Math.min(i+1,opts.length-1)]);},
       dur_down:function(){var opts=['1min','2min','4min','8min','worldcup'],i=opts.indexOf(pendDur);setPendDur(opts[Math.max(i-1,0)]);},
       side_left:function(){setSide('left');},side_right:function(){setSide('right');},
@@ -1455,7 +1704,13 @@ function App(){
     if(screen==='online'){
       acts.online_create=function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);};
       acts.online_join=function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});};
+      acts.online_stickers=openOnlineStickerPicker;
       acts.online_name=function(){if(onlineNameInputRef.current)onlineNameInputRef.current.focus();};
+      for(var stickerIndex=0;stickerIndex<ONLINE_STICKERS.length;stickerIndex++){
+        (function(index){acts['sticker_'+index]=function(){chooseOnlineSticker(ONLINE_STICKERS[index].id);};})(stickerIndex);
+      }
+      acts.sticker_done=finishOnlineStickerPicker;
+      acts.sticker_cancel=cancelOnlineStickerPicker;
       acts.online_code0=function(){if(joinInputRefs[0].current)joinInputRefs[0].current.focus();};
       acts.online_code1=function(){if(joinInputRefs[1].current)joinInputRefs[1].current.focus();};
       acts.online_code2=function(){if(joinInputRefs[2].current)joinInputRefs[2].current.focus();};
@@ -1464,7 +1719,7 @@ function App(){
       acts.online_dur1=function(){setOnl(function(o){return Object.assign({},o,{dur:'1min'});});};
       acts.online_dur2=function(){setOnl(function(o){return Object.assign({},o,{dur:'2min'});});};
       acts.online_dur4=function(){setOnl(function(o){return Object.assign({},o,{dur:'4min'});});};
-      acts.online_start=function(){var gpn=netFind('g');startGame(onl.dur,'online',DC,{left:cleanName(myName)||'Host',right:cleanName(gpn&&gpn.n)||'Guest'},'left','regular',null,null);};
+      acts.online_start=function(){var gpn=netFind('g');startGame(onl.dur,'online',DC,{left:onlinePlayerName()||'Host',right:cleanName(gpn&&gpn.n)||'Guest'},'left','regular',null,null);};
       acts.online_back=function(){onlineCleanup();setScreen('menu');};
       acts.online_cancel=function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});};
     }
@@ -1484,9 +1739,16 @@ function App(){
     function onNav(e){
       var key=e.key.toLowerCase();
       if(e.target.tagName==='INPUT'&&(screen!=='online'||(key!=='arrowup'&&key!=='arrowdown'&&key!=='escape')))return;
+      if(screen==='practice_select'&&(key==='1'||key==='2'||key==='3')){
+        e.preventDefault();
+        var practiceId=['prac_regular','prac_air','prac_ground'][Number(key)-1];
+        var practiceButton=btns.find(function(button){return button.id===practiceId;});
+        if(practiceButton)practiceButton.act();
+        return;
+      }
       if(key==='enter'||key===' '){e.preventDefault();var b=btns[focusIdx];if(b)b.act();return;}
       if(themeOpen&&key!=='enter'&&key!==' '&&key!=='escape'){e.preventDefault();var td=(key==='arrowright'||key==='d'||key==='arrowdown'||key==='s')?1:(key==='arrowleft'||key==='a'||key==='arrowup'||key==='w')?-1:0;if(td)setFocusIdx((focusIdx+td+3)%3);return;}
-      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(6);return;}if(screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
+      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(7);return;}if(screen==='accounts'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
       var pos=getFocusPos(grid,focusIdx),r=pos[0],c=pos[1],nr=r,nc=c;
       if(key==='arrowdown'||key==='s'){nr=(r+1)%grid.length;}
       else if(key==='arrowup'||key==='w'){nr=(r-1+grid.length)%grid.length;}
@@ -1499,7 +1761,7 @@ function App(){
     }
     window.addEventListener('keydown',onNav);
     return function(){window.removeEventListener('keydown',onNav);};
-  },[screen,introDone,focusIdx,pendDur,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName]);
+  },[screen,introDone,focusIdx,pendDur,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots]);
 
   function resetPos(defMove){
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
@@ -1597,7 +1859,7 @@ function App(){
       if(!roomRef.current)return;
       var role=onRoleRef.current,other=netFind(role==='host'?'g':'h'),on=!!other;
       setOnl(function(o){return o.peerOn===on?o:Object.assign({},o,{peerOn:on});});
-      if(role==='guest'&&other&&other.st==='play'&&other.mid!==netMidRef.current){netMidRef.current=other.mid;startGame(other.dur||'2min','online',DC,{left:cleanName(other.n)||'Host',right:cleanName(myNameRef.current)||'You'},'right','regular',null,null);}
+      if(role==='guest'&&other&&other.st==='play'&&other.mid!==netMidRef.current){netMidRef.current=other.mid;startGame(other.dur||'2min','online',DC,{left:cleanName(other.n)||'Host',right:onlinePlayerName()||'You'},'right','regular',null,null);}
     },250);
     return function(){clearInterval(id);};
   },[screen]);
@@ -1609,6 +1871,12 @@ function App(){
       if(key==='/'&&screen==='game'&&pmRef.current==='online'&&!goRef.current){
         e.preventDefault();setChatOpen(true);setChatError('');
         setTimeout(function(){if(chatInputRef.current)chatInputRef.current.focus();},0);
+        return;
+      }
+      if(/^[1-5]$/.test(key)&&screen==='game'&&pmRef.current==='online'&&!goRef.current){
+        e.preventDefault();
+        var stickerId=stickerSlots[Number(key)-1];
+        if(stickerId)sendOnlineSticker(stickerId);
         return;
       }
       e.preventDefault();
@@ -1623,7 +1891,7 @@ function App(){
     function up(e){if(e.target.tagName==='INPUT')return;e.preventDefault();var key=e.key.toLowerCase();if(onRoleRef.current&&NETMAP[key])key=NETMAP[key];kRef.current[key]=false;jrRef.current[key]=true;if(onRoleRef.current==='guest'&&key==='s')netCtrRef.current.rc++;}
     window.addEventListener('keydown',dn);window.addEventListener('keyup',up);
     return function(){window.removeEventListener('keydown',dn);window.removeEventListener('keyup',up);};
-  },[screen]);
+  },[screen,stickerSlots,myName]);
 
   useEffect(function(){
     if(!running)return;
@@ -1774,14 +2042,15 @@ function App(){
   function bgLayer(){return React.createElement(ThemeBg,{theme:themeMode});}
 
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
-  if(showPD)return React.createElement('div',{className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{onChange:syncPlayers,onBack:function(){syncPlayers(dbLoad());setShowPD(false);}})));
-  if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,onBack:function(){setShowMatchReplay(false);}})));
+  if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');}})));
+  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{onChange:syncPlayers,onBack:function(){syncPlayers(dbLoad());setShowPD(false);}})));
+  if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,onBack:function(){setShowMatchReplay(false);}})));
 
   // ── MENU ─────────────────────────────────────────────────────────────
   if(screen==='menu'){
     var menuCards=[
       {key:'single',label:'Player vs. AI',sub:'Take on the computer',hdr:'linear-gradient(135deg,#1e40af,#1d4ed8)',bg:'rgba(5,12,45,0.82)',glow:'rgba(59,130,246,0.4)',act:function(){pmRef.current='single';setGmode('single');setScreen('duration');}},
-      {key:'multi',label:'Multiplayer',sub:'Two players, one keyboard',hdr:'linear-gradient(135deg,#1e40af,#1d4ed8)',bg:'rgba(5,12,45,0.82)',glow:'rgba(59,130,246,0.4)',act:function(){pmRef.current='multi';setGmode('multi');setScreen('player_select');}},
+      {key:'multi',label:'Multiplayer',sub:'Play on the same device',hdr:'linear-gradient(135deg,#1e40af,#1d4ed8)',bg:'rgba(5,12,45,0.82)',glow:'rgba(59,130,246,0.4)',act:function(){pmRef.current='multi';setGmode('multi');setScreen('player_select');}},
       {key:'practice',label:'Practice',sub:'Free play and drills',hdr:'linear-gradient(135deg,#6d28d9,#7c3aed)',bg:'rgba(20,5,45,0.82)',glow:'rgba(139,92,246,0.4)',act:function(){setScreen('practice_select');}}
     ];
     var cardCols=isDay?[['#D94A3A','rgba(45,12,10,0.82)','rgba(217,74,58,0.45)'],['#E47B20','rgba(48,24,6,0.82)','rgba(228,123,32,0.45)'],['#A9435F','rgba(40,10,20,0.82)','rgba(169,67,95,0.45)']]
@@ -1793,37 +2062,40 @@ function App(){
       {key:'playerdata',label:'Local Player Data',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}},
       {key:'theme',label:'Theme '+(themeOpen?'\u25B4':'\u25BE'),bg:THEME_BG[themeMode],act:toggleTheme}
     ];
-    return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),
+    return React.createElement('div',{key:'menu',className:'screen-in',style:baseStyle},bgLayer(),
       React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:22})},
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
           React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'The ultimate slime sport')),
-        React.createElement('div',{style:{display:'flex',gap:18,flexWrap:'wrap',justifyContent:'center'}},
+        React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
-            return React.createElement('button',{key:card.key,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid rgba(255,255,255,0.12)',boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 16px 45px rgba(0,0,0,0.55),0 0 30px '+card.glow:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',transform:hov?'translateY(-7px) scale(1.03)':'translateY(0) scale(1)',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',cursor:'pointer'},focusSty(card.key))},
-              React.createElement('div',{style:{background:card.hdr,padding:'11px 0 9px'}},
-                React.createElement('div',{style:{fontFamily:DISP,fontWeight:600,fontSize:17,letterSpacing:'0.04em'}},card.label),
-                React.createElement('div',{style:{fontSize:11,fontWeight:700,opacity:0.75,marginTop:1}},card.sub)),
+            return React.createElement('button',{key:card.key,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid rgba(255,255,255,0.12)',boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 16px 45px rgba(0,0,0,0.55),0 0 30px '+card.glow:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',transform:hov?'translateY(-7px)':'translateY(0)',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',cursor:'pointer'},focusSty(card.key),{transform:hov?'translateY(-7px)':'none'})},
+              React.createElement('div',{style:{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',minHeight:68,padding:'9px 12px',boxSizing:'border-box',background:card.hdr,boxShadow:'inset 0 1px 0 rgba(255,255,255,0.38),inset 0 -3px 0 rgba(0,0,0,0.2)'}},
+                React.createElement('div',{style:{position:'absolute',top:0,left:'22%',width:'56%',height:2,background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.7),rgba(255,255,255,0))'}}),
+                React.createElement('div',{style:{minWidth:0,flex:1}},
+                  React.createElement('div',{style:{fontFamily:DISP,fontWeight:600,fontSize:20,letterSpacing:'0.025em',lineHeight:1.15,textShadow:'0 2px 5px rgba(0,0,0,0.28)'}},card.label),
+                  React.createElement('div',{style:{fontSize:10,fontWeight:800,letterSpacing:'0.025em',opacity:0.84,marginTop:4,lineHeight:1.2}},card.sub))),
               React.createElement('div',{style:{width:'100%',height:140,background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode})));
           })
         ),
-        React.createElement('div',{style:{display:'flex',gap:12,flexWrap:'wrap',justifyContent:'center'}},
+        React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:12,flexWrap:'wrap',justifyContent:'space-between',alignItems:'center'}},
+          React.createElement('button',{key:'accounts',type:'button',title:'Your Account','aria-label':'Your Account',onClick:function(){setScreen('accounts');},onMouseEnter:function(){setHovCard('accounts');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:2,borderRadius:'50%',border:'none',background:'rgba(5,12,35,0.78)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='accounts'||isFocused('accounts')?'translateY(-3px) scale(1.04)':'none'},focusSty('accounts'))},React.createElement(ProfileAvatar,{profile:account.avatar,size:38})),
           menuPills.map(function(btn){
-            var b=React.createElement('button',{key:btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg,{fontSize:13})},btn.label);
+            var b=React.createElement('button',{key:btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label);
             if(btn.key!=='theme')return b;
             return React.createElement('div',{key:'theme','data-theme-dd':'1',style:{position:'relative',display:'inline-block'}},b,
               themeOpen&&React.createElement('div',{className:'rise',style:{position:'absolute',top:'calc(100% + 10px)',left:'50%',marginLeft:-65,width:130,display:'flex',flexDirection:'column',gap:8,zIndex:20}},
                 [['day','Day'],['night','Night'],['japan','Sakura']].map(function(o){
                   var id='theme_'+o[0],cur=themeMode===o[0];
-                  return React.createElement('button',{key:id,onClick:function(){setThemeMode(o[0]);setThemeOpen(false);setFocusIdx(6);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:hovPill(id,THEME_BG[o[0]],{fontSize:13,padding:'10px 0',boxShadow:cur?'0 0 0 3px rgba(255,255,255,0.85),0 6px 18px rgba(0,0,0,0.4)':undefined})},o[1]);
+                  return React.createElement('button',{key:id,onClick:function(){setThemeMode(o[0]);setThemeOpen(false);setFocusIdx(7);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:hovPill(id,THEME_BG[o[0]],{fontSize:13,padding:'10px 0',boxShadow:cur?'0 0 0 3px rgba(255,255,255,0.85),0 6px 18px rgba(0,0,0,0.4)':undefined})},o[1]);
                 })));
           })
         ),
         React.createElement('p',{style:{margin:0,fontSize:13,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
           React.createElement('span',{className:'kbd'},'W'),React.createElement('span',{className:'kbd'},'A'),React.createElement('span',{className:'kbd'},'S'),React.createElement('span',{className:'kbd'},'D'),' or arrow keys to move, ',React.createElement('span',{className:'kbd'},'Enter'),' or ',React.createElement('span',{className:'kbd'},'Space'),' to choose'),
-        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.0.6')
+        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.3.3')
       )
     );
   }
@@ -1834,13 +2106,35 @@ function App(){
     function oBack(){onlineCleanup();setScreen('menu');}
     function oBackToChoose(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});}
     var oBody=[];
+    if(oV==='host'||oV==='guest'){
+      var remoteProfile=netFind(onRoleRef.current==='host'?'g':'h');
+      oBody.push(React.createElement('div',{key:'profiles',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:12,width:'100%'}},
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:74}},React.createElement(ProfileAvatar,{profile:account.avatar,size:52}),React.createElement('span',{style:{fontSize:11,fontWeight:800,maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},onlinePlayerName()|| (onRoleRef.current==='host'?'Host':'Guest'))),
+        React.createElement('span',{style:{fontSize:12,fontWeight:900,color:'rgba(255,255,255,0.55)'}},'VS'),
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:74,opacity:remoteProfile?1:0.55}},React.createElement(ProfileAvatar,{profile:remoteProfile&&remoteProfile.a||defaultAccountAvatar(),size:52}),React.createElement('span',{style:{fontSize:11,fontWeight:800,maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},remoteProfile&&cleanName(remoteProfile.n)||'Opponent'))));
+    }
     if(oV==='choose'){
       oBody.push(React.createElement('div',{key:'t',style:oTxt},'Play a friend on a different computer. One of you creates a room, the other types in the code.'));
       oBody.push(React.createElement('button',{key:'c',onClick:function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);},style:Object.assign(pill(btnPrimary,{width:240}),focusSty('online_create'))},'Create room'));
       oBody.push(React.createElement('button',{key:'j',onClick:function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});},style:Object.assign(pill('linear-gradient(135deg,#059669,#047857)',{width:240}),focusSty('online_join'))},'Join room'));
-      oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6,marginTop:4}},
+      if(cleanName(account.name))oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',alignItems:'center',gap:9,marginTop:4,padding:'7px 12px',borderRadius:14,background:'rgba(0,0,0,0.28)',border:'1px solid rgba(255,255,255,0.18)'}},React.createElement(ProfileAvatar,{profile:account.avatar,size:32}),React.createElement('span',{style:{fontSize:13,fontWeight:800}},'Playing as '+cleanName(account.name))));
+      else oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6,marginTop:4}},
         React.createElement('div',{style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Your name'),
         React.createElement('input',{ref:onlineNameInputRef,value:myName,maxLength:12,placeholder:'Enter a name',onFocus:function(){setFocusIdx(2);},onChange:function(e){setMyName(e.target.value);if(cleanName(e.target.value))setOnl(function(o){return o.err?Object.assign({},o,{err:''}):o;});},onKeyDown:function(e){if(e.key!=='ArrowUp'&&e.key!=='ArrowDown'&&e.key!=='Escape')e.stopPropagation();},style:Object.assign({fontFamily:DISP,fontSize:20,textAlign:'center',width:220,padding:'7px 10px',borderRadius:14,border:'2px solid rgba(255,255,255,0.3)',background:'rgba(0,0,0,0.35)',color:'#fff',outline:'none'},focusSty('online_name'))})));
+      oBody.push(React.createElement('button',{key:'stickers',onClick:openOnlineStickerPicker,style:Object.assign(pill(btnSecondary,{width:240,fontSize:12}),focusSty('online_stickers'))},'Choose stickers · '+stickerSlots.length+'/5'));
+    }else if(oV==='stickers'){
+      oBody.push(React.createElement('div',{key:'t',style:oTxt},'Choose five GIFs for your in-game number keys. Click a selected sticker to unassign it.'));
+      oBody.push(React.createElement('div',{key:'grid',ref:onlineStickerGridRef,style:{width:'100%',flex:'1 1 auto',minHeight:0,overflowY:'auto',overscrollBehavior:'contain',alignContent:'start',display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:10,padding:4,boxSizing:'border-box'}},
+        ONLINE_STICKERS.map(function(sticker,index){
+          var slot=stickerSlots.indexOf(sticker.id),selected=slot>=0;
+          return React.createElement('button',{key:sticker.id,ref:function(el){if(el)onlineStickerButtonRefs.current['sticker_'+index]=el;else delete onlineStickerButtonRefs.current['sticker_'+index];},onClick:function(){chooseOnlineSticker(sticker.id);},style:Object.assign({position:'relative',display:'flex',flexDirection:'column',alignItems:'stretch',gap:5,minWidth:0,padding:7,borderRadius:12,scrollMargin:8,border:selected?'2px solid '+accentColor:'1px solid rgba(255,255,255,0.16)',background:selected?'rgba(56,189,248,0.18)':'rgba(255,255,255,0.06)',color:'#fff',cursor:'pointer',textAlign:'center',boxShadow:selected?'0 0 14px rgba(56,189,248,0.25)':'none'},focusSty('sticker_'+index))},
+            React.createElement('div',{style:{position:'relative',height:92,overflow:'hidden',borderRadius:8,background:'rgba(0,0,0,0.3)'}},
+              React.createElement('img',{src:sticker.src,alt:sticker.name,loading:'lazy',style:{width:'100%',height:'100%',objectFit:'contain',display:'block'}}),
+              selected&&React.createElement('span',{style:{position:'absolute',top:5,left:5,minWidth:22,padding:'3px 5px',borderRadius:7,background:btnPrimary,fontSize:11,fontWeight:900,boxShadow:'0 2px 6px rgba(0,0,0,0.4)'}},String(slot+1))),
+            React.createElement('span',{style:{fontSize:10,color:selected?accentColor:'rgba(255,255,255,0.55)',fontWeight:800}},selected?'KEY '+(slot+1):'ADD'));
+        })));
+      oBody.push(React.createElement('div',{key:'count',style:{flexShrink:0,color:stickerSlots.length===5?accentColor:'rgba(255,255,255,0.7)',fontSize:11,fontWeight:800}},stickerSlots.length+' of 5 keys assigned'));
+      oBody.push(React.createElement('button',{key:'done',onClick:finishOnlineStickerPicker,style:Object.assign(pill(btnPrimary,{width:220,flexShrink:0}),focusSty('sticker_done'))},'Done'));
     }else if(oV==='join'){
       oBody.push(React.createElement('div',{key:'t',style:oTxt},'Type the room code from your friend'));
       oBody.push(React.createElement('div',{key:'codeinputs',style:{display:'flex',gap:10,justifyContent:'center',alignItems:'center'}},[0,1,2,3].map(function(idx){
@@ -1897,22 +2191,24 @@ function App(){
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.peerOn?'Your friend is in! Pick a length and start.':(onl.status==='Connected'?'Waiting for your friend to join…':onl.status)));
       if(onl.peerOn){
         oBody.push(React.createElement('div',{key:'d',style:{display:'flex',gap:8}},['1min','2min','4min'].map(function(dv){var navId='online_dur'+dv.replace('min','');return React.createElement('button',{key:dv,onClick:function(){setOnl(function(o){return Object.assign({},o,{dur:dv});});},style:Object.assign(hudChip(false,{padding:'6px 14px',fontSize:12,background:onl.dur===dv?btnPrimary:'rgba(255,255,255,0.12)'}),focusSty(navId))},dv.replace('min',' min'));})));
-        oBody.push(React.createElement('button',{key:'st',onClick:function(){var gpn=netFind('g');startGame(onl.dur,'online',DC,{left:cleanName(myName)||'Host',right:cleanName(gpn&&gpn.n)||'Guest'},'left','regular',null,null);},style:Object.assign(pill('linear-gradient(135deg,#16a34a,#15803d)',{width:240}),focusSty('online_start'))},'Start match'));
+        oBody.push(React.createElement('button',{key:'st',onClick:function(){var gpn=netFind('g');startGame(onl.dur,'online',DC,{left:onlinePlayerName()||'Host',right:cleanName(gpn&&gpn.n)||'Guest'},'left','regular',null,null);},style:Object.assign(pill('linear-gradient(135deg,#16a34a,#15803d)',{width:240}),focusSty('online_start'))},'Start match'));
       }
     }else{
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:44,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.status!=='Connected'?onl.status:(onl.peerOn?'Connected! Waiting for the host to start the match…':'Connected. Looking for the host…')));
     }
     if(onl.err)oBody.push(React.createElement('div',{key:'e',style:{color:'#fecaca',fontSize:12,textAlign:'center',maxWidth:300,lineHeight:1.45,background:'rgba(239,68,68,0.18)',border:'1px solid rgba(248,113,113,0.4)',borderRadius:12,padding:'8px 12px'}},onl.err));
-    var backId=oV==='choose'?'online_back':'online_cancel';
-    oBody.push(React.createElement('button',{key:'b',onClick:oV==='choose'?oBack:oBackToChoose,style:Object.assign(pill('rgba(255,255,255,0.12)',{fontSize:13,padding:'9px 22px',textTransform:'none',letterSpacing:0}),focusSty(backId))},oV==='choose'?'Back':'Cancel'));
-    return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18})},heading('Play Online','Two players · one room code'),React.createElement('div',{style:oCard},oBody)));
+    var backId=oV==='choose'?'online_back':oV==='stickers'?'sticker_cancel':'online_cancel';
+    var backAct=oV==='choose'?oBack:oV==='stickers'?cancelOnlineStickerPicker:oBackToChoose;
+    oBody.push(React.createElement('button',{key:'b',onClick:backAct,style:Object.assign(pill('rgba(255,255,255,0.12)',{fontSize:13,padding:'9px 22px',textTransform:'none',letterSpacing:0,flexShrink:0}),focusSty(backId))},oV==='choose'?'Back':'Cancel'));
+    var onlineStyle=oV==='stickers'?Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'}):baseStyle;
+    return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
   }
 
-  if(screen==='guide')return React.createElement('div',{className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{theme:themeMode,onBack:function(){setScreen('menu');},focusSty:focusSty})));
+  if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{theme:themeMode,onBack:function(){setScreen('menu');},focusSty:focusSty})));
 
   // ── PLAYER SELECT ────────────────────────────────────────────────────
-  if(screen==='player_select')return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),
+  if(screen==='player_select')return React.createElement('div',{key:'player-select',className:'screen-in',style:baseStyle},bgLayer(),
     React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{maxWidth:520,width:'100%',gap:20})},
       heading('Select Players','Pick a player or continue as Guest','clamp(26px,6vw,36px)'),
       React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16,width:'100%'}},
@@ -1932,14 +2228,17 @@ function App(){
   );
 
   // ── PRACTICE SELECT ──────────────────────────────────────────────────
-  if(screen==='practice_select')return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),
+  if(screen==='practice_select')return React.createElement('div',{key:'practice-select',className:'screen-in',style:baseStyle},bgLayer(),
     React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:26})},
       heading('Practice','Choose your drill'),
       React.createElement('div',{style:{display:'flex',gap:16,flexWrap:'wrap',justifyContent:'center'}},
-        [['prac_regular','Regular','regular',btnPrimary],['prac_air','Air-Dash','air','linear-gradient(135deg,#0891b2,#0e7490)'],['prac_ground','Ground','ground','linear-gradient(135deg,#059669,#047857)']].map(function(item){
+        [['prac_regular','Regular','regular',btnPrimary,'01'],['prac_air','Air-Dash','air','linear-gradient(135deg,#0891b2,#0e7490)','02'],['prac_ground','Ground','ground','linear-gradient(135deg,#059669,#047857)','03']].map(function(item){
           var id=item[0],lbl=item[1],mkey=item[2],hdr=item[3],hov=hovCard===id||isFocused(id);
           return React.createElement('button',{key:id,onClick:function(){setPractMode(mkey);practModeRef.current=mkey;startGame(null,'practice',DC,{left:'P1',right:'P2'},sideRef.current,mkey,null,null);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:165,borderRadius:16,overflow:'hidden',background:cardDark,padding:0,color:'#ffffff',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid '+cardBorder,boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 12px 35px rgba(0,0,0,0.5)':'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 4px 18px rgba(0,0,0,0.3)',transform:hov?'translateY(-5px) scale(1.03)':'none',transition:'all 0.18s',cursor:'pointer'},focusSty(id))},
-            React.createElement('div',{style:{background:hdr,padding:'10px 0',textAlign:'center',fontFamily:DISP,fontWeight:600,fontSize:15,letterSpacing:'0.05em',boxShadow:'inset 0 1px 0 rgba(255,255,255,0.32),inset 0 -2px 0 rgba(0,0,0,0.2)'}},lbl),
+            React.createElement('div',{style:{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',minHeight:52,padding:'8px 11px',boxSizing:'border-box',textAlign:'center',fontFamily:DISP,fontWeight:600,fontSize:16,letterSpacing:'0.035em',background:hdr,boxShadow:'inset 0 1px 0 rgba(255,255,255,0.4),inset 0 -3px 0 rgba(0,0,0,0.2)',textShadow:'0 2px 5px rgba(0,0,0,0.3)'}},
+              React.createElement('div',{style:{position:'absolute',top:0,left:'22%',width:'56%',height:2,background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.7),rgba(255,255,255,0))'}}),
+              React.createElement('span',null,lbl),
+              React.createElement('span',{style:{position:'absolute',right:11,fontSize:10,fontWeight:900,letterSpacing:'0.08em',padding:'5px 7px',borderRadius:8,background:'rgba(0,0,0,0.2)',border:'1px solid rgba(255,255,255,0.24)',boxShadow:'inset 0 1px 0 rgba(255,255,255,0.15)'}},item[4])),
             React.createElement('div',{style:{height:100,overflow:'hidden'}},React.createElement(PracticePreviewCanvas,{type:mkey,k:uiK,theme:themeMode})));
         })
       ),
@@ -1949,14 +2248,18 @@ function App(){
     )
   );
 
-  if(screen==='customise')return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),React.createElement('div',{className:'rise',style:wrapStyle},React.createElement(CustomiseScreen,{initDur:pendDur,onDurChange:function(d){setPendDur(d);},onStart:function(c,dur){var n1=selP1?dbPlayers.find(function(p){return p.id===selP1;}):null,n2=selP2?dbPlayers.find(function(p){return p.id===selP2;}):null;startGame(dur||pendDur,'multi',c,{left:n1?n1.name:'P1',right:n2?n2.name:'P2'},'right','regular',selP1,selP2);},onBack:function(){setScreen('player_select');}})));
+  if(screen==='customise')return React.createElement('div',{key:'customise',className:'screen-in',style:baseStyle},bgLayer(),React.createElement('div',{className:'rise',style:wrapStyle},React.createElement(CustomiseScreen,{initDur:pendDur,onDurChange:function(d){setPendDur(d);},onStart:function(c,dur){var n1=selP1?dbPlayers.find(function(p){return p.id===selP1;}):null,n2=selP2?dbPlayers.find(function(p){return p.id===selP2;}):null;startGame(dur||pendDur,'multi',c,{left:n1?n1.name:'P1',right:n2?n2.name:'P2'},'right','regular',selP1,selP2);},onBack:function(){setScreen('player_select');}})));
 
   // ── DURATION / DIFFICULTY ────────────────────────────────────────────
   if(screen==='duration'){
     var diffInfo={easy:'A relaxed opponent. A good place to learn the moves.',hard:'Varied tactics. Cuts off angles and defends high balls.',impossible:'Studies how you score and learns from every goal. Gets sharper as the match goes on.'};
-    return React.createElement('div',{className:'screen-in',style:baseStyle},bgLayer(),
+    var selectedChoice=isJapanT?'linear-gradient(135deg,#ec4899,#be185d)':'linear-gradient(135deg,#fde047,#f59e0b)';
+    var selectedText=isJapanT?'#fff':'#172033',selectedBorder=isJapanT?'#fce7f3':'#fff7b2';
+    var selectedGlow=isJapanT?'0 0 0 2px rgba(80,20,55,0.45),0 0 20px rgba(236,72,153,0.85)':'0 0 0 2px rgba(15,23,42,0.4),0 0 20px rgba(250,204,21,0.85)';
+    var playButton=isDay?'linear-gradient(135deg,#16a34a,#166534)':isJapanT?'linear-gradient(135deg,#e11d72,#9d174d)':'linear-gradient(135deg,#818cf8,#4338ca)';
+    return React.createElement('div',{key:'duration',className:'screen-in',style:baseStyle},bgLayer(),
       React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:22})},
-        heading('Select Duration','How long do you want to play?'),
+        heading(pmRef.current==='single'?'Player vs AI':'Select Duration','How long do you want to play?'),
         React.createElement('div',{style:{display:'flex',alignItems:'center',background:'rgba(5,12,35,0.82)',borderRadius:16,border:'1px solid '+cardBorder,overflow:'hidden',width:260,boxShadow:'0 0 24px rgba(56,189,248,0.15)'}},
           React.createElement('div',{style:{background:'rgba(0,0,0,0.5)',padding:'14px 20px',minWidth:62,textAlign:'center'}},React.createElement('span',{style:{fontSize:36,fontWeight:900,color:'#ffffff',fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums'}},pendDur==='worldcup'?'5':pendDur.replace('min',''))),
           React.createElement('div',{style:{display:'flex',flexDirection:'column',padding:'4px 2px',borderLeft:'1px solid '+cardBorder}},
@@ -1965,12 +2268,12 @@ function App(){
           React.createElement('div',{style:{flex:1,textAlign:'center'}},React.createElement('span',{style:{fontSize:18,fontWeight:900,color:'#ffffff',letterSpacing:'0.04em'}},pendDur==='worldcup'?'World Cup':'Mins'))),
         React.createElement('div',{style:{display:'flex',gap:'22px 36px',alignItems:'flex-start',flexWrap:'wrap',justifyContent:'center'}},
           React.createElement('div',{style:{textAlign:'center'}},label('Your Side'),
-            React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?btnPrimary:btnInactive,{padding:'9px 18px',fontSize:13}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
+            React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
           pmRef.current==='single'&&React.createElement('div',{style:{textAlign:'center'}},label('AI Difficulty'),
-            React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}},['easy','hard','impossible'].map(function(val){var id='diff_'+val,isActive=diff===val;return React.createElement('button',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:Object.assign(pill(isActive?(val==='impossible'?'linear-gradient(135deg,#ef4444,#991b1b)':btnPrimary):btnInactive,{padding:'9px 18px',fontSize:13}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));})),
+            React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}},['easy','hard','impossible'].map(function(val){var id='diff_'+val,isActive=diff===val;return React.createElement('button',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));})),
             React.createElement('p',{style:{margin:'10px auto 0',maxWidth:300,minHeight:34,fontSize:12,lineHeight:1.45,color:'rgba(255,255,255,0.85)',textShadow:softText}},diffInfo[diff]||''))
         ),
-        pmRef.current==='single'&&React.createElement('button',{onClick:function(){startGame(pendDur,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill(btnPrimary,{fontSize:18,padding:'15px 60px',letterSpacing:'0.08em',boxShadow:'0 6px 28px rgba(56,189,248,0.45)'}),focusSty('play'))},'Play'),
+        pmRef.current==='single'&&React.createElement('button',{onClick:function(){startGame(pendDur,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill(playButton,{fontSize:18,padding:'15px 60px',letterSpacing:'0.08em',border:'2px solid rgba(255,255,255,0.7)',boxShadow:isDay?'0 6px 28px rgba(22,163,74,0.7)':isJapanT?'0 6px 28px rgba(225,29,114,0.7)':'0 6px 28px rgba(129,140,248,0.7)'}),focusSty('play'))},'Play'),
         React.createElement('button',{onClick:function(){setScreen(pmRef.current==='multi'?'player_select':'menu');},style:ghostBtn('back')},'Back')
       )
     );
@@ -1981,13 +2284,16 @@ function App(){
     var isOnG=gmode==='online',isSingleG=gmode==='single',isImpG=isSingleG&&diff==='impossible';
     var memCount=0;if(isImpG){var hpo=hPatternsRef.current;for(var hk in hpo){if(hpo.hasOwnProperty(hk))memCount+=hpo[hk].length;}}
     var lLeft=gmode==='multi'||isOnG||activeSide==='left',rRight=!isOnG&&(gmode==='multi'||activeSide==='right');
+    var onlineOpponent= isOnG?netFind(onRoleRef.current==='host'?'g':'h'):null;
+    var leftAvatar=isOnG?(onRoleRef.current==='host'?account.avatar:onlineOpponent&&onlineOpponent.a||defaultAccountAvatar()):null;
+    var rightAvatar=isOnG?(onRoleRef.current==='host'?onlineOpponent&&onlineOpponent.a||defaultAccountAvatar():account.avatar):null;
     function keys(list){return list.map(function(k,i){return React.createElement('span',{key:i,className:'kbd'},k);});}
     function closeChat(){setChatOpen(false);if(chatInputRef.current)chatInputRef.current.blur();}
     function sendChat(e){
       e.preventDefault();
       var input=chatInputRef.current,text=input?input.value.trim().slice(0,200):'';
       if(!text)return;
-      var message={n:cleanName(myName)||'Player',m:text},rm=roomRef.current&&roomRef.current.room;
+      var message={n:onlinePlayerName()||'Player',m:text},rm=roomRef.current&&roomRef.current.room;
       if(!rm||!rm.sendChat(message)){setChatError('Chat is unavailable while disconnected.');return;}
       setChatMessages(function(messages){return messages.concat([Object.assign({mine:true},message)]).slice(-60);});
       setChatError('');
@@ -1995,7 +2301,7 @@ function App(){
       closeChat();
     }
     var hudH=50,boxW=GW+2,chatW=300,chatGap=18,layoutW=boxW+chatGap+chatW; // canvas width includes its borders
-    return React.createElement('div',{className:'screen-in',style:baseStyle},React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
+    return React.createElement('div',{key:'game',className:'screen-in',style:baseStyle},React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
       React.createElement('div',{style:{position:'relative',zIndex:1,width:(isOnG?layoutW:boxW)*fit,display:'flex',flexDirection:'column',alignItems:isOnG?'flex-start':'center'}},
         React.createElement('div',{style:{width:boxW,alignSelf:'flex-start',transform:'scale('+fit+')',transformOrigin:'top left',marginBottom:-(GH+hudH)*(1-fit)}},
           React.createElement('div',{style:{background:isDay?'linear-gradient(180deg,rgba(24,84,150,0.96),rgba(14,58,112,0.97))':'linear-gradient(180deg,rgba(8,14,40,0.98),rgba(3,7,25,0.98))',borderRadius:'14px 14px 0 0',display:'flex',alignItems:'center',width:boxW,minHeight:hudH,padding:'0 10px',boxSizing:'border-box',borderBottom:'1px solid rgba(255,255,255,0.08)',boxShadow:'0 -2px 24px rgba(0,0,0,0.3)'}},
@@ -2009,6 +2315,7 @@ function App(){
                   React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'))
               :React.createElement('div',{style:{display:'flex',alignItems:'center',width:'100%',height:hudH}},
                   React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,borderLeft:'4px solid '+(colors.left?colors.left.body:'#1a6bcc'),paddingLeft:8}},
+                    isOnG&&React.createElement(ProfileAvatar,{profile:leftAvatar,size:28}),
                     React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),
                     React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.left)),
                   React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:2}},
@@ -2018,7 +2325,8 @@ function App(){
                       !isOnG&&React.createElement('button',{onClick:togglePause,style:hudChip(false,{padding:'2px 8px',fontSize:10})},paused?'Resume':'Pause'))),
                   React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',borderRight:'4px solid '+(colors.right?colors.right.body:'#e8192c'),paddingRight:8}},
                     React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.right),
-                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names.right)))
+                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names.right),
+                    isOnG&&React.createElement(ProfileAvatar,{profile:rightAvatar,size:28})))
           ),
           React.createElement('div',{style:{position:'relative',width:GW,height:GH}},
             React.createElement('canvas',{ref:cvRef,width:Math.round(GW*rs),height:Math.round(GH*rs),style:{display:'block',width:GW,height:GH,border:'1px solid rgba(255,255,255,0.1)',borderTop:'none',boxSizing:'content-box',borderRadius:'0 0 14px 14px',boxShadow:'0 18px 50px rgba(0,0,0,0.45)'}}),
@@ -2062,18 +2370,23 @@ function App(){
           React.createElement('div',null,
             lLeft&&React.createElement('span',{style:{marginRight:rRight?14:0}},keys(['A','D']),'move ',keys(['W']),'jump ',keys(['S']),'dash'),
             rRight&&React.createElement('span',null,keys(['←','→']),'move ',keys(['↑']),'jump ',keys(['↓']),'dash')),
-          isOnG&&React.createElement('div',{style:{opacity:0.85}},(onRoleRef.current==='host'?'You are the blue slime':'You are the red slime')+' · arrow keys work too'),
+          isOnG&&React.createElement('div',{style:{opacity:0.85}},(onRoleRef.current==='host'?'You are the blue slime':'You are the red slime')+' · arrow keys work too · 1–5 stickers'),
           isImpG&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(239,68,68,0.2)',border:'1px solid rgba(248,113,113,0.45)',color:'#fecaca',fontWeight:800,fontSize:11,letterSpacing:'0.06em',textTransform:'uppercase'}},'Impossible AI · has studied '+memCount+' of your goals')),
         isOnG&&React.createElement('div',{style:{position:'absolute',zIndex:2,left:(boxW+chatGap)*fit,top:0,bottom:0,width:chatW*fit,boxSizing:'border-box',display:'flex',flexDirection:'column',padding:12,borderRadius:16,background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.18)',boxShadow:'0 18px 50px rgba(0,0,0,0.42)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}},
         React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
           React.createElement('span',{style:{fontFamily:DISP,fontSize:18,letterSpacing:'0.04em'}},'Match Chat'),
-          React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)'}},chatOpen?'Typing…':'/ to chat')),
+          React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)'}},chatOpen?'Typing…':'/ chat · 1–5 stickers')),
         React.createElement('div',{ref:chatListRef,style:{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column',gap:7,padding:'4px 2px 8px'}},
           chatMessages.length===0
             ?React.createElement('div',{style:{margin:'auto',textAlign:'center',fontSize:12,color:'rgba(255,255,255,0.5)',lineHeight:1.5}},'Say hi to your opponent!',' ',React.createElement('span',{className:'kbd'},'/'))
-            :chatMessages.map(function(message,i){return React.createElement('div',{key:i,style:{alignSelf:message.mine?'flex-end':'flex-start',maxWidth:'90%',padding:'7px 10px',borderRadius:12,background:message.mine?'rgba(14,165,233,0.28)':'rgba(255,255,255,0.09)',border:'1px solid '+(message.mine?'rgba(56,189,248,0.28)':'rgba(255,255,255,0.08)'),wordBreak:'break-word'}},
+            :chatMessages.map(function(message,i){
+              var sticker=findOnlineSticker(message.s);
+              return React.createElement('div',{key:i,style:{alignSelf:message.mine?'flex-end':'flex-start',maxWidth:'90%',padding:'7px 10px',borderRadius:12,background:message.mine?'rgba(14,165,233,0.28)':'rgba(255,255,255,0.09)',border:'1px solid '+(message.mine?'rgba(56,189,248,0.28)':'rgba(255,255,255,0.08)'),wordBreak:'break-word'}},
                 React.createElement('div',{style:{fontSize:10,fontWeight:800,color:message.mine?'#7dd3fc':'#fca5a5',marginBottom:2}},message.n),
-                React.createElement('div',{style:{fontFamily:'var(--font-title)',fontSize:13,lineHeight:1.3}},message.m));})),
+                sticker
+                  ?React.createElement('img',{src:sticker.src,alt:sticker.name,loading:'lazy',style:{display:'block',width:'100%',maxWidth:210,maxHeight:170,objectFit:'contain',borderRadius:8}})
+                  :React.createElement('div',{style:{fontFamily:'var(--font-title)',fontSize:13,lineHeight:1.3}},message.m));
+            })),
         React.createElement('form',{onSubmit:sendChat,style:{display:'flex',gap:6,marginTop:7}},
           React.createElement('input',{ref:chatInputRef,type:'text',maxLength:200,placeholder:'Press / to chat…',onFocus:function(){setChatOpen(true);},onBlur:function(){setChatOpen(false);},onKeyDown:function(e){e.stopPropagation();if(e.key==='Escape'){e.preventDefault();setChatError('');closeChat();}},style:{flex:1,minWidth:0,padding:'8px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',fontFamily:'var(--font-title)',fontSize:12,outline:'none'}}),
           React.createElement('button',{type:'submit',style:{padding:'0 12px',border:0,borderRadius:10,background:'linear-gradient(135deg,#0ea5e9,#0369a1)',color:'#fff',fontWeight:800,cursor:'pointer'}},'Send')),
