@@ -80,9 +80,23 @@ function loadOnlineStickerSlots(){
 }
 var DC={left:{body:'#1a6bcc',accent:'#0a3d7a'},right:{body:'#e8192c',accent:'#8b0000'}};
 var AI_ROBOT_SKIN={id:'robot',name:'AI Robot',color:'#9ca3af',accent:'#38bdf8',detail:'#e2e8f0',pattern:'robot'};
+var GAME_SETTINGS_KEY='soccer_slime_settings',GAME_AUDIO_VOLUME=1;
+function cleanGameSettings(value){
+  value=value&&typeof value==='object'?value:{};
+  return{
+    defaultSide:value.defaultSide==='left'?'left':'right',
+    soundEnabled:typeof value.soundEnabled==='boolean'?value.soundEnabled:true,
+    sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
+    uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,value.uiScale)):1
+  };
+}
+function loadGameSettings(){
+  try{return cleanGameSettings(JSON.parse(window.localStorage.getItem(GAME_SETTINGS_KEY)||'null'));}
+  catch(error){console.warn('Game settings could not be loaded.',error);return cleanGameSettings(null);}
+}
 var GAME_AUDIO=null,GAME_AUDIO_WARNED=false,GAMEPAD_WARNED=false;
 function playGameSound(kind){
-  if(typeof window==='undefined'||!window.AudioContext&&!window.webkitAudioContext)return;
+  if(typeof window==='undefined'||GAME_AUDIO_VOLUME<=0||!window.AudioContext&&!window.webkitAudioContext)return;
   try{
     var AudioCtor=window.AudioContext||window.webkitAudioContext;
     if(!GAME_AUDIO)GAME_AUDIO=new AudioCtor();
@@ -92,7 +106,7 @@ function playGameSound(kind){
     osc.frequency.setValueAtTime(kind==='goal'?520:kind==='save'?650:kind==='dash'?180:260,now);
     if(kind==='goal')osc.frequency.exponentialRampToValueAtTime(980,now+0.32);
     else osc.frequency.exponentialRampToValueAtTime(kind==='dash'?90:kind==='save'?420:180,now+0.09);
-    gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(kind==='goal'?0.12:0.045,now+0.015);
+    gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(Math.max(0.0001,(kind==='goal'?0.12:0.045)*GAME_AUDIO_VOLUME),now+0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001,now+(kind==='goal'?0.42:0.13));
     osc.connect(gain);gain.connect(GAME_AUDIO.destination);osc.start(now);osc.stop(now+(kind==='goal'?0.44:0.15));
   }catch(e){if(!GAME_AUDIO_WARNED){GAME_AUDIO_WARNED=true;console.warn('Game audio could not be played.',e);}}
@@ -1129,7 +1143,7 @@ function PlayerDataScreen(props){
       }),
       React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginTop:12})},
         React.createElement('div',{style:{fontWeight:900,fontSize:14,marginBottom:5}},'Developer tools'),
-        React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.7)',lineHeight:1.45,marginBottom:10}},'Enter the developer password to unlock every achievement, frame, and slime skin in this browser. This password is visible in the static game files, so it is only a casual gate.'),
+        React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.7)',lineHeight:1.45,marginBottom:10}},'Enter the developer password to unlock every achievement, frame, and slime skin in this browser.'),
         React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap'}},
           React.createElement('input',{type:'password',value:devPassword,onChange:function(e){setDevPassword(e.target.value);setDevPasswordError('');},onKeyDown:function(e){if(e.key==='Enter'){e.preventDefault();e.stopPropagation();if(devPassword==='SOCCERSLIME26'){props.onUnlockAll();setDevPassword('');setDevPasswordError('');}else setDevPasswordError('That developer password is not correct.');}else e.stopPropagation();},autoComplete:'off','aria-label':'Developer password',placeholder:'Developer password',style:{flex:'1 1 160px',minWidth:140,padding:'9px 12px',borderRadius:20,border:'1px solid rgba(255,255,255,0.25)',background:'rgba(0,0,0,0.28)',color:'#fff',fontSize:12,outline:'none'}}),
           React.createElement('button',{type:'button',onClick:function(){if(devPassword==='SOCCERSLIME26'){props.onUnlockAll();setDevPassword('');setDevPasswordError('');}else setDevPasswordError('That developer password is not correct.');},style:{padding:'9px 16px',borderRadius:50,border:'1px solid rgba(251,191,36,0.5)',background:'linear-gradient(135deg,#b45309,#92400e)',color:'#fff',fontWeight:900,cursor:'pointer'}},achievementProgress.developerUnlocked?'Unlock everything (Dev)':'Unlock everything')),
@@ -1477,10 +1491,66 @@ function AccountScreen(props){
         React.createElement('button',{onClick:save,style:{padding:'11px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.6)',background:'linear-gradient(135deg,#059669,#047857)',color:'#fff',fontWeight:900,fontSize:14,letterSpacing:'0.05em',cursor:'pointer',boxShadow:'0 5px 18px rgba(5,150,105,0.38)'}},'Save account'),
         React.createElement('button',{onClick:props.onBack,style:{padding:'10px 22px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Cancel'))));
 }
+function SettingsScreen(props){
+  var panelRef=useRef(null),settings=props.settings;
+  useEffect(function(){if(panelRef.current){var first=panelRef.current.querySelector('button[aria-pressed="true"]')||panelRef.current.querySelector('button');if(first)first.focus();}},[]);
+  function handlePanelKeyDown(e){
+    var key=e.key.toLowerCase();
+    if(key==='escape'){e.preventDefault();e.stopPropagation();props.onClose();return;}
+    var direction={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right'}[key];
+    if(!direction||!panelRef.current)return;
+    var active=document.activeElement;
+    if(active&&active.tagName==='INPUT'&&active.type==='range'&&(key==='arrowleft'||key==='arrowright'))return;
+    if(active&&active.tagName==='INPUT'&&active.type==='range'&&(direction==='left'||direction==='right')&&key!=='arrowleft'&&key!=='arrowright'){
+      e.preventDefault();e.stopPropagation();
+      var step=Number(active.step)||1,next=Number(active.value)+(direction==='right'?step:-step);
+      next=Math.max(Number(active.min),Math.min(Number(active.max),next));
+      var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      setter.call(active,String(next));active.dispatchEvent(new Event('input',{bubbles:true}));
+      return;
+    }
+    e.preventDefault();e.stopPropagation();
+    if(active&&active.type==='checkbox'&&(direction==='left'||direction==='right')){active.click();return;}
+    var closeButton=panelRef.current.querySelector('button[aria-label="Close settings"]');
+    var sideButtons=Array.prototype.slice.call(panelRef.current.querySelectorAll('button[aria-pressed]'));
+    var checkbox=panelRef.current.querySelector('input[type="checkbox"]');
+    var sliders=Array.prototype.slice.call(panelRef.current.querySelectorAll('input[type="range"]'));
+    var rows=[[closeButton],sideButtons,checkbox?[checkbox]:[],sliders.length?[sliders[0]]:[],sliders.length>1?[sliders[1]]:[]].filter(function(row){return row.length;});
+    var rowIndex=-1,columnIndex=0;
+    for(var ri=0;ri<rows.length;ri++){var ci=rows[ri].indexOf(active);if(ci!==-1){rowIndex=ri;columnIndex=ci;break;}}
+    if(rowIndex===-1){rows[1][0].focus();return;}
+    if(direction==='left'||direction==='right'){
+      var row=rows[rowIndex],columnStep=direction==='left'?-1:1;
+      if(row.length>1)row[(columnIndex+columnStep+row.length)%row.length].focus();
+      return;
+    }
+    var rowStep=direction==='up'?-1:1,targetRow=(rowIndex+rowStep+rows.length)%rows.length,target=rows[targetRow];
+    target[Math.min(columnIndex,target.length-1)].focus();
+  }
+  var panel={width:'min(440px,92vw)',boxSizing:'border-box',padding:24,borderRadius:22,background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.2)',boxShadow:'0 20px 60px rgba(0,0,0,0.55)',display:'flex',flexDirection:'column',gap:18};
+  function sideButton(side,label){var active=settings.defaultSide===side;return React.createElement('button',{type:'button',onClick:function(){props.onChange({defaultSide:side});},'aria-pressed':active,style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},label);}
+  function slider(id,label,value,min,max,step,display,change){return React.createElement('label',{key:id,htmlFor:id,style:{display:'grid',gridTemplateColumns:'minmax(120px,1fr) 2fr 48px',alignItems:'center',gap:10,fontSize:13,fontWeight:800}},label,React.createElement('input',{id:id,type:'range',min:min,max:max,step:step,value:value,onChange:function(e){change(Number(e.target.value));}}),React.createElement('span',{style:{textAlign:'right',fontVariantNumeric:'tabular-nums'}},display));}
+  return React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'settings-title',onKeyDownCapture:handlePanelKeyDown,style:{position:'fixed',inset:0,zIndex:10000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,boxSizing:'border-box',background:'rgba(1,6,20,0.72)',backdropFilter:'blur(8px)'}},
+    React.createElement('div',{ref:panelRef,style:panel},
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12}},
+        React.createElement('h1',{id:'settings-title',style:{flex:1,fontFamily:'var(--font-display)',fontSize:30,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.55)'}},'Settings'),
+        React.createElement('button',{type:'button',onClick:props.onClose,'aria-label':'Close settings',style:{width:40,height:40,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontSize:22,fontWeight:900,cursor:'pointer'}},'×')),
+      React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
+        React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Default side'),
+        React.createElement('div',{style:{display:'flex',gap:8}},sideButton('left','Left'),sideButton('right','Right'))),
+      React.createElement('label',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,fontSize:14,fontWeight:900}},
+        'Sound effects',
+        React.createElement('input',{type:'checkbox',checked:settings.soundEnabled,onChange:function(e){props.onChange({soundEnabled:e.target.checked});},'aria-label':'Sound effects'})),
+      slider('settings-sfx-volume','Sound volume',settings.sfxVolume,0,1,0.05,Math.round(settings.sfxVolume*100)+'%',function(value){props.onChange({sfxVolume:value});}),
+      slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});}),
+      props.saveError&&React.createElement('div',{role:'alert',style:{fontSize:12,lineHeight:1.4,color:'#fecaca'}},props.saveError),
+      React.createElement('p',{style:{margin:0,fontSize:11,color:'rgba(255,255,255,0.62)'}},'Settings are saved on this device.')));
+}
 function App(){
   var s_done=useState(false),introDone=s_done[0],setIntroDone=s_done[1];
   var cvRef=useRef(null),animRef=useRef(null),lfRef=useRef(0);
   var kRef=useRef({}),jrRef=useRef({});
+  var jumpHeldRef=useRef({left:false,right:false});
   var gsRef=useRef({left:mkSlime(200),right:mkSlime(600),ball:{x:GW/2,y:150,vx:0,vy:0}});
   var colRef=useRef(DC),pmRef=useRef(null),tlRef=useRef(0),practRef=useRef(false);
   var frozenRef=useRef(false),pausedRef=useRef(false),goRef=useRef(false);
@@ -1859,6 +1929,10 @@ function App(){
   function applySnap(sv){for(var fi=0;fi<SF.length;fi++){gsRef.current.left[SF[fi]]=sv.left[SF[fi]];gsRef.current.right[SF[fi]]=sv.right[SF[fi]];}gsRef.current.ball.x=sv.ball.x;gsRef.current.ball.y=sv.ball.y;gsRef.current.ball.vx=sv.ball.vx;gsRef.current.ball.vy=sv.ball.vy;gsRef.current.ball.ang=sv.ball.ang||0;}
 
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
+  var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
+  GAME_AUDIO_VOLUME=gameSettings.sfxVolume;
+  var s_settingsErr=useState(''),settingsSaveError=s_settingsErr[0],setSettingsSaveError=s_settingsErr[1];
+  var s_showSettings=useState(false),showSettings=s_showSettings[0],setShowSettings=s_showSettings[1];
   var s_gm=useState(null),gmode=s_gm[0],setGmode=s_gm[1];
   var s_pd=useState('1min'),pendDur=s_pd[0],setPendDur=s_pd[1];
   var s_cd=useState('10'),customMinutes=s_cd[0],setCustomMinutes=s_cd[1];
@@ -1877,12 +1951,12 @@ function App(){
   var s_nm=useState({left:'P1',right:'P2'}),names=s_nm[0],setNames=s_nm[1];
   var s_pau=useState(false),paused=s_pau[0],setPaused=s_pau[1];
   var s_df=useState('hard'),diff=s_df[0],setDiff=s_df[1];
-  var s_sd=useState('right'),side=s_sd[0],setSide=s_sd[1];
+  var s_sd=useState(gameSettings.defaultSide),side=s_sd[0],setSide=s_sd[1];
   var s_as=useState('right'),activeSide=s_as[0],setActiveSide=s_as[1];
   var s_es=useState(null),endStats=s_es[0],setEndStats=s_es[1];
   var s_scoreLimit=useState(0),scoreLimit=s_scoreLimit[0],setScoreLimit=s_scoreLimit[1];
   var s_overtime=useState(true),overtimeEnabled=s_overtime[0],setOvertimeEnabled=s_overtime[1];
-  var s_sound=useState(true),soundEnabled=s_sound[0],setSoundEnabled=s_sound[1];
+  var s_sound=useState(gameSettings.soundEnabled),soundEnabled=s_sound[0],setSoundEnabled=s_sound[1];
   var s_training=useState(null),trainingResult=s_training[0],setTrainingResult=s_training[1];
   var s_trainingScore=useState(0),trainingScore=s_trainingScore[0],setTrainingScore=s_trainingScore[1];
   var s_pm=useState('regular'),practMode=s_pm[0],setPractMode=s_pm[1];
@@ -1950,7 +2024,7 @@ function App(){
   var s_hov=useState(null),hovCard=s_hov[0],setHovCard=s_hov[1];
   var s_th=useState('night'),themeMode=s_th[0],setThemeMode=s_th[1];
   var s_tdd=useState(false),themeOpen=s_tdd[0],setThemeOpen=s_tdd[1];
-  useEffect(function(){if(!themeOpen)return;function away(e){if(!(e.target.closest&&e.target.closest('[data-theme-dd]'))){setThemeOpen(false);setFocusIdx(7);}}document.addEventListener('mousedown',away);return function(){document.removeEventListener('mousedown',away);};},[themeOpen]);
+  useEffect(function(){if(!themeOpen)return;function away(e){if(!(e.target.closest&&e.target.closest('[data-theme-dd]'))){setThemeOpen(false);setFocusIdx(8);}}document.addEventListener('mousedown',away);return function(){document.removeEventListener('mousedown',away);};},[themeOpen]);
   var s_foc=useState(0),focusIdx=s_foc[0],setFocusIdx=s_foc[1];
 
   useEffect(function(){tlRef.current=tl;},[tl]);
@@ -1979,16 +2053,24 @@ function App(){
   var s_fit=useState(1),fit=s_fit[0],setFit=s_fit[1];
   var s_rs=useState(1),rs=s_rs[0],setRs=s_rs[1],s_uz=useState(1),uiZ=s_uz[0],setUiZ=s_uz[1],s_uk=useState(1),uiK=s_uk[0],setUiK=s_uk[1],rsRef=useRef(1);
   rsRef.current=rs;if(RS!==rs)setRS(rs);
-  useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?GW+8+18+300:GW+8,minFit=online?0.25:0.4,f=Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=Math.round(Math.max(1,Math.min(2.2,window.innerWidth/900,window.innerHeight/720))*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(4,Math.max(1,Math.ceil(z*d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode]);
+  useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?GW+8+18+300:GW+8,minFit=online?0.25:0.4,f=Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(4,Math.max(1,Math.ceil(z*d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale]);
   useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad();},[]);
 
-  function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(7);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
+  function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(8);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
+  function updateGameSettings(patch){
+    var next=cleanGameSettings(Object.assign({},gameSettings,patch));
+    setGameSettings(next);GAME_AUDIO_VOLUME=next.sfxVolume;
+    if(Object.prototype.hasOwnProperty.call(patch,'defaultSide')){setSide(next.defaultSide);sideRef.current=next.defaultSide;}
+    if(Object.prototype.hasOwnProperty.call(patch,'soundEnabled')){setSoundEnabled(next.soundEnabled);soundEnabledRef.current=next.soundEnabled;}
+    try{window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(next));setSettingsSaveError('');}
+    catch(error){console.error('Game settings could not be saved.',error);setSettingsSaveError('Settings could not be saved on this device.');}
+  }
   function startTraining(challenge){
     trainingChallengeRef.current=challenge;
     startGame('training','training',DC,{left:'YOU',right:'YOU'},sideRef.current,challenge,null,null);
   }
   function getNavGrid(){
-    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','online','guide','playerdata'],['theme']];
+    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','settings','online','guide','playerdata'],['theme']];
     if(screen==='online'){
       if(onl.view==='choose')return cleanName(account.name)?[['online_create'],['online_join'],['online_stickers'],['online_back']]:[['online_create'],['online_join'],['online_name'],['online_stickers'],['online_back']];
       if(onl.view==='stickers'){
@@ -2024,11 +2106,12 @@ function App(){
       train_dash:function(){startTraining('dash');},
       train_save:function(){startTraining('save');},
       accounts:function(){setScreen('accounts');},
+      settings:function(){setSettingsSaveError('');setShowSettings(true);},
       online:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');},
       guide:function(){setScreen('guide');},
       playerdata:function(){setShowPD(true);},
       theme:toggleTheme,
-      theme_day:function(){setThemeMode('day');setThemeOpen(false);setFocusIdx(7);},theme_night:function(){setThemeMode('night');setThemeOpen(false);setFocusIdx(7);},theme_japan:function(){setThemeMode('japan');setThemeOpen(false);setFocusIdx(7);},
+      theme_day:function(){setThemeMode('day');setThemeOpen(false);setFocusIdx(8);},theme_night:function(){setThemeMode('night');setThemeOpen(false);setFocusIdx(8);},theme_japan:function(){setThemeMode('japan');setThemeOpen(false);setFocusIdx(8);},
       dur_up:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.min(i+1,opts.length-1)]);},
       dur_down:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.max(i-1,0)]);},
       score_none:function(){setScoreLimit(0);},score_3:function(){setScoreLimit(3);},score_5:function(){setScoreLimit(5);},score_10:function(){setScoreLimit(10);},
@@ -2081,7 +2164,7 @@ function App(){
     var btns=getMenuButtons(),grid=getNavGrid();
     if(!btns.length)return;
     function onNav(e){
-      if(showPD)return;
+      if(showPD||showSettings)return;
       var key=e.key.toLowerCase();
       if(e.target.tagName==='INPUT'&&(screen!=='online'||(key!=='arrowup'&&key!=='arrowdown'&&key!=='escape')))return;
       if(screen==='practice_select'&&(key==='1'||key==='2'||key==='3')){
@@ -2100,7 +2183,7 @@ function App(){
       }
       if(key==='enter'||key===' '){e.preventDefault();var b=btns[focusIdx];if(b)b.act();return;}
       if(themeOpen&&key!=='enter'&&key!==' '&&key!=='escape'){e.preventDefault();var td=(key==='arrowright'||key==='d'||key==='arrowdown'||key==='s')?1:(key==='arrowleft'||key==='a'||key==='arrowup'||key==='w')?-1:0;if(td)setFocusIdx((focusIdx+td+3)%3);return;}
-      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(7);return;}if(screen==='accounts'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
+      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(8);return;}if(screen==='accounts'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
       var pos=getFocusPos(grid,focusIdx),r=pos[0],c=pos[1],nr=r,nc=c;
       if(key==='arrowdown'||key==='s'){nr=(r+1)%grid.length;}
       else if(key==='arrowup'||key==='w'){nr=(r-1+grid.length)%grid.length;}
@@ -2113,7 +2196,7 @@ function App(){
     }
     window.addEventListener('keydown',onNav);
     return function(){window.removeEventListener('keydown',onNav);};
-  },[screen,introDone,focusIdx,pendDur,customMinutes,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots,showPD,scoreLimit,overtimeEnabled,themeMode]);
+  },[screen,introDone,focusIdx,pendDur,customMinutes,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots,showPD,showSettings,scoreLimit,overtimeEnabled,themeMode]);
 
   function resetPos(defMove){
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
@@ -2197,6 +2280,7 @@ function App(){
 
   function startGame(duration,mode,cols,nms,pside,pmode,pid1,pid2,options){
     var prac=mode==='practice',c=cols||DC,n=nms||{left:'P1',right:'P2'},ps=pside||sideRef.current,pm2=pmode||practModeRef.current;
+    jumpHeldRef.current={left:false,right:false};
     if(options&&typeof options.scoreLimit==='number'){setScoreLimit(options.scoreLimit);scoreLimitRef.current=options.scoreLimit;}
     if(options&&typeof options.overtime==='boolean'){setOvertimeEnabled(options.overtime);overtimeEnabledRef.current=options.overtime;}
     trainingScoreRef.current=0;setTrainingScore(0);setTrainingResult(null);
@@ -2320,6 +2404,9 @@ function App(){
             assignPad(pads[0],'arrowleft','arrowright','arrowup','arrowdown');
           }
         }
+        var leftJumpPressed=!!kk['w']&&!jumpHeldRef.current.left,rightJumpPressed=!!kk['arrowup']&&!jumpHeldRef.current.right;
+        jumpHeldRef.current.left=!!kk['w'];jumpHeldRef.current.right=!!kk['arrowup'];
+        kk['_wPL']=!leftJumpPressed;kk['_wPR']=!rightJumpPressed;
         if(mode==='online'&&onRoleRef.current==='guest'){
           if(controllerKeys.w&&!gamepadRef.current.w)netCtrRef.current.jc++;
           if(controllerKeys.s&&!gamepadRef.current.s)netCtrRef.current.dc++;
@@ -2475,6 +2562,7 @@ function App(){
   function bgLayer(){return React.createElement(ThemeBg,{theme:themeMode});}
 
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
+  if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'})},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress)})));
   if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,onBack:function(){setShowMatchReplay(false);}})));
@@ -2514,6 +2602,7 @@ function App(){
         ),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:8,flexWrap:'wrap',justifyContent:'center',alignItems:'center'}},
           React.createElement('button',{key:'accounts',type:'button',title:'Your Account','aria-label':'Your Account',onClick:function(){setScreen('accounts');},onMouseEnter:function(){setHovCard('accounts');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:2,borderRadius:'50%',border:'none',background:'rgba(5,12,35,0.78)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='accounts'||isFocused('accounts')?'translateY(-3px) scale(1.04)':'none'},focusSty('accounts'))},React.createElement(ProfileAvatar,{profile:account.avatar,size:38})),
+          React.createElement('button',{key:'settings',type:'button',title:'Settings','aria-label':'Settings',onClick:function(){setSettingsSaveError('');setShowSettings(true);},onMouseEnter:function(){setHovCard('settings');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:0,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.18)',background:'rgba(5,12,35,0.78)',color:'#fff',fontSize:25,lineHeight:1,cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='settings'||isFocused('settings')?'translateY(-3px) scale(1.04)':'none'},focusSty('settings'))},'\u2699'),
           menuPills.map(function(btn){
             var b=React.createElement('button',{key:btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label);
             return b;
@@ -2525,7 +2614,7 @@ function App(){
             React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,width:themeOpen?240:0,opacity:themeOpen?1:0,overflow:'visible',flexShrink:0,transition:'width 0.22s ease,opacity 0.16s ease',zIndex:20,pointerEvents:themeOpen?'auto':'none'}},
               [['day','Day'],['night','Night'],['japan','Sakura']].map(function(o){
                 var id='theme_'+o[0],cur=themeMode===o[0];
-                return React.createElement('button',{key:id,onClick:function(){setThemeMode(o[0]);setThemeOpen(false);setFocusIdx(7);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign(hovPill(id,THEME_BG[o[0]],{fontSize:14,padding:'10px 12px',whiteSpace:'nowrap',flex:'0 0 auto',boxShadow:cur?'0 0 0 3px rgba(255,255,255,0.85),0 6px 18px rgba(0,0,0,0.4)':undefined}),{transition:'transform 0.13s,box-shadow 0.13s'})},o[1]);
+                return React.createElement('button',{key:id,onClick:function(){setThemeMode(o[0]);setThemeOpen(false);setFocusIdx(8);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign(hovPill(id,THEME_BG[o[0]],{fontSize:14,padding:'10px 12px',whiteSpace:'nowrap',flex:'0 0 auto',boxShadow:cur?'0 0 0 3px rgba(255,255,255,0.85),0 6px 18px rgba(0,0,0,0.4)':undefined}),{transition:'transform 0.13s,box-shadow 0.13s'})},o[1]);
               })))
           ),
         React.createElement('p',{style:{margin:0,fontSize:13,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
