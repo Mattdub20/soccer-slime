@@ -87,6 +87,7 @@ function cleanGameSettings(value){
   return{
     defaultSide:value.defaultSide==='left'?'left':'right',
     soundEnabled:typeof value.soundEnabled==='boolean'?value.soundEnabled:true,
+    perfMode:['auto','on','off'].indexOf(value.perfMode)>=0?value.perfMode:'auto',
     sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
     uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,value.uiScale)):1
   };
@@ -94,6 +95,26 @@ function cleanGameSettings(value){
 function loadGameSettings(){
   try{return cleanGameSettings(JSON.parse(window.localStorage.getItem(GAME_SETTINGS_KEY)||'null'));}
   catch(error){console.warn('Game settings could not be loaded.',error);return cleanGameSettings(null);}
+}
+var PERF_LOW=false,PERF_BATT=false,PERF_BATT_INIT=false;
+function initBatteryWatch(){
+  if(PERF_BATT_INIT)return;PERF_BATT_INIT=true;
+  try{if(navigator.getBattery)navigator.getBattery().then(function(b){
+    function upd(){PERF_BATT=!b.charging&&b.level<=0.2;}
+    upd();b.addEventListener('levelchange',upd);b.addEventListener('chargingchange',upd);
+  });}catch(e){}
+}
+function deviceIsWeak(){
+  try{
+    if(navigator.deviceMemory&&navigator.deviceMemory<=2)return true;
+    if(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=2)return true;
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return true;
+  }catch(e){}
+  return false;
+}
+function updatePerf(mode){
+  initBatteryWatch();
+  PERF_LOW=mode==='on'?true:mode==='off'?false:(PERF_BATT||deviceIsWeak());
 }
 var GAME_AUDIO=null,GAME_AUDIO_WARNED=false,GAMEPAD_WARNED=false;
 function playGameSound(kind){
@@ -194,7 +215,8 @@ function drawSlimeAt(ctx, x, y, col, acc, isR, spinAngle, spinDipY, isSpinning, 
   var darkC  = hslToHex(hsl2[0], Math.min(100,hsl2[1]+8), Math.max(5, hsl2[2]-20));
 
   // Outer glow
-  if(isNight){ctx.shadowColor=col;ctx.shadowBlur=28;}
+  if(PERF_LOW){ctx.shadowBlur=0;}
+  else if(isNight){ctx.shadowColor=col;ctx.shadowBlur=28;}
   else if(isSpinning){ctx.shadowColor=col;ctx.shadowBlur=18;}
   else{ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=6;}
 
@@ -728,7 +750,7 @@ function drawCrowdCheer(ctx,fanArr,top,rowHeight,time,cols){
 }
 
 function drawParticles(ctx,pts){
-  if(pts.length>260)pts.splice(0,pts.length-260);
+  var pcap=PERF_LOW?60:260;if(pts.length>pcap)pts.splice(0,pts.length-pcap);
   for(var pti=pts.length-1;pti>=0;pti--){
     var pt=pts[pti];pt.vy+=0.15;pt.vx*=0.93;pt.x+=pt.vx;pt.y+=pt.vy;pt.life--;
     if(pt.life<=0){pts.splice(pti,1);continue;}
@@ -843,7 +865,7 @@ function ThemeBg(props){
     for(i=0;i<BG_PETALS.length;i++){var p=BG_PETALS[i];kids.push(React.createElement('div',{key:'p'+i,className:'petal',style:{left:p.x+'%',animationDelay:(-p.d)+'s',animationDuration:p.t+'s',transform:'scale('+p.s+')'}}));}
   }else{
     if(!props.noSun)kids.push(React.createElement('div',{key:'sun',className:'sun'}));kids.push(React.createElement('div',{key:'hills',className:'hills'}));
-    for(i=0;i<BG_CLOUDS.length;i++){var c=BG_CLOUDS[i];kids.push(React.createElement('div',{key:'c'+i,className:'cloud',style:{top:c.y+'%',animationDelay:c.d+'s',animationDuration:c.t+'s',opacity:c.a,scale:String(c.s)}}));}
+    for(i=0;i<(PERF_LOW?1:BG_CLOUDS.length);i++){var c=BG_CLOUDS[i];kids.push(React.createElement('div',{key:'c'+i,className:'cloud',style:{top:c.y+'%',animationDelay:c.d+'s',animationDuration:c.t+'s',opacity:c.a,scale:String(c.s)}}));}
   }
   return React.createElement('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:0,background:themeBg(t),overflow:'hidden',pointerEvents:'none'}},kids);
 }
@@ -1546,6 +1568,13 @@ function SettingsScreen(props){
         'Sound effects',
         React.createElement('input',{type:'checkbox',checked:settings.soundEnabled,onChange:function(e){props.onChange({soundEnabled:e.target.checked});},'aria-label':'Sound effects'})),
       slider('settings-sfx-volume','Sound volume',settings.sfxVolume,0,1,0.05,Math.round(settings.sfxVolume*100)+'%',function(value){props.onChange({sfxVolume:value});}),
+      React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
+  React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Performance mode'),
+  React.createElement('div',{style:{display:'flex',gap:8}},
+    [['auto','Auto'],['on','On'],['off','Off']].map(function(o){
+      var active=settings.perfMode===o[0];
+      return React.createElement('button',{key:o[0],type:'button','aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
+    }))),
       slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});}),
       props.saveError&&React.createElement('div',{role:'alert',style:{fontSize:12,lineHeight:1.4,color:'#fecaca'}},props.saveError),
       React.createElement('p',{style:{margin:0,fontSize:11,color:'rgba(255,255,255,0.62)'}},'Settings are saved on this device.')));
@@ -1935,6 +1964,7 @@ function App(){
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
   GAME_AUDIO_VOLUME=gameSettings.sfxVolume;
+  updatePerf(gameSettings.perfMode);
   var s_settingsErr=useState(''),settingsSaveError=s_settingsErr[0],setSettingsSaveError=s_settingsErr[1];
   var s_showSettings=useState(false),showSettings=s_showSettings[0],setShowSettings=s_showSettings[1];
   var s_gm=useState(null),gmode=s_gm[0],setGmode=s_gm[1];
@@ -2058,8 +2088,8 @@ function App(){
   var s_fit=useState(1),fit=s_fit[0],setFit=s_fit[1];
   var s_rs=useState(1),rs=s_rs[0],setRs=s_rs[1],s_uz=useState(1),uiZ=s_uz[0],setUiZ=s_uz[1],s_uk=useState(1),uiK=s_uk[0],setUiK=s_uk[1],rsRef=useRef(1);
   rsRef.current=rs;if(RS!==rs)setRS(rs);
-  useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?GW+8+18+300:GW+8,minFit=online?0.25:0.4,f=Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(4,Math.max(1,Math.ceil(z*d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale]);
-  useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad();},[]);
+  useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?GW+8+18+300:GW+8,minFit=online?0.25:0.4,f=Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(PERF_LOW?1:Math.min(4,Math.max(1,Math.ceil(z*d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale]);
+  useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad(); var perfTimer=setInterval(function(){updatePerf(gameSettings.perfMode);},5000);},[]);
 
   function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(8);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
   function updateGameSettings(patch){
@@ -2400,7 +2430,7 @@ function App(){
     var alive=true;lfRef.current=0;
     function loop(now){
       if(!alive)return;
-      if(now-lfRef.current>=1000/60-2){
+      if(now-lfRef.current>=(PERF_LOW?1000/30-2:1000/60-2)){
        try{
         var kk=Object.assign({},kRef.current),jr=jrRef.current;
         var ls=gsRef.current.left,rs=gsRef.current.right,ball=gsRef.current.ball;
@@ -2662,7 +2692,7 @@ function App(){
           ),
         React.createElement('p',{style:{margin:0,fontSize:13,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
           React.createElement('span',{className:'kbd'},'W'),React.createElement('span',{className:'kbd'},'A'),React.createElement('span',{className:'kbd'},'S'),React.createElement('span',{className:'kbd'},'D'),' or arrow keys to move, ',React.createElement('span',{className:'kbd'},'Enter'),' or ',React.createElement('span',{className:'kbd'},'Space'),' to choose'),
-        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.4.2')
+        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},'v24.4.3')
       )
     );
   }
