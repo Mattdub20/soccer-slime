@@ -2814,8 +2814,7 @@ function App(){
             React.createElement('div',{style:{height:100,overflow:'hidden'}},React.createElement(PracticePreviewCanvas,{type:mkey,k:uiK,theme:themeMode})));
         })
       ),
-      React.createElement('button',{onClick:openTrainingSelect,style:Object.assign(pill('linear-gradient(135deg,#f59e0b,#b45309)',{fontSize:14,padding:'10px 24px'}),focusSty('training_open'))},'Training Challenges'),
-      React.createElement('div',{style:{textAlign:'center'}},label('Your Side'),
+            React.createElement('button',{disabled:true,title:'Coming soon',style:Object.assign(pill('linear-gradient(135deg,#64748b,#475569)',{fontSize:14,padding:'10px 24px'}),{opacity:0.6,cursor:'not-allowed',boxShadow:'none'},focusSty('training_open'))},'Training Challenges - Unavailable'),
         React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?btnPrimary:btnSecondary,{padding:'9px 22px',fontSize:13}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
       React.createElement('button',{onClick:function(){setScreen('menu');},style:ghostBtn('back')},'Back')
     )
