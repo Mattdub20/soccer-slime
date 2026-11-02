@@ -636,7 +636,7 @@ function drawJapanFlag(ctx,t){
   for(i=0;i<N;i++){ph=Math.sin(t*0.004-i*0.55);ctx.drawImage(f,i*sw,0,sw+0.5*RS,f.height,fx+i*w,fy+ph*3.2*(i/N),w+0.5,64);if(ph>0){ctx.fillStyle='rgba(0,0,0,'+(0.07*ph)+')';ctx.fillRect(fx+i*w,fy+ph*3.2*(i/N),w+0.5,64);}}
 }
 
-function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNight,isJapan,skins){
+function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNight,isJapan,skins,showTrainingKeeper){
   if(isJapan){var gr=ctx.createLinearGradient(0,0,0,GH-GRND);gr.addColorStop(0,'#3f8fd8');gr.addColorStop(0.55,'#7dbbea');gr.addColorStop(1,'#cfe7f6');ctx.fillStyle=gr;ctx.fillRect(0,0,GW,GH);}
   else if(isNight){var grN=ctx.createLinearGradient(0,0,0,GH);grN.addColorStop(0,'#020818');grN.addColorStop(1,'#0a1628');ctx.fillStyle=grN;ctx.fillRect(0,0,GW,GH);}
   else{var grD=ctx.createLinearGradient(0,0,0,GH*0.7);grD.addColorStop(0,'#3a9ae6');grD.addColorStop(0.6,'#7cc8f2');grD.addColorStop(1,'#cdeefb');ctx.fillStyle=grD;ctx.fillRect(0,0,GW,GH);}
@@ -704,7 +704,10 @@ function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNig
   dG(false);dG(true);
   ls._ballX=ball.x; ls._ballY=ball.y; rs._ballX=ball.x; rs._ballY=ball.y;
   if(mode==='multi'||mode==='single'||mode==='online'){drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left);drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right);}
-  else if(mode==='practice'||mode==='training'){if(side==='right')drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right);else drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left);}
+  else if(mode==='practice'||mode==='training'){
+    if(mode==='training'&&showTrainingKeeper){drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left);drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right);}
+    else if(side==='right')drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right);else drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left);
+  }
   drawBall(ctx,ball,isNight,isJapan);
 }
 
@@ -1178,7 +1181,7 @@ function GuideScreenshot(props){
     ctx.save();ctx.font='bold 14px "Lilita One",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
     var label=kind==='objective'?'SCORE!':kind==='p1'?'JUMP + MOVE':kind==='p2'?'P2 CONTROLS':kind==='keys'?'KEYBOARD SHORTCUTS':kind==='ai'?'AI POSITIONS FOR THE BALL':kind==='overtime'?'GOLDEN GOAL':kind==='replay'?'INSTANT REPLAY':kind==='practice'?'FREE PRACTICE':kind==='camping'?'GOAL-LINE WARNING':'';
     ctx.fillStyle=labelBg;ctx.fillRect(GW/2-115,GH-37,230,25);ctx.fillStyle='#fff';ctx.fillText(label,GW/2,GH-25);
-    if(kind==='overtime'){ctx.font='bold 22px "Lilita One",sans-serif';ctx.fillStyle=rightHud;ctx.shadowColor=rightHud;ctx.shadowBlur=14;ctx.fillText('GOLDEN GOAL',GW/2,95);}
+    if(kind==='overtime'){ctx.font='bold 22px "Lilita One",sans-serif';ctx.fillStyle=rightHud;ctx.shadowColor=rightHud;ctx.shadowBlur=14;ctx.fillText('OVERTIME',GW/2,95);}
     else if(kind==='replay'){ctx.fillStyle=hudBg;ctx.fillRect(0,48,GW,24);ctx.fillStyle=highlight;ctx.textAlign='left';ctx.fillText('INSTANT REPLAY',12,60);ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,GH-8,GW,4);ctx.fillStyle=highlight;ctx.fillRect(0,GH-8,GW*0.68,4);}
     else if(kind==='camping'){ctx.strokeStyle=rightHud;ctx.lineWidth=4;ctx.strokeRect(0,GH-GRND-70,GOALW,GH-(GH-GRND-70));ctx.fillStyle=rightHud;ctx.fillText('1.0s',52,GH-GRND-82);}
     else if(kind==='p1'||kind==='p2'||kind==='keys'){ctx.fillStyle='rgba(255,255,255,0.94)';ctx.font='bold 12px "Lilita One",sans-serif';ctx.fillText(kind==='p1'?'A / D  ·  W  ·  S':kind==='p2'?'← / →  ·  ↑  ·  ↓':'J  ·  P  ·  SPACE',GW/2,GH-54);}
@@ -1190,7 +1193,7 @@ function GuideScreenshot(props){
 function GuideScreen(props){
   var onBack=props.onBack;
   useEffect(function(){function h(e){if(e.key==='Escape')onBack();}window.addEventListener('keydown',h);return function(){window.removeEventListener('keydown',h);};},[onBack]);
-  var S=[{t:'Objective',b:'Score more goals before time runs out. Then the clock stops and overtime rules apply, and the next goal wins.',shot:'objective'},{t:'P1 Controls',b:'Move: A/D  Jump: W (double jump in air)  Dash: S',shot:'p1'},{t:'P2 Controls',b:'Move: arrows  Jump: up  Dash: down',shot:'p2'},{t:'Extra keys',b:'J: toggle unlimited jump in Practice only. P/Space: pause outside Practice.',shot:'keys'},{t:'Controller and touch',b:'Connect a gamepad before or during a match: left stick or D-pad moves, A jumps, and B dashes. On phones and tablets, use the on-screen arrows, jump, and dash buttons.',shot:'keys'},{t:'AI difficulty',b:'Easy is relaxed. Hard uses varied tactics, cuts off angles and defends high balls. Impossible also learns from every goal and studies how you score.',shot:'ai'},{t:'Match options',b:'Before a match, choose unlimited scoring or a 3, 5, or 10-goal limit and enable or disable overtime. Choose the arena with the Day, Night, or Sakura theme controls. In online play the host chooses the score limit and overtime rules.',shot:'objective'},{t:'Golden Goal (0:00)',b:'When overtime is enabled and scores are tied at 0:00, the next goal wins. Turn overtime off in match options to end tied matches as a draw.',shot:'overtime'},{t:'Replay',b:'After each goal in multiplayer. Scorer skips with jump key.',shot:'replay'},{t:'Training challenges',b:'Practice aiming shots, jump and dash timing, and saving goals in 45-second drills. Score enough points for bronze, silver, or gold medals.',shot:'practice'},{t:'After the match',b:'Review the score and best streak, plus fastest shot, longest goal, saves, and longest rally.',shot:'objective'},{t:'Practice',b:'No opponent, no timer. R to reset. Toggle unlimited jump with J or the ∞ Jump button.',shot:'practice'},{t:'Camping Penalty',b:'Stay in your own goal 1s = opponent gets free goal.',shot:'camping'}];
+  var S=[{t:'Objective',b:'Score more goals before time runs out. At 0:00, overtime rules apply based on your match settings.',shot:'objective'},{t:'P1 Controls',b:'Move: A/D  Jump: W (double jump in air)  Dash: S',shot:'p1'},{t:'P2 Controls',b:'Move: arrows  Jump: up  Dash: down',shot:'p2'},{t:'Extra keys',b:'J: toggle unlimited jump in Practice only. P/Space: pause outside Practice.',shot:'keys'},{t:'Controller and touch',b:'Connect a gamepad before or during a match: left stick or D-pad moves, A jumps, and B dashes. On phones and tablets, use the on-screen arrows, jump, and dash buttons.',shot:'keys'},{t:'AI difficulty',b:'Easy is relaxed. Hard uses varied tactics, cuts off angles and defends high balls. Impossible also learns from every goal and studies how you score.',shot:'ai'},{t:'Match options',b:'Before a match, choose unlimited scoring or a 3, 5, or 10-goal limit and enable or disable overtime. Choose the arena with the Day, Night, or Sakura theme controls. In online play the host chooses the score limit and overtime rules.',shot:'objective'},{t:'Overtime (0:00)',b:'When overtime is enabled, play continues at 0:00 regardless of the score. The first goal in overtime wins the match. Turn overtime off in match options to end the match when time runs out.',shot:'overtime'},{t:'Replay',b:'After each goal in multiplayer. Scorer skips with jump key.',shot:'replay'},{t:'Training challenges',b:'Practice aiming shots, jump and dash timing, and saving goals in 45-second drills. Score enough points for bronze, silver, or gold medals.',shot:'practice'},{t:'After the match',b:'Review the score and best streak, plus fastest shot, longest goal, saves, and longest rally.',shot:'objective'},{t:'Practice',b:'No opponent, no timer. R to reset. Toggle unlimited jump with J or the ∞ Jump button.',shot:'practice'},{t:'Camping Penalty',b:'Stay in your own goal 1s = opponent gets free goal.',shot:'camping'}];
   return React.createElement('div',{style:{maxWidth:500,width:'100%',height:'100%',minHeight:0,margin:'0 auto',padding:'4px 0',boxSizing:'border-box',display:'flex',flexDirection:'column',alignItems:'center',overflow:'hidden'}},
     React.createElement('h2',{style:{flex:'0 0 auto',fontFamily:'var(--font-display)',color:'#fff',fontSize:34,fontWeight:700,margin:'0 0 8px',textShadow:'0 0 20px rgba(56,189,248,0.6)',letterSpacing:'0.04em',textAlign:'center'}},'How to Play'),
     React.createElement('div',{style:{flex:'1 1 0',minHeight:0,overflowY:'auto',overscrollBehavior:'contain',display:'flex',flexDirection:'column',gap:10,padding:'0 6px',width:'100%',boxSizing:'border-box'}},
@@ -1570,7 +1573,7 @@ function App(){
   var replayScorerRef=useRef(null),goalFlashDoneRef=useRef(false),postRpRef=useRef(0);
   var replayTxRef=useRef(null),replayRxRef=useRef(null),replayNetIdRef=useRef(0),netReplayRef=useRef(false);
   var scoreLimitRef=useRef(0),overtimeEnabledRef=useRef(true),soundEnabledRef=useRef(true),lastSoundAtRef=useRef(0);
-  var trainingChallengeRef=useRef(null),trainingScoreRef=useRef(0),gamepadRef=useRef({w:false,s:false}),lastGameOptionsRef=useRef({scoreLimit:0,overtime:true});
+  var trainingChallengeRef=useRef(null),trainingScoreRef=useRef(0),trainingAttemptRef=useRef({tries:0,resolved:false,resetAt:0}),trainingKeeperCooldownRef=useRef(0),gamepadRef=useRef({w:false,s:false}),lastGameOptionsRef=useRef({scoreLimit:0,overtime:true});
   var pendingWinRef=useRef(null);
   var matchRecRef=useRef([]),matchRecActiveRef=useRef(false),particlesRef=useRef([]);
   var ballTrailRef=useRef([]);
@@ -1959,6 +1962,7 @@ function App(){
   var s_sound=useState(gameSettings.soundEnabled),soundEnabled=s_sound[0],setSoundEnabled=s_sound[1];
   var s_training=useState(null),trainingResult=s_training[0],setTrainingResult=s_training[1];
   var s_trainingScore=useState(0),trainingScore=s_trainingScore[0],setTrainingScore=s_trainingScore[1];
+  var s_trainingTries=useState(0),trainingTries=s_trainingTries[0],setTrainingTries=s_trainingTries[1];
   var s_pm=useState('regular'),practMode=s_pm[0],setPractMode=s_pm[1];
   var s_mf=useState([]),matchFrames=s_mf[0],setMatchFrames=s_mf[1];
   var s_mc=useState(DC),matchColors=s_mc[0],setMatchColors=s_mc[1];
@@ -2069,6 +2073,31 @@ function App(){
     trainingChallengeRef.current=challenge;
     startGame('training','training',DC,{left:'YOU',right:'YOU'},sideRef.current,challenge,null,null);
   }
+  function openTrainingSelect(){setFocusIdx(0);setScreen('training_select');}
+  function launchTrainingBall(challenge,playerSide){
+    var player=playerSide==='right'?gsRef.current.right:gsRef.current.left,ground=GH-GRND,ball;
+    if(challenge==='aim'){
+      var shotDir=playerSide==='right'?-1:1;
+      ball={x:player.x+shotDir*110,y:ground-40-Math.random()*90,vx:shotDir*(3.8+Math.random()*1.8),vy:-1-Math.random()*2,spin:0};
+    }else{
+      var towardPlayer=playerSide==='right'?1:-1,distance,speed,vertical;
+      if(challenge==='save'){distance=180+Math.random()*105;speed=4.5+Math.random()*3;vertical=-2+Math.random()*4;}
+      else if(challenge==='dash'){distance=135+Math.random()*125;speed=3.5+Math.random()*4;vertical=-1+Math.random()*3;}
+      else{distance=100+Math.random()*135;speed=2.8+Math.random()*3.8;vertical=-4+Math.random()*6;}
+      var startX=Math.max(BR+2,Math.min(GW-BR-2,player.x-towardPlayer*distance));
+      ball={x:startX,y:ground-(challenge==='save'?75+Math.random()*145:45+Math.random()*150),vx:towardPlayer*speed,vy:vertical,spin:(Math.random()-0.5)*0.16};
+    }
+    gsRef.current.ball=ball;
+  }
+  function completeTrainingAttempt(success){
+    var attempt=trainingAttemptRef.current;
+    if(attempt.resolved||pmRef.current!=='training')return;
+    attempt.resolved=true;attempt.tries++;
+    setTrainingTries(attempt.tries);
+    if(success){trainingScoreRef.current++;setTrainingScore(trainingScoreRef.current);}
+    if(trainingChallengeRef.current==='dash'&&attempt.tries>=10){attempt.resetAt=0;finishTraining();return;}
+    attempt.resetAt=performance.now()+420;
+  }
   function getNavGrid(){
     if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','settings','online','guide','playerdata'],['theme']];
     if(screen==='online'){
@@ -2100,7 +2129,7 @@ function App(){
       single:function(){pmRef.current='single';setGmode('single');setScreen('duration');},
       multi:function(){pmRef.current='multi';setGmode('multi');setScreen('player_select');},
       practice:function(){setScreen('practice_select');},
-      training_open:function(){setScreen('training_select');},
+      training_open:openTrainingSelect,
       train_aim:function(){startTraining('aim');},
       train_jump:function(){startTraining('jump');},
       train_dash:function(){startTraining('dash');},
@@ -2202,9 +2231,7 @@ function App(){
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
     var pm=practRef.current?practModeRef.current:'regular',hSide=sideRef.current;
     if(pmRef.current==='training'){
-      var trainingSl=hSide==='right'?gsRef.current.right:gsRef.current.left,challenge=trainingChallengeRef.current;
-      if(challenge==='save')gsRef.current.ball={x:trainingSl.x+(hSide==='right'?-145:145),y:GH-GRND-90,vx:hSide==='right'?6:-6,vy:-1};
-      else gsRef.current.ball={x:trainingSl.x+(hSide==='right'?-90:90),y:GH-GRND-75,vx:hSide==='right'?-2.8:2.8,vy:-2};
+      launchTrainingBall(trainingChallengeRef.current,hSide);
     }else if(practRef.current&&pm==='ground'){gsRef.current.ball={x:GW/2,y:GH-GRND-BR-1,vx:0,vy:0};}
     else if(practRef.current&&pm==='air'){var airVx=hSide==='right'?5:-5;gsRef.current.ball={x:hSide==='right'?GW/2-100:GW/2+100,y:GH-GRND-160,vx:airVx,vy:-9};}
     else{gsRef.current.ball={x:GW/2,y:150,vx:0,vy:0};}
@@ -2218,8 +2245,8 @@ function App(){
   function finishTraining(){
     if(goRef.current)return;
     var challenge=trainingChallengeRef.current||'aim',score=trainingScoreRef.current;
-    var medals={aim:[2,4,6],jump:[3,6,10],dash:[2,4,7],save:[1,3,5]}[challenge]||[2,4,6];
-    setTrainingResult({challenge:challenge,score:score,medal:score>=medals[2]?'Gold':score>=medals[1]?'Silver':score>=medals[0]?'Bronze':'No medal'});
+    var medals={aim:[2,4,6],jump:[3,6,10],dash:[4,6,7],save:[3,5,7]}[challenge]||[2,4,6];
+    setTrainingResult({challenge:challenge,score:score,attempts:trainingAttemptRef.current.tries,medal:score>=medals[2]?'Gold':score>=medals[1]?'Silver':score>=medals[0]?'Bronze':'No medal'});
     triggerWin('training');
   }
   function doGoalFlashThenReset(goalSide,scoring,isSingle){
@@ -2249,6 +2276,7 @@ function App(){
     if(replayActiveRef.current||goalFlashRef.current||frozenRef.current)return;
     if(practRef.current){resetPosRef.current(false);return;}
     if(goRef.current)return;
+    if(pmRef.current==='training'&&trainingChallengeRef.current!=='aim'){completeTrainingAttempt(false);return;}
     var scoring=goalSide==='left'?'right':'left',st=statsRef.current;
     if(scoring==='left')st.lG++;else st.rG++;
     if(pmRef.current!=='training')recordAchievementGoal(scoring);
@@ -2264,7 +2292,7 @@ function App(){
     if(soundEnabledRef.current)playGameSound('goal');
     var isSingle=pmRef.current==='single'||pmRef.current==='training';
     if(pmRef.current!=='training'&&scoreLimitRef.current>0&&Math.max(st.lG,st.rG)>=scoreLimitRef.current){pendingWinRef.current=scoring;doGoalFlashThenReset(goalSide,scoring,isSingle);return;}
-    if(otRef.current){if(st.lG!==st.rG){var overtimeWinner=st.lG>st.rG?'left':'right';if(isSingle)triggerWin(overtimeWinner);else{pendingWinRef.current=overtimeWinner;doGoalFlashThenReset(goalSide,scoring,isSingle);}}else doGoalFlashThenReset(goalSide,scoring,isSingle);return;}
+    if(otRef.current){if(isSingle)triggerWin(scoring);else{pendingWinRef.current=scoring;doGoalFlashThenReset(goalSide,scoring,isSingle);}return;}
     doGoalFlashThenReset(goalSide,scoring,isSingle);
   }
   scoreGoalRef.current=scoreGoal;
@@ -2274,7 +2302,7 @@ function App(){
     if(tl!==0||!running||ot||isPractice&&gmode!=='training'||onRoleRef.current==='guest')return;
     if(gmode==='training'){finishTraining();return;}
     var stats=statsRef.current;
-    if(stats.lG!==stats.rG||!overtimeEnabledRef.current){triggerWin(stats.lG===stats.rG?'draw':stats.lG>stats.rG?'left':'right');return;}
+    if(!overtimeEnabledRef.current){triggerWin(stats.lG===stats.rG?'draw':stats.lG>stats.rG?'left':'right');return;}
     setOt(true);otRef.current=true;otReadyRef.current=false;
   },[tl]);
 
@@ -2283,7 +2311,7 @@ function App(){
     jumpHeldRef.current={left:false,right:false};
     if(options&&typeof options.scoreLimit==='number'){setScoreLimit(options.scoreLimit);scoreLimitRef.current=options.scoreLimit;}
     if(options&&typeof options.overtime==='boolean'){setOvertimeEnabled(options.overtime);overtimeEnabledRef.current=options.overtime;}
-    trainingScoreRef.current=0;setTrainingScore(0);setTrainingResult(null);
+    trainingScoreRef.current=0;trainingAttemptRef.current={tries:0,resolved:false,resetAt:0};trainingKeeperCooldownRef.current=0;setTrainingScore(0);setTrainingTries(0);setTrainingResult(null);
     achievementSideRef.current=mode==='online'?(onRoleRef.current==='host'?'left':'right'):ps;
     if(mode==='single')n={left:ps==='left'?'YOU':'AI',right:ps==='right'?'YOU':'AI'};
     p1IdRef.current=pid1||null;p2IdRef.current=pid2||null;winRef.current=null;readyRef.current=null;netRfRef.current=-999;netRfPrevRef.current=-999;
@@ -2300,18 +2328,15 @@ function App(){
     matchRecRef.current=[];matchRecActiveRef.current=!prac&&mode!=='online'&&mode!=='training';particlesRef.current=[];ballTrailRef.current=[];practModeRef.current=pm2;
     qHistRef.current=[];qGoalsRef.current=0;humanBufRef.current=[];shakeRef.current=0;aiAlertRef.current=0;
     var pool=diffRef.current==='easy'?EP:diffRef.current==='impossible'?IP:HP;stratRef.current=pool[Math.floor(Math.random()*pool.length)];stratTimRef.current=150+Math.floor(Math.random()*200);
-    if(mode==='training')tlRef.current=45;else if(!prac)tlRef.current=matchDurationSeconds(duration);else tlRef.current=0;
+    if(mode==='training')tlRef.current=trainingChallengeRef.current==='dash'?-1:45;else if(!prac)tlRef.current=matchDurationSeconds(duration);else tlRef.current=0;
     lastGM.current=duration;lastPM.current=mode;lastCol.current=c;lastNm.current=n;lastSide.current=ps;
     lastGameOptionsRef.current={scoreLimit:scoreLimitRef.current,overtime:overtimeEnabledRef.current};
     setColors(c);setNames(n);setSc({left:0,right:0});setWinner(null);setLCD(0);setRCD(0);setEndStats(null);
     setOt(false);setGoalFlash(false);setReplayActive(false);setMatchFrames([]);setShowMatchReplay(false);
     setPaused(false);setIsPractice(prac);setGmode(mode);setActiveSide(ps);
-    if(mode==='training')setTl(45);else if(!prac)setTl(matchDurationSeconds(duration));else setTl(0);
-    if(mode==='training'){
-      var trainingSl=ps==='right'?gsRef.current.right:gsRef.current.left;
-      if(trainingChallengeRef.current==='save')gsRef.current.ball={x:trainingSl.x+(ps==='right'?-145:145),y:GH-GRND-90,vx:ps==='right'?6:-6,vy:-1};
-      else gsRef.current.ball={x:trainingSl.x+(ps==='right'?-90:90),y:GH-GRND-75,vx:ps==='right'?-2.8:2.8,vy:-2};
-    }else if(prac&&pm2==='ground'){gsRef.current.ball={x:GW/2,y:GH-GRND-BR-1,vx:0,vy:0};}
+    if(mode==='training')setTl(trainingChallengeRef.current==='dash'?-1:45);else if(!prac)setTl(matchDurationSeconds(duration));else setTl(0);
+    if(mode==='training'){launchTrainingBall(trainingChallengeRef.current,ps);}
+    else if(prac&&pm2==='ground'){gsRef.current.ball={x:GW/2,y:GH-GRND-BR-1,vx:0,vy:0};}
     else if(prac&&pm2==='air'){var airVx=ps==='right'?5:-5;gsRef.current.ball={x:ps==='right'?GW/2-100:GW/2+100,y:GH-GRND-160,vx:airVx,vy:-9};}
     else{gsRef.current.ball={x:GW/2,y:150,vx:0,vy:0};}
     setScreen('game');setRunning(true);
@@ -2449,7 +2474,7 @@ function App(){
         if(goalFlashRef.current){
           goalFlashFrRef.current++;
           var cv1=cvRef.current;
-          if(cv1){var ctx1=cv1.getContext('2d');ctx1.setTransform(RSn,0,0,RSn,0,0);ctx1.save();var shk1=shakeRef.current;if(shk1>0.4){ctx1.translate((Math.random()-0.5)*shk1,(Math.random()-0.5)*shk1);shakeRef.current=shk1*0.88;}else shakeRef.current=0;drawScene(ctx1,ls,rs,ball,cols,mode,hSide,practRef.current,fanRef.current,true,null,tm==='night',tm==='japan',getGameSlimeSkins(mode));drawParticles(ctx1,particlesRef.current);
+          if(cv1){var ctx1=cv1.getContext('2d');ctx1.setTransform(RSn,0,0,RSn,0,0);ctx1.save();var shk1=shakeRef.current;if(shk1>0.4){ctx1.translate((Math.random()-0.5)*shk1,(Math.random()-0.5)*shk1);shakeRef.current=shk1*0.88;}else shakeRef.current=0;drawScene(ctx1,ls,rs,ball,cols,mode,hSide,practRef.current,fanRef.current,true,null,tm==='night',tm==='japan',getGameSlimeSkins(mode),mode==='training'&&trainingChallengeRef.current==='aim');drawParticles(ctx1,particlesRef.current);
             var gfr=goalFlashFrRef.current,gfa=Math.max(0,0.5*(1-gfr/55));ctx1.fillStyle='rgba(0,0,0,'+gfa+')';ctx1.fillRect(0,0,GW,GH);
             var gfs=Math.min(112,72+gfr*3),gfp=0.88+0.12*Math.sin(gfr*0.35);
             ctx1.save();ctx1.textAlign='center';ctx1.textBaseline='middle';
@@ -2460,6 +2485,11 @@ function App(){
         }
 
         if(!frozenRef.current){
+          if(mode==='training'&&trainingChallengeRef.current!=='aim'&&trainingAttemptRef.current.resetAt&&now>=trainingAttemptRef.current.resetAt){
+            launchTrainingBall(trainingChallengeRef.current,hSide);
+            trainingAttemptRef.current.resolved=false;
+            trainingAttemptRef.current.resetAt=0;
+          }
           if(!gameOver){
             var liveStats=statsRef.current,ballSpeed=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy);
             liveStats.rallyFrames++;liveStats.fastestShot=Math.max(liveStats.fastestShot||0,ballSpeed);
@@ -2467,6 +2497,15 @@ function App(){
           }
           if(practRef.current){if(kk['r']&&!kk['_rp'])resetPosRef.current(false);kk['_rp']=kk['r'];}
           if(!gameOver){
+            if(mode==='training'&&trainingChallengeRef.current==='aim'){
+              var keeperLeft=hSide==='right',keeper=keeperLeft?ls:rs,keeperX=keeperLeft?GOALW+SR:GW-GOALW-SR;
+              keeper.x=keeperX;keeper.vx=0;keeper.goalLineTime=0;
+              if(trainingKeeperCooldownRef.current>0)trainingKeeperCooldownRef.current--;
+              var ballTowardKeeper=keeperLeft?ball.vx<0:ball.vx>0;
+              if(trainingKeeperCooldownRef.current===0&&keeper.y>=GH-GRND-1&&ballTowardKeeper&&Math.abs(ball.x-keeper.x)<175&&ball.y<GH-GRND-20&&ball.y>GH-GRND-180){
+                keeper.vy=JUMP;trainingKeeperCooldownRef.current=48;
+              }
+            }
             var hL=(mode==='multi')||(mode==='online')||(mode==='single'&&hSide==='left')||((mode==='practice'||mode==='training')&&hSide==='left');
             var hR=(mode==='multi')||(mode==='online')||(mode==='single'&&hSide==='right')||((mode==='practice'||mode==='training')&&hSide==='right');
             if(hL){if(!ls.isSpinning)ls.vx=kk['a']?-SPD:kk['d']?SPD:0;if(kk['w']&&!kk['_wPL']){if(ls.y>=GH-GRND-1&&!ls.isSpinning){ls.vy=JUMP;ls.hasDoubleJumped=false;ls.ballRefreshJump=false;}else if(practRef.current&&unlimJumpRef.current&&!ls.isSpinning){ls.vy=JUMP*0.85;}else if(!ls.hasDoubleJumped&&!ls.isSpinning){ls.vy=JUMP*0.85;ls.hasDoubleJumped=true;}else if(ls.ballRefreshJump&&!ls.isSpinning){ls.vy=JUMP*0.85;ls.ballRefreshJump=false;}}kk['_wPL']=kk['w'];if(kk['s']&&!ls._lastDown)tryDash(ls,true,'a','d',kk);if(jr['s']){snapRel(ls,kk['d']?1:kk['a']?-1:1);jr['s']=false;}ls._lastDown=kk['s'];}
@@ -2497,13 +2536,16 @@ function App(){
           var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=0.2;if(bt[bti].life<=0)bt.splice(bti,1);}
           if(ball.x<BR){var wh1=Math.abs(ball.vx);ball.x=BR;ball.vx=-ball.vx*0.88;ball.vy+=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;emitWall(particlesRef.current,ball.x,ball.y,wh1);}
           if(ball.x>GW-BR){var wh2=Math.abs(ball.vx);ball.x=GW-BR;ball.vx=-ball.vx*0.88;ball.vy-=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;emitWall(particlesRef.current,ball.x,ball.y,wh2);}
-          if(ball.y>GH-GRND-BR){var prevVy=ball.vy;ball.y=GH-GRND-BR;ball.vy=-ball.vy*BBOUND;ball.vx+=(ball.spin||0)*BR*0.25;ball.spin=(ball.spin||0)*0.7;emitBounce(particlesRef.current,ball.x,ball.y,prevVy);if(otRef.current&&!otReadyRef.current&&!goalFlashRef.current&&!frozenRef.current){otReadyRef.current=true;var curL=statsRef.current.lG,curR=statsRef.current.rG;if(curL!==curR)triggerWin(curL>curR?'left':'right');else{resetPosRef.current(pmRef.current!=='online');if(pmRef.current==='multi'||pmRef.current==='online'||pmRef.current==='single')startReady(true);}}}
+          if(ball.y>GH-GRND-BR){var prevVy=ball.vy;ball.y=GH-GRND-BR;ball.vy=-ball.vy*BBOUND;ball.vx+=(ball.spin||0)*BR*0.25;ball.spin=(ball.spin||0)*0.7;emitBounce(particlesRef.current,ball.x,ball.y,prevVy);if(mode==='training'&&trainingChallengeRef.current!=='aim')completeTrainingAttempt(false);if(otRef.current&&!otReadyRef.current&&!goalFlashRef.current&&!frozenRef.current){otReadyRef.current=true;resetPosRef.current(pmRef.current!=='online');if(pmRef.current==='multi'||pmRef.current==='online'||pmRef.current==='single')startReady(true);}}
           if(ball.y<BR){ball.y=BR;ball.vy=-ball.vy*BBOUND;}
           if(!gameOver){if(ball.x<=BR&&ball.y>GH-GRND-GOALH)scoreGoalRef.current('left');else if(ball.x>=GW-BR&&ball.y>GH-GRND-GOALH)scoreGoalRef.current('right');}
           var colSl=mode==='practice'||mode==='training'?(hSide==='right'?[rs]:[ls]):[ls,rs];
           for(var coli=0;coli<colSl.length;coli++){var csl=colSl[coli],cdY=csl.spinDipY||0,bxc=ball.x-csl.x,byc=ball.y-(csl.y+cdY),bdd=Math.sqrt(bxc*bxc+byc*byc);if(bdd>=SR+BR)continue;
             var trainingHit=mode==='training',trainingPlayer=csl===(hSide==='right'?rs:ls),incomingVx=ball.vx;
-            if(trainingHit&&trainingPlayer){var challenge=trainingChallengeRef.current,actionScore=false;if(challenge==='jump'&&csl.y<GH-GRND-1)actionScore=true;if(challenge==='dash'&&(csl.dashFrames>0||csl.isSpinning))actionScore=true;if(challenge==='save'&&(hSide==='right'?incomingVx>0:incomingVx<0))actionScore=true;if(actionScore){trainingScoreRef.current++;setTrainingScore(trainingScoreRef.current);}}
+            if(trainingHit&&trainingPlayer&&trainingChallengeRef.current!=='aim'){
+              var challenge=trainingChallengeRef.current,actionScore=challenge==='jump'&&csl.y<GH-GRND-1||challenge==='dash'&&(csl.dashFrames>0||csl.isSpinning)||challenge==='save'&&(hSide==='right'?incomingVx>0:incomingVx<0);
+              completeTrainingAttempt(actionScore);
+            }
             var isLeftSlime=csl===ls,nearGoal=isLeftSlime?ball.x<GW*0.35:ball.x>GW*0.65;
             var isSave=nearGoal&&(isLeftSlime?incomingVx< -3:incomingVx>3)&&statsRef.current.saveCooldown<=0;
             if(isSave){statsRef.current.saves++;statsRef.current.saveCooldown=45;if(soundEnabledRef.current)playGameSound('save');}
@@ -2516,7 +2558,7 @@ function App(){
         if(cv){
           var ctx=cv.getContext('2d'),ls2=gsRef.current.left,rs2=gsRef.current.right,ball2=gsRef.current.ball,cols2=colRef.current,mode2=pmRef.current,tm2=themeModeRef.current;
           ctx.setTransform(RSn,0,0,RSn,0,0);ctx.save();var shk=shakeRef.current;if(shk>0.4){ctx.translate((Math.random()-0.5)*shk,(Math.random()-0.5)*shk);shakeRef.current=shk*0.84;}else shakeRef.current=0;
-          drawScene(ctx,ls2,rs2,ball2,cols2,mode2,sideRef.current,practRef.current,fanRef.current,flashRef.current,[ls2.goalLineTime,rs2.goalLineTime],tm2==='night',tm2==='japan',getGameSlimeSkins(mode2));
+          drawScene(ctx,ls2,rs2,ball2,cols2,mode2,sideRef.current,practRef.current,fanRef.current,flashRef.current,[ls2.goalLineTime,rs2.goalLineTime],tm2==='night',tm2==='japan',getGameSlimeSkins(mode2),mode2==='training'&&trainingChallengeRef.current==='aim');
           var tr=ballTrailRef.current;
           for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.4;ctx.fillStyle=tr[tri].isJapan?'#cc0000':'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
           drawParticles(ctx,particlesRef.current);
@@ -2772,7 +2814,7 @@ function App(){
             React.createElement('div',{style:{height:100,overflow:'hidden'}},React.createElement(PracticePreviewCanvas,{type:mkey,k:uiK,theme:themeMode})));
         })
       ),
-      React.createElement('button',{onClick:function(){setScreen('training_select');},style:Object.assign(pill('linear-gradient(135deg,#f59e0b,#b45309)',{fontSize:14,padding:'10px 24px'}),focusSty('training_open'))},'Training Challenges'),
+      React.createElement('button',{onClick:openTrainingSelect,style:Object.assign(pill('linear-gradient(135deg,#f59e0b,#b45309)',{fontSize:14,padding:'10px 24px'}),focusSty('training_open'))},'Training Challenges'),
       React.createElement('div',{style:{textAlign:'center'}},label('Your Side'),
         React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?btnPrimary:btnSecondary,{padding:'9px 22px',fontSize:13}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
       React.createElement('button',{onClick:function(){setScreen('menu');},style:ghostBtn('back')},'Back')
@@ -2781,15 +2823,15 @@ function App(){
 
   if(screen==='training_select'){
     var trainingOptions=[
-      {id:'train_aim',title:'Aiming',detail:'Score goals in 45 seconds.',medal:'2 / 4 / 6 goals',color:'linear-gradient(135deg,#0ea5e9,#0369a1)',key:'1'},
-      {id:'train_jump',title:'Jump timing',detail:'Hit the ball while airborne.',medal:'3 / 6 / 10 hits',color:'linear-gradient(135deg,#8b5cf6,#6d28d9)',key:'2'},
-      {id:'train_dash',title:'Dash control',detail:'Connect with the ball mid-dash.',medal:'2 / 4 / 7 hits',color:'linear-gradient(135deg,#f97316,#c2410c)',key:'3'},
-      {id:'train_save',title:'Goalkeeping',detail:'Block shots coming at your goal.',medal:'1 / 3 / 5 saves',color:'linear-gradient(135deg,#10b981,#047857)',key:'4'}
+      {id:'train_aim',title:'Aiming',detail:'Score past a planted keeper who can only jump to block.',medal:'2 / 4 / 6 goals',color:'linear-gradient(135deg,#0ea5e9,#0369a1)',key:'1'},
+      {id:'train_jump',title:'Jump timing',detail:'Meet randomized high and low balls while airborne.',medal:'3 / 6 / 10 hits',color:'linear-gradient(135deg,#8b5cf6,#6d28d9)',key:'2'},
+      {id:'train_dash',title:'Dash control',detail:'10 randomized attempts. No timer; land 7 mid-dash hits for gold.',medal:'4 / 6 / 7 hits',color:'linear-gradient(135deg,#f97316,#c2410c)',key:'3'},
+      {id:'train_save',title:'Goalkeeping',detail:'Block randomized shots with changing speed and height.',medal:'3 / 5 / 7 saves',color:'linear-gradient(135deg,#10b981,#047857)',key:'4'}
     ];
     return React.createElement('div',{key:'training-select',className:'screen-in',style:baseStyle},bgLayer(),
       React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:720})},
-        heading('Training Challenges','Complete each 45-second drill for medals.'),
-        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:12,width:'100%'}},
+        heading('Training Challenges','Use 1–4 or keyboard navigation. Rules and medals are on each card.'),
+        React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:12,width:'100%'}},
           trainingOptions.map(function(item){
             var focused=isFocused(item.id);
             return React.createElement('button',{key:item.id,onClick:function(){startTraining(item.id.replace('train_',''));},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'flex-start',gap:7,padding:'15px 17px',borderRadius:16,border:focused?'2px solid rgba(255,255,255,0.8)':'1px solid rgba(255,255,255,0.2)',background:'rgba(5,12,35,0.82)',color:'#fff',textAlign:'left',cursor:'pointer',boxShadow:focused?'0 0 20px rgba(56,189,248,0.3)':'0 8px 20px rgba(0,0,0,0.2)'},focusSty(item.id))},
@@ -2799,7 +2841,7 @@ function App(){
           })),
         React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',alignItems:'center'}},label('Your Side'),
           ['left','right'].map(function(value){var id='side_'+value;return React.createElement('button',{key:value,onClick:function(){setSide(value);},'aria-pressed':side===value,style:Object.assign(pill(side===value?btnPrimary:btnSecondary,{padding:'8px 18px',fontSize:12}),focusSty(id))},value==='left'?'Left':'Right');})),
-        React.createElement('button',{onClick:function(){setScreen('practice_select');},style:ghostBtn('back')},'Back')));
+        React.createElement('button',{onClick:function(){setFocusIdx(3);setScreen('practice_select');},style:ghostBtn('back')},'Back')));
   }
 
   if(screen==='customise')return React.createElement('div',{key:'customise',className:'screen-in',style:baseStyle},bgLayer(),React.createElement('div',{className:'rise',style:wrapStyle},React.createElement(CustomiseScreen,{initDur:pendDur,onDurChange:function(d){setPendDur(d);},scoreLimit:scoreLimit,onScoreLimitChange:setScoreLimit,overtime:overtimeEnabled,onOvertimeChange:setOvertimeEnabled,onStart:function(c,dur,options){var n1=selP1?dbPlayers.find(function(p){return p.id===selP1;}):null,n2=selP2?dbPlayers.find(function(p){return p.id===selP2;}):null;startGame(dur||pendDur,'multi',c,{left:n1?n1.name:'P1',right:n2?n2.name:'P2'},'right','regular',selP1,selP2,options);},onBack:function(){setScreen('player_select');}})));
@@ -2905,7 +2947,7 @@ function App(){
                     React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),
                     React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.left)),
                   React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:2}},
-                    React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot?'pulse 1s ease-in-out infinite':'none'}},ot?'OVERTIME':fmt(tl)),
+                    React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot?'pulse 1s ease-in-out infinite':'none'}},ot?'OVERTIME':gmode==='training'&&trainingChallengeRef.current==='dash'?Math.max(0,10-trainingAttemptRef.current.tries)+' LEFT':fmt(tl)),
                     React.createElement('div',{style:{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center'}},
                       (isSingleG||isOnG)&&React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{padding:'2px 8px',fontSize:10,background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'),
                       !isOnG&&React.createElement('button',{onClick:togglePause,style:hudChip(false,{padding:'2px 8px',fontSize:10})},paused?'Resume':'Pause'),
@@ -2940,7 +2982,7 @@ function App(){
                     ?React.createElement(React.Fragment,null,
                       React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:4,fontWeight:800}},'Training complete'),
                       React.createElement('h2',{style:{fontFamily:DISP,fontSize:28,fontWeight:700,color:'#ffffff',margin:0,textShadow:'0 0 20px '+accentColor}},trainingResult.medal==='No medal'?'Keep practicing!':trainingResult.medal+' medal'),
-                      React.createElement('div',{style:{fontSize:13,color:'#fde68a',fontWeight:900,marginTop:5}},trainingResult.challenge.charAt(0).toUpperCase()+trainingResult.challenge.slice(1)+' · '+trainingResult.score+' points'))
+                      React.createElement('div',{style:{fontSize:13,color:'#fde68a',fontWeight:900,marginTop:5}},(trainingResult.challenge==='aim'?'Aiming':trainingResult.challenge==='jump'?'Jump timing':trainingResult.challenge==='dash'?'Dash control':'Goalkeeping')+' · '+trainingResult.score+' '+(trainingResult.challenge==='aim'?(trainingResult.score===1?'goal':'goals'):trainingResult.challenge==='save'?(trainingResult.score===1?'save':'saves'):(trainingResult.score===1?'hit':'hits'))+(trainingResult.challenge==='dash'?' / 10 tries':trainingResult.challenge==='aim'?'':' in '+trainingResult.attempts+(trainingResult.attempts===1?' attempt':' attempts'))))
                     :React.createElement(React.Fragment,null,
                       React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:4,fontWeight:800}},winner==='draw'?'Match tied':'Winner'),
                       React.createElement('h2',{style:{fontFamily:DISP,fontSize:28,fontWeight:700,color:'#ffffff',margin:0,textShadow:'0 0 20px '+accentColor}},winner==='draw'?'Draw!':(function(wn){return wn==='YOU'?'You Win!':wn+' Wins!';})(winner==='left'?(gmode==='single'&&activeSide==='right'?'AI':names.left):(gmode==='single'&&activeSide==='left'?'AI':names.right))))),
@@ -2973,7 +3015,7 @@ function App(){
             rRight&&React.createElement('span',null,keys(['←','→']),'move ',keys(['↑']),'jump ',keys(['↓']),'dash')),
           isOnG&&React.createElement('div',{style:{opacity:0.85}},(onRoleRef.current==='host'?'You are the blue slime':'You are the red slime')+' · arrow keys work too · 1–5 stickers'),
           isImpG&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(239,68,68,0.2)',border:'1px solid rgba(248,113,113,0.45)',color:'#fecaca',fontWeight:800,fontSize:11,letterSpacing:'0.06em',textTransform:'uppercase'}},'Impossible AI · has studied '+memCount+' of your goals'),
-          gmode==='training'&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(245,158,11,0.2)',border:'1px solid rgba(252,211,77,0.35)',color:'#fde68a',fontWeight:800,fontSize:11}},'Drill: '+(trainingChallengeRef.current||'aim')+' · Score '+trainingScore+' · '+fmt(tl)+' left')),
+          gmode==='training'&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(245,158,11,0.2)',border:'1px solid rgba(252,211,77,0.35)',color:'#fde68a',fontWeight:800,fontSize:11}},trainingChallengeRef.current==='dash'?'Dash control · '+trainingScore+' '+(trainingScore===1?'hit':'hits')+' · '+trainingTries+'/10 tries':(trainingChallengeRef.current==='aim'?'Aiming':trainingChallengeRef.current==='jump'?'Jump timing':'Goalkeeping')+' · '+trainingScore+' '+(trainingChallengeRef.current==='aim'?(trainingScore===1?'goal':'goals'):trainingChallengeRef.current==='save'?(trainingScore===1?'save':'saves'):(trainingScore===1?'hit':'hits'))+' · '+fmt(tl)+' left')),
         isOnG&&React.createElement('div',{style:{position:'absolute',zIndex:2,left:(boxW+chatGap)*fit,top:0,bottom:0,width:chatW*fit,boxSizing:'border-box',display:'flex',flexDirection:'column',padding:12,borderRadius:16,background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.18)',boxShadow:'0 18px 50px rgba(0,0,0,0.42)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}},
         React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
           React.createElement('span',{style:{fontFamily:DISP,fontSize:18,letterSpacing:'0.04em'}},'Match Chat'),
