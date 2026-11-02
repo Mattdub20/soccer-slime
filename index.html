@@ -1651,7 +1651,7 @@ function SettingsScreen(props){
         },resetConfirmed?'Impossible AI reset ✓':'Reset Impossible AI'),
         React.createElement('div',{id:'reset-impossible-ai-help',style:{fontSize:10,color:'rgba(255,255,255,0.58)'}},resetConfirmed?'Learning data has been cleared.':'Hold for 2 seconds to confirm.'),
         React.createElement('div',{role:'progressbar','aria-label':'Reset confirmation progress','aria-valuemin':0,'aria-valuemax':100,'aria-valuenow':Math.round(resetProgress*100),style:{height:7,width:'100%',overflow:'hidden',borderRadius:10,background:'rgba(255,255,255,0.12)',opacity:resetConfirmed?0:1}},
-          React.createElement('div',{style:{height:'100%',width:(resetProgress*100)+'%',borderRadius:10,background:'linear-gradient(90deg,#f59e0b,#22c55e)',transition:'width 25ms linear'}}))
+          React.createElement('div',{style:{height:'100%',width:(resetProgress*100)+'%',borderRadius:10,background:'linear-gradient(90deg,#f59e0b,#22c55e)',transition:'width 25ms linear'}})),
       React.createElement('p',{style:{margin:0,fontSize:11,color:'rgba(255,255,255,0.62)'}},'Settings are saved on this device.')));
 }
 function App(){
