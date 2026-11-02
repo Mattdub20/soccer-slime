@@ -1541,7 +1541,8 @@ function SettingsScreen(props){
     var sideButtons=Array.prototype.slice.call(panelRef.current.querySelectorAll('button[aria-pressed]'));
     var checkbox=panelRef.current.querySelector('input[type="checkbox"]');
     var sliders=Array.prototype.slice.call(panelRef.current.querySelectorAll('input[type="range"]'));
-    var rows=[[closeButton],sideButtons,checkbox?[checkbox]:[],sliders.length?[sliders[0]]:[],sliders.length>1?[sliders[1]]:[]].filter(function(row){return row.length;});
+    var resetAIButton=panelRef.current.querySelector('button[data-reset-impossible-ai]');
+    var rows=[[closeButton],sideButtons,checkbox?[checkbox]:[],sliders.length?[sliders[0]]:[],sliders.length>1?[sliders[1]]:[],resetAIButton?[resetAIButton]:[]].filter(function(row){return row.length;});
     var rowIndex=-1,columnIndex=0;
     for(var ri=0;ri<rows.length;ri++){var ci=rows[ri].indexOf(active);if(ci!==-1){rowIndex=ri;columnIndex=ci;break;}}
     if(rowIndex===-1){rows[1][0].focus();return;}
@@ -1575,6 +1576,24 @@ function SettingsScreen(props){
       var active=settings.perfMode===o[0];
       return React.createElement('button',{key:o[0],type:'button','aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
     }))),
+          React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
+        React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#fca5a5'}},'Impossible AI'),
+        React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)',lineHeight:1.4}},'Reset the Impossible AI learning back to its default state.'),
+        React.createElement('button',{
+          type:'button',
+          'data-reset-impossible-ai':true,
+          onClick:props.onResetImpossibleAI,
+          style:{
+            padding:'9px 18px',
+            borderRadius:50,
+            border:'1px solid rgba(248,113,113,0.5)',
+            background:'rgba(239,68,68,0.16)',
+            color:'#fecaca',
+            fontWeight:900,
+            cursor:'pointer'
+          }
+        },'Reset Impossible AI')
+      ),
       slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});}),
       props.saveError&&React.createElement('div',{role:'alert',style:{fontSize:12,lineHeight:1.4,color:'#fecaca'}},props.saveError),
       React.createElement('p',{style:{margin:0,fontSize:11,color:'rgba(255,255,255,0.62)'}},'Settings are saved on this device.')));
@@ -2100,6 +2119,22 @@ function App(){
     try{window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(next));setSettingsSaveError('');}
     catch(error){console.error('Game settings could not be saved.',error);setSettingsSaveError('Settings could not be saved on this device.');}
   }
+  function resetImpossibleAI(){
+  qTableRef.current={};
+  qHistRef.current=[];
+  qGoalsRef.current=0;
+  hPatternsRef.current={};
+  humanBufRef.current=[];
+  aiAlertRef.current=0;
+
+  try{
+    window.localStorage.removeItem('slime_qtv3');
+    window.localStorage.removeItem('slime_hpatterns_v2');
+  }catch(e){}
+
+  stratRef.current='balanced';
+  stratTimRef.current=150+Math.floor(Math.random()*200);
+}
   function startTraining(challenge){
     trainingChallengeRef.current=challenge;
     startGame('training','training',DC,{left:'YOU',right:'YOU'},sideRef.current,challenge,null,null);
@@ -2635,7 +2670,7 @@ function App(){
   function bgLayer(){return React.createElement(ThemeBg,{theme:themeMode});}
 
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
-  if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'})},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
+  if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'})},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress)})));
   if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,onBack:function(){setShowMatchReplay(false);}})));
