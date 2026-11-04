@@ -1636,16 +1636,55 @@ function AccountScreen(props){
   var unlockedFrames=props.unlockedFrames||[];
   var unlockedSkins=props.unlockedSkins||[];
   var fileRef=useRef(null),nameRef=useRef(null),panelRef=useRef(null);
+  // The name box starts focused but locked; Enter/Space (or a click) unlocks it for typing.
+  var s_edit=useState(false),editingName=s_edit[0],setEditingName=s_edit[1];
   useEffect(function(){if(nameRef.current)nameRef.current.focus();},[]);
-  function handleAccountKeyDown(e){
-    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();props.onBack();return;}
-    if(e.key!=='Tab'||!panelRef.current)return;
-    var controls=Array.prototype.slice.call(panelRef.current.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(function(el){return el.type!=='file'&&el.getClientRects().length>0;});
+  function startEditingName(){setEditingName(true);setTimeout(function(){var el=nameRef.current;if(el){el.focus();var n=el.value.length;try{el.setSelectionRange(n,n);}catch(err){}}},0);}
+  function accountControls(){
+    if(!panelRef.current)return[];
+    return Array.prototype.slice.call(panelRef.current.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(function(el){return el.type!=='file'&&el.getClientRects().length>0;});
+  }
+  // Move focus to the nearest control in the pressed direction (works for rows of chips and single columns alike).
+  function moveAccountFocus(dx,dy){
+    var controls=accountControls(),cur=document.activeElement;
     if(!controls.length)return;
-    var index=controls.indexOf(document.activeElement);
-    e.preventDefault();
-    if(index<0)index=e.shiftKey?0:-1;
-    controls[(index+(e.shiftKey?-1:1)+controls.length)%controls.length].focus();
+    if(controls.indexOf(cur)<0){controls[0].focus();return;}
+    var a=cur.getBoundingClientRect(),ax=a.left+a.width/2,ay=a.top+a.height/2,best=null,bestScore=Infinity;
+    controls.forEach(function(el){
+      if(el===cur)return;
+      var b=el.getBoundingClientRect(),bx=b.left+b.width/2,by=b.top+b.height/2,along=dx?(bx-ax)*dx:(by-ay)*dy,across=dx?Math.abs(by-ay):Math.abs(bx-ax);
+      if(along<=4)return;
+      var score=along+across*(dx?3:0.6);
+      if(score<bestScore){bestScore=score;best=el;}
+    });
+    if(!best&&dy){var i=controls.indexOf(cur);best=controls[(i+dy+controls.length)%controls.length];}
+    if(best){best.focus();if(best.scrollIntoView)best.scrollIntoView({block:'nearest'});}
+  }
+  function handleAccountKeyDown(e){
+    var target=e.target,key=e.key.toLowerCase();
+    if(target===nameRef.current){
+      if(editingName){
+        if(key==='enter'||key==='escape'){e.preventDefault();e.stopPropagation();setEditingName(false);}
+        return;
+      }
+      if(key==='enter'||key===' '){e.preventDefault();e.stopPropagation();startEditingName();return;}
+    }
+    if(key==='escape'){e.preventDefault();e.stopPropagation();props.onBack();return;}
+    if(key==='tab'){
+      var controls=accountControls();
+      if(!controls.length)return;
+      var index=controls.indexOf(document.activeElement);
+      e.preventDefault();
+      if(index<0)index=e.shiftKey?0:-1;
+      controls[(index+(e.shiftKey?-1:1)+controls.length)%controls.length].focus();
+      return;
+    }
+    if(target.type==='range'&&(key==='arrowleft'||key==='arrowright'))return;
+    if(target.tagName==='SELECT'&&(key==='enter'||key===' ')){e.preventDefault();try{target.showPicker();}catch(err){}return;}
+    var dx=(key==='arrowright'||key==='d')?1:(key==='arrowleft'||key==='a')?-1:0,dy=(key==='arrowdown'||key==='s')?1:(key==='arrowup'||key==='w')?-1:0;
+    if(!dx&&!dy)return;
+    e.preventDefault();e.stopPropagation();
+    moveAccountFocus(dx,dy);
   }
   function updateAvatar(patch){setAvatar(function(current){return cleanAccountAvatar(Object.assign({},current,patch));});setNotice('');}
   function selectPhoto(e){
@@ -1687,9 +1726,9 @@ function AccountScreen(props){
   return React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'account-screen-title','aria-describedby':'account-keyboard-help',onKeyDown:handleAccountKeyDown,style:{width:'100%',height:'100%',minHeight:'100%',display:'flex',alignItems:'center',justifyContent:'center',padding:16,boxSizing:'border-box'}},
     React.createElement('div',{ref:panelRef,style:panel},
       React.createElement('h1',{id:'account-screen-title',style:{fontFamily:'var(--font-display)',fontSize:34,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.55)'}},'Your Account'),
-      React.createElement('p',{id:'account-keyboard-help',style:{margin:'-8px 0 0',fontSize:11,color:'rgba(255,255,255,0.68)',textAlign:'center'}},'Tab / Shift+Tab to move · Enter or Space to activate buttons · Esc to return'),
+      React.createElement('p',{id:'account-keyboard-help',style:{margin:'-8px 0 0',fontSize:11,color:'rgba(255,255,255,0.68)',textAlign:'center'}},'Arrow keys / WASD to move · Enter or Space to select · Esc to return'),
       React.createElement('label',{style:{display:'flex',flexDirection:'column',gap:6,width:'100%',fontSize:12,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase'}},'Player name',
-        React.createElement('input',{ref:nameRef,value:name,maxLength:12,placeholder:'Optional name for online play',onChange:function(e){setName(e.target.value);setError('');},style:{fontFamily:'var(--font-body)',fontSize:17,padding:'10px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,0.28)',background:'rgba(0,0,0,0.3)',color:'#fff',boxSizing:'border-box'}})),
+        React.createElement('input',{ref:nameRef,value:name,maxLength:12,readOnly:!editingName,'aria-description':editingName?'Press Enter when done':'Press Enter or Space to edit',placeholder:editingName?'Type a name for online play':'Press Enter to edit your name',onMouseDown:function(){if(!editingName)startEditingName();},onBlur:function(){setEditingName(false);},onChange:function(e){setName(e.target.value);setError('');},style:{fontFamily:'var(--font-body)',fontSize:17,padding:'10px 12px',borderRadius:12,border:'1px solid '+(editingName?'#7dd3fc':'rgba(255,255,255,0.28)'),background:editingName?'rgba(0,0,0,0.45)':'rgba(0,0,0,0.3)',color:'#fff',boxSizing:'border-box',cursor:editingName?'text':'pointer',caretColor:editingName?'auto':'transparent'}})),
       React.createElement('div',{style:{display:'flex',alignItems:'center',gap:14,width:'100%',padding:'12px 0',borderTop:'1px solid rgba(255,255,255,0.12)',borderBottom:'1px solid rgba(255,255,255,0.12)'}},
         React.createElement(ProfileAvatar,{profile:avatar,size:76}),
         React.createElement('div',{style:{flex:1,minWidth:0,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}},
@@ -3043,7 +3082,7 @@ function App(){
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
-          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.5.4')),
+          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.5.5')),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
