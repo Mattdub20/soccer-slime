@@ -1490,7 +1490,7 @@ function PlayerDataScreen(props){
   }
   return React.createElement('div',{onKeyDownCapture:handlePlayerDataKeyCapture,style:{color:'#fff',minHeight:'100%',padding:'clamp(20px,7vh,64px) max(16px, env(safe-area-inset-left, 0px)) 24px',maxWidth:700,margin:'0 auto',boxSizing:'border-box'}},
     React.createElement('div',{style:{display:'flex',alignItems:'center',marginBottom:16,gap:12}},
-      React.createElement('h1',{style:{fontFamily:'var(--font-display)',fontSize:30,fontWeight:700,flex:1,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.6)'}},'Local Player Data'),
+      React.createElement('h1',{style:{fontFamily:'var(--font-display)',fontSize:30,fontWeight:700,flex:1,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.6)'}},'Stats & Social'),
       React.createElement('button',{onClick:onBack,style:{padding:'8px 20px',background:'var(--ghost)',border:'1px solid rgba(255,255,255,0.32)',borderRadius:50,color:'#fff',cursor:'pointer',fontWeight:700,fontSize:13}},'Back')
     ),
     previewAchievement&&(function(){
@@ -1504,7 +1504,7 @@ function PlayerDataScreen(props){
           React.createElement('div',{style:{fontSize:12,color:got?'#4ade80':'rgba(255,255,255,0.72)',textAlign:'center'}},got?'Unlocked! Equip it from Your Account.':ach.title+': '+ach.description+' ('+prog+' / '+ach.target+')'),
           React.createElement('button',{type:'button',autoFocus:true,onClick:function(){setPreviewAchievement(null);},style:{padding:'9px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.14)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Close')));
     })(),
-    React.createElement('div',{role:'tablist','aria-label':'Player data sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
+    React.createElement('div',{role:'tablist','aria-label':'Stats and social sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
       [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'}].map(function(option){return React.createElement('button',{key:option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
     ),
     tab==='roster'&&React.createElement('div',null,
@@ -3634,14 +3634,14 @@ function App(){
     var menuPills=[
       {key:'online',label:'Play Online',bg:'linear-gradient(135deg,#059669,#047857)',act:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');}},
       {key:'guide',label:'How to Play',bg:'linear-gradient(135deg,#475569,#1e293b)',act:function(){setScreen('guide');}},
-      {key:'playerdata',label:'Stats & Achievements',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
+      {key:'playerdata',label:'Stats & Social',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
       React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:22})},
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
-          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.6.4')),
+          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.6.5')),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
@@ -3802,7 +3802,7 @@ function App(){
             React.createElement('div',{style:{fontSize:11,color:accentColor,marginBottom:10,fontWeight:800,letterSpacing:'0.14em',textTransform:'uppercase'}},lbl),
             React.createElement('button',{onClick:function(){setSel(null);},style:Object.assign(pill(sel===null?btnPrimary:btnSecondary,{display:'block',width:'100%',textAlign:'left',marginBottom:6,padding:'9px 16px',fontSize:13,textTransform:'none',letterSpacing:0}),focusSty(gid))},'Guest'),
             React.createElement('div',{style:{maxHeight:150,overflowY:'auto'}},dbPlayers.map(function(p){return React.createElement('button',{key:p.id,onClick:function(){setSel(p.id);},style:{display:'block',width:'100%',textAlign:'left',padding:'7px 14px',borderRadius:8,fontSize:13,marginBottom:3,background:sel===p.id?btnPrimary:btnSecondary,color:'#ffffff',border:'none',cursor:'pointer',fontWeight:sel===p.id?800:500}},p.name+(p.id===linkedLocalPlayerId()?' (You)':''));})),
-            dbPlayers.length===0&&React.createElement('p',{style:{margin:'6px 2px 0',fontSize:12,color:'rgba(255,255,255,0.6)'}},'Add players under Local Player Data to track stats.'));
+            dbPlayers.length===0&&React.createElement('p',{style:{margin:'6px 2px 0',fontSize:12,color:'rgba(255,255,255,0.6)'}},'Add players under Stats & Social → Roster to track stats.'));
         })
       ),
       React.createElement('div',{style:{display:'flex',gap:10,width:'100%'}},
