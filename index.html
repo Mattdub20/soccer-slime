@@ -2054,12 +2054,12 @@ function App(){
   // needed there. Relays on port 443 over TCP/TLS look like normal HTTPS and
   // get through most firewalls. Paste your own free TURN credentials below
   // (e.g. from metered.ca → TURN Server → free plan). Leave blank for STUN only.
-  var TURN_HOST='';      // e.g. 'global.relay.metered.ca'
-  var TURN_USERNAME='';
-  var TURN_CREDENTIAL='';
+  var TURN_HOST='global.relay.metered.ca';
+  var TURN_USERNAME='698083b06e212345d6374c11';
+  var TURN_CREDENTIAL='CWNj0cLNf/ukM/kn';
   var PEER_CONNECT_TIMEOUT_MS=15000;
   function peerOptions(){
-    var ice=[{urls:['stun:stun.l.google.com:19302','stun:stun.cloudflare.com:3478']}];
+    var ice=[{urls:['stun:stun.l.google.com:19302','stun:stun.cloudflare.com:3478','stun:stun.relay.metered.ca:80']}];
     if(TURN_HOST&&TURN_USERNAME&&TURN_CREDENTIAL){
       ice.push({
         urls:['turn:'+TURN_HOST+':80','turn:'+TURN_HOST+':80?transport=tcp','turn:'+TURN_HOST+':443','turns:'+TURN_HOST+':443?transport=tcp'],
@@ -3082,7 +3082,7 @@ function App(){
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
-          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.5.5')),
+          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.5.6')),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
