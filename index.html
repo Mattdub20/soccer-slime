@@ -71,6 +71,9 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
 <script>
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
+// The game's version. Bump this with every update; open copies of the game compare it with the live site
+// and offer a reload when a newer one is published.
+var GAME_VERSION='v24.6.6';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3030,6 +3033,8 @@ function App(){
   function declineInvite(){setIncomingInvite(null);cloudClearInvite();}
   // Keep the pop-up (rendered outside App) in step with the latest invite and handlers.
   useEffect(function(){INVITE_UI.set(incomingInvite,acceptInvite,declineInvite);});
+  // Tell the update pop-up when a match is being played, so it waits until the match is over.
+  useEffect(function(){GAME_UI.setInGame(screen==='game'&&!winner);});
   function resetImpossibleAI(){
   qTableRef.current={};
   qHistRef.current=[];
@@ -3641,7 +3646,7 @@ function App(){
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
-          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.6.5')),
+          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},GAME_VERSION)),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
@@ -4143,7 +4148,42 @@ function InviteBanner(){
     React.createElement('button',{type:'button',onClick:function(){if(INVITE_UI.accept)INVITE_UI.accept();},style:{padding:'9px 16px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Join'),
     React.createElement('button',{type:'button','aria-label':'Decline invite',onClick:function(){if(INVITE_UI.decline)INVITE_UI.decline();},style:{padding:'9px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},'✕'));
 }
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(React.Fragment,null,React.createElement(App),React.createElement(InviteBanner)));
+// ── "New version available" pop-up ──
+// Every few minutes (and whenever the tab comes back into view) fetch the live page and read its GAME_VERSION.
+// If it's newer than this copy, offer a reload. Never pops up mid-match: it waits for a menu or the end screen.
+var GAME_UI={inGame:false,listeners:[],setInGame:function(v){if(this.inGame===v)return;this.inGame=v;this.listeners.forEach(function(f){f(v);});}};
+function versionParts(v){return String(v||'').replace(/^v/,'').split('.').map(function(n){return parseInt(n,10)||0;});}
+function isNewerVersion(a,b){var x=versionParts(a),y=versionParts(b);for(var i=0;i<Math.max(x.length,y.length);i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;}
+function fetchLiveVersion(){
+  if(location.protocol!=='http:'&&location.protocol!=='https:')return Promise.resolve(null);
+  return fetch(location.pathname+'?check='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(html){var m=/var GAME_VERSION='(v[\d.]+)'/.exec(html);return m?m[1]:null;}).catch(function(){return null;});
+}
+function UpdateBanner(){
+  var s_v=useState(null),newVersion=s_v[0],setNewVersion=s_v[1];
+  var s_g=useState(GAME_UI.inGame),inGame=s_g[0],setInGame=s_g[1];
+  var s_d=useState(''),dismissed=s_d[0],setDismissed=s_d[1];
+  useEffect(function(){
+    GAME_UI.listeners.push(setInGame);
+    var alive=true,last=0;
+    function check(){
+      if(Date.now()-last<60000)return;last=Date.now();
+      fetchLiveVersion().then(function(v){if(alive&&v&&isNewerVersion(v,GAME_VERSION))setNewVersion(v);});
+    }
+    var t=setInterval(check,5*60000);
+    function onVisible(){if(document.visibilityState==='visible')check();}
+    document.addEventListener('visibilitychange',onVisible);
+    setTimeout(check,15000);
+    return function(){alive=false;clearInterval(t);document.removeEventListener('visibilitychange',onVisible);GAME_UI.listeners=GAME_UI.listeners.filter(function(f){return f!==setInGame;});};
+  },[]);
+  if(!newVersion||inGame||dismissed===newVersion)return null;
+  return React.createElement('div',{role:'status','aria-live':'polite',className:'rise',style:{position:'fixed',left:'calc(env(safe-area-inset-left,0px) + 12px)',bottom:'calc(env(safe-area-inset-bottom,0px) + 12px)',zIndex:85,maxWidth:'min(360px,calc(100vw - 24px))',boxSizing:'border-box',padding:'10px 12px',borderRadius:14,background:'rgba(5,12,35,0.96)',border:'1px solid #4ade80',boxShadow:'0 10px 30px rgba(0,0,0,0.5),0 0 16px rgba(74,222,128,0.35)',display:'flex',alignItems:'center',gap:10,color:'#fff',fontFamily:'var(--font-body)'}},
+    React.createElement('div',{style:{flex:1,minWidth:0}},
+      React.createElement('div',{style:{fontSize:10,letterSpacing:'0.14em',textTransform:'uppercase',color:'#86efac',fontWeight:900}},'Update available'),
+      React.createElement('div',{style:{fontSize:13,fontWeight:800}},'Soccer Slime '+newVersion+' is out (you have '+GAME_VERSION+').')),
+    React.createElement('button',{type:'button',onClick:function(){location.href=location.pathname+'?v='+encodeURIComponent(newVersion);},style:{padding:'9px 16px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Reload'),
+    React.createElement('button',{type:'button','aria-label':'Not now',onClick:function(){setDismissed(newVersion);},style:{padding:'9px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Later'));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(React.Fragment,null,React.createElement(App),React.createElement(InviteBanner),React.createElement(UpdateBanner)));
 
 </script>
 
