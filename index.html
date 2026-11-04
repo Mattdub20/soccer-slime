@@ -73,7 +73,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.6.6';
+var GAME_VERSION='v24.6.7';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -269,7 +269,8 @@ var SKIN_FX={
   toxic:{c:['#bef264','#84cc16','#ecfccb'],g:-0.08,s:'bubble'},
   candy:{c:['#ec4899','#fbcfe8','#ffffff','#a5f3fc'],g:0.1,s:'star'},
   shadow:{c:['#ef4444','#1f2937','#fca5a5'],g:-0.04},
-  aurora:{c:['#a3e635','#2dd4bf','#d9f99d','#818cf8'],g:-0.02,s:'flake',slow:true}
+  aurora:{c:['#a3e635','#2dd4bf','#d9f99d','#818cf8'],g:-0.02,s:'flake',slow:true},
+  robot:{c:['#38bdf8','#67e8f9','#e2e8f0','#9ca3af'],g:0.12,s:'pixel'}  // the AI: cyan/silver digital pixels
 };
 // Restyle the particles emitted since index `from` to match a skin.
 function skinFx(P,from,skin){
@@ -1008,6 +1009,7 @@ function drawParticles(ctx,pts){
     if(pt.isLine){ctx.strokeStyle=pt.color;ctx.lineWidth=pt.size;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pt.x+pt.dir*pt.lineLen*(pt.life/pt.maxLife),pt.y);ctx.stroke();}
     else if(pt.shape==='star'){var sr=psz*1.6;ctx.fillStyle=pt.color;ctx.beginPath();ctx.moveTo(pt.x,pt.y-sr);ctx.lineTo(pt.x+sr*0.3,pt.y-sr*0.3);ctx.lineTo(pt.x+sr,pt.y);ctx.lineTo(pt.x+sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x,pt.y+sr);ctx.lineTo(pt.x-sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x-sr,pt.y);ctx.lineTo(pt.x-sr*0.3,pt.y-sr*0.3);ctx.closePath();ctx.fill();}
     else if(pt.shape==='flake'){ctx.strokeStyle=pt.color;ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();for(var fk=0;fk<3;fk++){var fa=fk*Math.PI/3+pt.life*0.05;ctx.moveTo(pt.x-Math.cos(fa)*psz*1.5,pt.y-Math.sin(fa)*psz*1.5);ctx.lineTo(pt.x+Math.cos(fa)*psz*1.5,pt.y+Math.sin(fa)*psz*1.5);}ctx.stroke();}
+    else if(pt.shape==='pixel'){var px=Math.max(1.5,psz*1.4);ctx.fillStyle=pt.color;ctx.fillRect(Math.round(pt.x-px/2),Math.round(pt.y-px/2),px,px);}
     else if(pt.shape==='bubble'){ctx.strokeStyle=pt.color;ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(pt.x,pt.y,psz*1.2,0,Math.PI*2);ctx.stroke();}
     else{ctx.fillStyle=pt.color;ctx.beginPath();ctx.arc(pt.x,pt.y,psz,0,Math.PI*2);ctx.fill();}
     ctx.restore();
@@ -1751,6 +1753,8 @@ function MatchReplayScreen(props){
   var s_t=useState(0),shownPos=s_t[0],setShownPos=s_t[1];
   var s_p=useState(true),playing=s_p[0],setPlaying=s_p[1];
   var s_s=useState(1),speed=s_s[0],setSpeed=s_s[1];
+  var s_rz=useState(0),setResizeTick=s_rz[1];
+  useEffect(function(){function onResize(){setResizeTick(function(n){return n+1;});}window.addEventListener('resize',onResize);return function(){window.removeEventListener('resize',onResize);};},[]);
   var fanRef=useRef(Array.from({length:CROWD_N},function(){return Math.random();}));
   var last=frames.length-1,SPEEDS=[0.25,0.5,1,2];
   // Goals: the ball touching a back wall below the crossbar. Used for timeline markers and "next goal".
@@ -1806,8 +1810,10 @@ function MatchReplayScreen(props){
   function fmt(sv){sv=Math.floor(sv);var m=Math.floor(sv/60),sec=sv%60;return(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
   function scrubTo(e){var r=e.currentTarget.getBoundingClientRect();setPos((e.clientX-r.left)/r.width*last);}
   var btn=function(active){return{padding:'7px 14px',minHeight:34,background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,'+(active?'0.6':'0.2')+')',borderRadius:50,color:'#fff',fontWeight:800,cursor:'pointer',fontSize:12};};
-  var dpr=Math.min(2,window.devicePixelRatio||1);
-  return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',width:'min(808px,96vw)'}},
+  // Draw at the size the replay is actually shown (it fills the screen), so it stays sharp when big.
+  var shownW=Math.min(window.innerWidth*0.96,Math.max(Math.min(window.innerWidth*0.96,320),(window.innerHeight-230)*2));
+  var dpr=Math.min(3,Math.max(1,shownW/GW*(window.devicePixelRatio||1)));
+  return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',width:'max(min(96vw,320px),min(96vw,calc((100dvh - 230px) * 2)))'}},
     React.createElement('div',{style:{background:'rgba(5,12,35,0.92)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px 12px 0 0',display:'flex',alignItems:'center',flexWrap:'wrap',gap:'6px 12px',padding:'10px 14px',width:'100%',boxSizing:'border-box'}},
       React.createElement('span',{style:{color:'#fbbf24',fontWeight:900,fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase'}},'Match Replay'),
       React.createElement('span',{style:{color:'rgba(255,255,255,0.65)',fontSize:12}},names.left+' vs '+names.right),
