@@ -26,6 +26,9 @@ canvas,img{-webkit-user-drag:none}
 @media (pointer:coarse){
   .touch-controls{display:flex}
   .kbd-hints{display:none!important}
+  /* comfortable finger-sized targets */
+  button,select,input:not([type=range]):not([type=color]){min-height:44px}
+  button{touch-action:manipulation;min-width:44px}
 }
 @media (pointer:coarse) and (orientation:portrait){.rotate-hint{display:block}}
 .tc-btn{display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(5,12,35,.55);color:#fff;font-size:26px;line-height:1;touch-action:none;pointer-events:auto;box-shadow:0 4px 14px rgba(0,0,0,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:transform .06s,background .06s}
@@ -209,7 +212,10 @@ var SKIN_FX={
   eclipse:{c:['#f472b6','#f5d0fe','#6366f1'],g:0.05,s:'star'},
   inferno:{c:['#fb923c','#fed7aa','#ef4444','#facc15'],g:-0.12},
   prism:{rainbow:true,g:0.06,s:'star'},
-  toxic:{c:['#bef264','#84cc16','#ecfccb'],g:-0.08,s:'bubble'}
+  toxic:{c:['#bef264','#84cc16','#ecfccb'],g:-0.08,s:'bubble'},
+  candy:{c:['#ec4899','#fbcfe8','#ffffff','#a5f3fc'],g:0.1,s:'star'},
+  shadow:{c:['#ef4444','#1f2937','#fca5a5'],g:-0.04},
+  aurora:{c:['#a3e635','#2dd4bf','#d9f99d','#818cf8'],g:-0.02,s:'flake',slow:true}
 };
 // Restyle the particles emitted since index `from` to match a skin.
 function skinFx(P,from,skin){
@@ -275,7 +281,7 @@ function cloudErrorText(e){
   return'Something went wrong ('+(code||'unknown error')+').';
 }
 // Everything that gets synced. AI learning data stays on the device (it is large and per-device).
-function readLocalSave(){return{achievements:loadAchievementProgress(),players:dbLoad(),account:loadAccountProfile(),stickers:loadOnlineStickerSlots(),settings:loadGameSettings()};}
+function readLocalSave(){return{achievements:loadAchievementProgress(),players:dbLoad(),account:loadAccountProfile(),stickers:loadOnlineStickerSlots(),settings:loadGameSettings(),friends:loadFriends()};}
 // Never lose progress: keep the higher achievement counts, and the longer history for each local player.
 function mergeSaves(local,cloud){
   if(!cloud)return local;
@@ -291,7 +297,8 @@ function mergeSaves(local,cloud){
     players:Object.keys(byId).map(function(id){return byId[id];}).slice(0,20),
     account:cloud.account||local.account,
     stickers:cloud.stickers||local.stickers,
-    settings:cloud.settings||local.settings
+    settings:cloud.settings||local.settings,
+    friends:(function(){var seen={},out=[];(cloud.friends||[]).concat(local.friends||[]).forEach(function(f){if(f&&f.uid&&!seen[f.uid]){seen[f.uid]=1;out.push(f);}});return out.slice(0,50);})()
   };
 }
 function writeLocalSave(save){
@@ -301,6 +308,7 @@ function writeLocalSave(save){
     window.localStorage.setItem('slime_account',JSON.stringify(save.account));
     window.localStorage.setItem('slime_sticker_slots',JSON.stringify(save.stickers));
     window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(save.settings));
+    window.localStorage.setItem('slime_friends',JSON.stringify(save.friends||[]));
   }catch(e){console.warn('Could not store the cloud save on this device.',e);}
 }
 function cloudDoc(){return CLOUD.db.collection('saves').doc(CLOUD.user.uid);}
@@ -314,7 +322,7 @@ function cloudPushNow(){
   clearTimeout(CLOUD.saveTimer);
   if(!CLOUD.user||!CLOUD.db)return Promise.resolve(false);
   return cloudDoc().set({data:JSON.stringify(readLocalSave()),username:cloudUsernameOf(CLOUD.user),updatedAt:firebase.firestore.FieldValue.serverTimestamp()})
-    .then(function(){CLOUD.lastSync=Date.now();if(CLOUD.onSynced)CLOUD.onSynced(true);return true;})
+    .then(function(){CLOUD.lastSync=Date.now();cloudPublish();if(CLOUD.onSynced)CLOUD.onSynced(true);return true;})
     .catch(function(e){console.warn('Cloud save failed.',e);if(CLOUD.onSynced)CLOUD.onSynced(false,e);return false;});
 }
 // Called after any local save; batches changes into one upload a couple of seconds later.
@@ -322,6 +330,33 @@ function cloudQueueSave(){
   if(!CLOUD.user||CLOUD.paused)return;
   clearTimeout(CLOUD.saveTimer);CLOUD.saveTimer=setTimeout(cloudPushNow,2500);
 }
+
+// ── Public profile (leaderboard + presence), friends and match invites ──
+// leaderboard/{uid} is the only data other players can see: username, display name, look and a few counters.
+var LEADERBOARD_FIELDS=[['wins','Wins'],['goals','Goals'],['bestWinStreak','Best streak'],['onlineWins','Online wins'],['impossibleWins','Impossible wins']];
+var ONLINE_WINDOW_MS=150000;
+function tsMillis(v){return v&&v.toMillis?v.toMillis():typeof v==='number'?v:0;}
+function cloudIsOnline(p){return !!p&&Date.now()-tsMillis(p.lastSeen)<ONLINE_WINDOW_MS;}
+function cloudPublicProfile(){
+  var a=loadAchievementProgress(),acct=loadAccountProfile(),p={username:cloudUsernameOf(CLOUD.user),name:acct.name||'',skin:acct.avatar.skin||'none',color:acct.avatar.kind==='slime'?acct.avatar.color:'#e8192c',lastSeen:firebase.firestore.FieldValue.serverTimestamp()};
+  LEADERBOARD_FIELDS.forEach(function(f){p[f[0]]=a[f[0]]||0;});
+  return p;
+}
+function lbCol(){return CLOUD.db.collection('leaderboard');}
+function cloudPublish(){if(!CLOUD.user||!CLOUD.db)return Promise.resolve();return lbCol().doc(CLOUD.user.uid).set(cloudPublicProfile()).catch(function(e){console.warn('Leaderboard update failed.',e);});}
+function cloudHeartbeat(){if(!CLOUD.user||!CLOUD.db)return Promise.resolve();return lbCol().doc(CLOUD.user.uid).set({lastSeen:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(function(){});}
+function cloudTop(field){return lbCol().orderBy(field,'desc').limit(25).get().then(function(s){return s.docs.map(function(d){return Object.assign({uid:d.id},d.data());});});}
+function cloudFindPlayer(username){return lbCol().where('username','==',username).limit(1).get().then(function(s){return s.docs.length?Object.assign({uid:s.docs[0].id},s.docs[0].data()):null;});}
+function cloudProfiles(uids){return Promise.all(uids.map(function(uid){return lbCol().doc(uid).get().then(function(d){return d.exists?Object.assign({uid:uid},d.data()):{uid:uid};}).catch(function(){return{uid:uid};});}));}
+function cloudSendInvite(toUid,code){
+  var acct=loadAccountProfile();
+  return CLOUD.db.collection('invites').doc(toUid).set({fromUid:CLOUD.user.uid,from:cloudUsernameOf(CLOUD.user),name:acct.name||'',code:code,at:firebase.firestore.FieldValue.serverTimestamp()});
+}
+function cloudWatchInvites(cb){return CLOUD.db.collection('invites').doc(CLOUD.user.uid).onSnapshot(function(s){cb(s.exists?s.data():null);},function(e){console.warn('Invite listener stopped.',e);});}
+function cloudClearInvite(){if(CLOUD.user&&CLOUD.db)CLOUD.db.collection('invites').doc(CLOUD.user.uid).delete().catch(function(){});}
+// Friends are a private list in your own save: [{uid, username}].
+function loadFriends(){try{var f=JSON.parse(window.localStorage.getItem('slime_friends')||'[]');return Array.isArray(f)?f.filter(function(x){return x&&typeof x.uid==='string'&&typeof x.username==='string';}).slice(0,50):[];}catch(e){return[];}}
+function saveFriends(list){try{window.localStorage.setItem('slime_friends',JSON.stringify(list));}catch(e){}cloudQueueSave();}
 function dbMk(name){return{id:'p'+Date.now(),name:name,wins:0,losses:0,draws:0,gf:0,ga:0,streak:0,maxStreak:0,hist:[]};}
 function dbH2H(p1,p2){var o={w:0,l:0,d:0,gf:0,ga:0,bw:null,bl:null,streak:0,streakWho:null,lines:{}};if(!p1||!p2)return o;for(var i=0;i<p1.hist.length;i++){var m=p1.hist[i];if(m.opp!==p2.id)continue;if(m.r==='w'){o.w++;if(o.streakWho===p1.id)o.streak++;else{o.streak=1;o.streakWho=p1.id;}}else if(m.r==='l'){o.l++;if(o.streakWho===p2.id)o.streak++;else{o.streak=1;o.streakWho=p2.id;}}else{o.d++;o.streak=0;o.streakWho=null;}o.gf+=m.gf;o.ga+=m.ga;var sc=m.gf+'-'+m.ga;o.lines[sc]=(o.lines[sc]||0)+1;var df=m.gf-m.ga;if(df>0&&(!o.bw||df>o.bw.d))o.bw={gf:m.gf,ga:m.ga,d:df};if(df<0&&(!o.bl||df<o.bl.d))o.bl={gf:m.gf,ga:m.ga,d:df};}return o;}
 function dbRecord(arr,id1,id2,g1,g2){var p1=null,p2=null;for(var i=0;i<arr.length;i++){if(arr[i].id===id1)p1=arr[i];if(arr[i].id===id2)p2=arr[i];}if(!p1||!p2)return;var ts=Date.now();if(g1>g2){p1.wins++;p2.losses++;p1.streak++;p2.streak=0;if(p1.streak>p1.maxStreak)p1.maxStreak=p1.streak;p1.hist.push({opp:id2,r:'w',gf:g1,ga:g2,ts:ts});p2.hist.push({opp:id1,r:'l',gf:g2,ga:g1,ts:ts});}else if(g1<g2){p2.wins++;p1.losses++;p2.streak++;p1.streak=0;if(p2.streak>p2.maxStreak)p2.maxStreak=p2.streak;p1.hist.push({opp:id2,r:'l',gf:g1,ga:g2,ts:ts});p2.hist.push({opp:id1,r:'w',gf:g2,ga:g1,ts:ts});}else{p1.draws=(p1.draws||0)+1;p2.draws=(p2.draws||0)+1;p1.streak=0;p2.streak=0;p1.hist.push({opp:id2,r:'d',gf:g1,ga:g2,ts:ts});p2.hist.push({opp:id1,r:'d',gf:g2,ga:g1,ts:ts});}p1.gf+=g1;p1.ga+=g2;p2.gf+=g2;p2.ga+=g1;}
@@ -1259,6 +1294,84 @@ function IntroScreen(props){
   return React.createElement('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,cursor:'pointer',overflow:'hidden',background:'#10213c'},onClick:skip},React.createElement('canvas',{ref:cvRef,style:{width:'100%',height:'100%',display:'block'}}),welcome,title,skipHint);
 }
 
+// Little slime dot in a player's own colour/skin, for leaderboard and friends rows.
+function PlayerDot(props){
+  var sk=achievementSkinDetails(props.skin),col=sk?sk.color:(props.color||'#64748b');
+  return React.createElement('span',{'aria-hidden':'true',style:{width:22,height:22,flex:'0 0 22px',borderRadius:'50%',background:col,border:'2px solid '+(sk?sk.accent:'rgba(255,255,255,0.5)'),boxSizing:'border-box',position:'relative'}},
+    props.online&&React.createElement('span',{style:{position:'absolute',right:-3,bottom:-3,width:10,height:10,borderRadius:'50%',background:'#22c55e',border:'2px solid #0b1430'}}));
+}
+function cloudSignInNotice(what,panelSty){
+  return React.createElement('div',{style:Object.assign({},panelSty,{padding:18,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.75)'})},
+    cloudEnabled()?'Log in under Your Account → Cloud save to see '+what+'.':'Cloud accounts are not set up for this copy of the game.');
+}
+function LeaderboardTab(props){
+  var s_f=useState('wins'),field=s_f[0],setField=s_f[1];
+  var s_r=useState(null),rows=s_r[0],setRows=s_r[1];
+  var s_e=useState(''),err=s_e[0],setErr=s_e[1];
+  useEffect(function(){
+    if(!props.cloudUser)return;
+    var alive=true;setRows(null);setErr('');
+    cloudPushNow().then(function(){return cloudTop(field);}).then(function(r){if(alive)setRows(r);}).catch(function(e){if(alive)setErr(cloudErrorText(e));});
+    return function(){alive=false;};
+  },[field,props.cloudUser]);
+  if(!props.cloudUser)return cloudSignInNotice('the leaderboard',props.panelSty);
+  var label=(LEADERBOARD_FIELDS.find(function(f){return f[0]===field;})||[field,field])[1];
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center',marginBottom:12}},
+      LEADERBOARD_FIELDS.map(function(f){var on=f[0]===field;return React.createElement('button',{key:f[0],type:'button','aria-pressed':on,onClick:function(){setField(f[0]);},style:{padding:'7px 14px',borderRadius:50,border:'1px solid '+(on?'rgba(255,255,255,0.75)':'rgba(255,255,255,0.22)'),background:on?'linear-gradient(135deg,#0ea5e9,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:800,fontSize:12,cursor:'pointer'}},f[1]);})),
+    err&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:13,textAlign:'center',marginBottom:10}},err),
+    !rows&&!err&&React.createElement('div',{style:{textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.65)'}},'Loading the leaderboard…'),
+    rows&&rows.length===0&&React.createElement('div',{style:{textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.65)'}},'No players yet. Play a match to get on the board!'),
+    rows&&rows.map(function(r,i){
+      var me=r.username===props.cloudUser,medal=i===0?'#fbbf24':i===1?'#cbd5e1':i===2?'#d97706':null;
+      return React.createElement('div',{key:r.uid,style:Object.assign({},props.panelSty,{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',marginBottom:6,borderColor:me?'#38bdf8':'rgba(255,255,255,0.1)',background:me?'rgba(14,165,233,0.16)':props.panelSty.background})},
+        React.createElement('span',{style:{width:26,textAlign:'center',fontFamily:'var(--font-display)',fontSize:18,color:medal||'rgba(255,255,255,0.6)'}},i+1),
+        React.createElement(PlayerDot,{skin:r.skin,color:r.color,online:cloudIsOnline(r)}),
+        React.createElement('div',{style:{flex:1,minWidth:0}},
+          React.createElement('div',{style:{fontWeight:900,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},(r.name||r.username)+(me?' (You)':'')),
+          r.name&&r.name.toLowerCase()!==r.username&&React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)'}},'@'+r.username)),
+        React.createElement('div',{style:{textAlign:'right'}},
+          React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:20}},r[field]||0),
+          React.createElement('div',{style:{fontSize:10,color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'0.06em'}},label)));
+    }));
+}
+function FriendsTab(props){
+  var s_n=useState(''),name=s_n[0],setName=s_n[1];
+  var s_m=useState(''),msg=s_m[0],setMsg=s_m[1];
+  var s_p=useState({}),profiles=s_p[0],setProfiles=s_p[1];
+  var s_b=useState(false),busy=s_b[0],setBusy=s_b[1];
+  var uids=props.friends.map(function(f){return f.uid;}).join(',');
+  // Refresh friends' stats and online status every 30 seconds while this tab is open.
+  useEffect(function(){
+    if(!props.cloudUser||!uids)return;
+    var alive=true;
+    function load(){cloudProfiles(uids.split(',')).then(function(list){if(!alive)return;var m={};list.forEach(function(p){m[p.uid]=p;});setProfiles(m);});}
+    load();var t=setInterval(load,30000);
+    return function(){alive=false;clearInterval(t);};
+  },[uids,props.cloudUser]);
+  if(!props.cloudUser)return cloudSignInNotice('your friends',props.panelSty);
+  function add(){
+    if(busy)return;setBusy(true);setMsg('');
+    props.onAdd(name).then(function(err){setBusy(false);if(err)setMsg(err);else{setMsg('');setName('');}});
+  }
+  var sorted=props.friends.slice().sort(function(a,b){return (cloudIsOnline(profiles[b.uid])?1:0)-(cloudIsOnline(profiles[a.uid])?1:0)||a.username.localeCompare(b.username);});
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',gap:8,marginBottom:8}},
+      React.createElement('input',{type:'text',value:name,maxLength:16,autoCapitalize:'none',spellCheck:false,placeholder:'Friend’s username','aria-label':'Friend’s username',onChange:function(e){setName(e.target.value);setMsg('');},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')add();},style:{flex:1,minWidth:0,padding:'8px 14px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:50,color:'#fff',fontSize:14,outline:'none'}}),
+      React.createElement('button',{type:'button',onClick:add,disabled:busy,style:{padding:'8px 18px',background:'linear-gradient(135deg,#22c55e,#15803d)',border:'none',borderRadius:50,color:'#fff',fontWeight:700,cursor:busy?'wait':'pointer'}},busy?'Adding…':'Add friend')),
+    msg&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:12,marginBottom:8}},msg),
+    props.friends.length===0&&React.createElement('div',{style:Object.assign({},props.panelSty,{padding:16,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.7)'})},'No friends yet. Add someone by their cloud username to see their stats and invite them to online matches.'),
+    sorted.map(function(f){
+      var p=profiles[f.uid]||{},online=cloudIsOnline(p);
+      return React.createElement('div',{key:f.uid,style:Object.assign({},props.panelSty,{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',marginBottom:6})},
+        React.createElement(PlayerDot,{skin:p.skin,color:p.color,online:online}),
+        React.createElement('div',{style:{flex:1,minWidth:0}},
+          React.createElement('div',{style:{fontWeight:900,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name||f.username),
+          React.createElement('div',{style:{fontSize:11,color:online?'#4ade80':'rgba(255,255,255,0.55)'}},(online?'Online now':'Offline')+' · '+(p.wins||0)+' wins · '+(p.goals||0)+' goals')),
+        React.createElement('button',{type:'button',disabled:!online,title:online?'Invite to an online match':'They need to be online',onClick:function(){props.onInvite(f);},style:{padding:'7px 14px',borderRadius:50,border:'none',background:online?'linear-gradient(135deg,#0ea5e9,#0369a1)':'rgba(255,255,255,0.08)',color:online?'#fff':'rgba(255,255,255,0.45)',fontWeight:800,fontSize:12,cursor:online?'pointer':'not-allowed'}},'Invite'),
+        React.createElement('button',{type:'button','aria-label':'Remove '+f.username,onClick:function(){props.onRemove(f.uid);},style:{padding:'7px 10px',borderRadius:50,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'rgba(255,255,255,0.7)',fontWeight:800,fontSize:12,cursor:'pointer'}},'✕'));
+    }));
+}
 // Small round badge showing a slime wearing an achievement skin.
 function SkinBadge(props){
   var size=props.size||34,skin=achievementSkinDetails(props.skin),canvasRef=useRef(null);
@@ -1308,8 +1421,8 @@ function PlayerDataScreen(props){
     if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||target.isContentEditable)return;
     if(previewAchievement||(target.getAttribute&&target.getAttribute('data-skin-preview')))return;
     var key=e.key.toLowerCase(),direction=(key==='arrowright'||key==='arrowdown'||key==='d'||key==='s')?1:(key==='arrowleft'||key==='arrowup'||key==='a'||key==='w')?-1:0;
-    if(direction){e.preventDefault();e.stopPropagation();var tabs=['roster','h2h','achievements'],index=tabs.indexOf(tabFocus),nextTab=tabs[(index+direction+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();}
-    else if(key==='enter'||key===' '){e.preventDefault();e.stopPropagation();setTab(tabFocus);}
+    if(direction){e.preventDefault();e.stopPropagation();var tabs=['roster','h2h','achievements','leaderboard','friends'],index=tabs.indexOf(tabFocus),nextTab=tabs[(index+direction+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();}
+    else if((key==='enter'||key===' ')&&target.getAttribute&&target.getAttribute('role')==='tab'){e.preventDefault();e.stopPropagation();setTab(tabFocus);}
   }
   return React.createElement('div',{onKeyDownCapture:handlePlayerDataKeyCapture,style:{color:'#fff',minHeight:'100%',padding:'clamp(20px,7vh,64px) max(16px, env(safe-area-inset-left, 0px)) 24px',maxWidth:700,margin:'0 auto',boxSizing:'border-box'}},
     React.createElement('div',{style:{display:'flex',alignItems:'center',marginBottom:16,gap:12}},
@@ -1328,7 +1441,7 @@ function PlayerDataScreen(props){
           React.createElement('button',{type:'button',autoFocus:true,onClick:function(){setPreviewAchievement(null);},style:{padding:'9px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.14)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Close')));
     })(),
     React.createElement('div',{role:'tablist','aria-label':'Player data sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
-      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'}].map(function(option){return React.createElement('button',{key:option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
+      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'}].map(function(option){return React.createElement('button',{key:option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
     ),
     tab==='roster'&&React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
@@ -1374,6 +1487,8 @@ function PlayerDataScreen(props){
         )
       )
     ),
+    tab==='leaderboard'&&React.createElement(LeaderboardTab,{cloudUser:props.cloudUser,panelSty:panelSty}),
+    tab==='friends'&&React.createElement(FriendsTab,{cloudUser:props.cloudUser,friends:props.friends||[],onAdd:props.onAddFriend,onRemove:props.onRemoveFriend,onInvite:props.onInviteFriend,panelSty:panelSty}),
     tab==='achievements'&&React.createElement('div',null,
       React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginBottom:12,textAlign:'center'})},
         React.createElement('div',{style:{fontSize:21,fontWeight:900,color:'#fbbf24'}},unlockedCount+' / '+ACHIEVEMENTS.length+' achievements'),
@@ -1606,8 +1721,18 @@ var ACHIEVEMENTS=[
   {id:'matches_100',title:'Hall of Fame',description:'Complete 100 matches.',stat:'matches',target:100,skin:'eclipse'},
   {id:'impossible_10',title:'Unbreakable',description:'Win 10 matches against Impossible AI.',stat:'impossibleWins',target:10,skin:'inferno'},
   {id:'hat_tricks_10',title:'Hat-Trick Hero',description:'Score 10 hat tricks in completed matches.',stat:'hatTricks',target:10,skin:'prism'},
-  {id:'clean_sheets_10',title:'Defensive Wall',description:'Win 10 matches without conceding.',stat:'cleanSheets',target:10,skin:'toxic'}
+  {id:'clean_sheets_10',title:'Defensive Wall',description:'Win 10 matches without conceding.',stat:'cleanSheets',target:10,skin:'toxic'},
+  {id:'wins_10',title:'Double Digits',description:'Win 10 matches.',stat:'wins',target:10,frame:'neon'},
+  {id:'goals_50',title:'Half Century',description:'Score 50 goals across matches.',stat:'goals',target:50,frame:'ruby'},
+  {id:'online_win',title:'Connected',description:'Win an online match.',stat:'onlineWins',target:1,frame:'sunset'},
+  {id:'comeback',title:'Comeback Kid',description:'Win a match after being 2 or more goals down.',stat:'comebacks',target:1,frame:'obsidian'},
+  {id:'long_rally',title:'Marathon Rally',description:'Keep a rally going for 20 seconds in a match.',stat:'longRallies',target:1,frame:'mint'},
+  {id:'big_win',title:'Demolition',description:'Win a match by 5 or more goals.',stat:'bigWins',target:1,skin:'candy'},
+  {id:'win_streak_5',title:'Unstoppable',description:'Win 5 matches in a row.',stat:'bestWinStreak',target:5,skin:'shadow'},
+  {id:'online_wins_10',title:'Network Legend',description:'Win 10 online matches.',stat:'onlineWins',target:10,skin:'aurora'}
 ];
+// Counters saved for achievements (all whole numbers). winStreak is the current run; bestWinStreak the record.
+var ACHIEVEMENT_STATS=['goals','wins','matches','hatTricks','cleanSheets','impossibleWins','onlineWins','comebacks','longRallies','bigWins','winStreak','bestWinStreak'];
 var ACHIEVEMENT_FRAMES=[
   {id:'sky',name:'Skyline',color:'#38bdf8'},
   {id:'flame',name:'Flame',color:'#fb7185'},
@@ -1616,7 +1741,12 @@ var ACHIEVEMENT_FRAMES=[
   {id:'emerald',name:'Emerald',color:'#34d399'},
   {id:'ice',name:'Ice',color:'#a5f3fc'},
   {id:'prism',name:'Prism',color:'#f0abfc'},
-  {id:'violet',name:'Violet',color:'#a78bfa'}
+  {id:'violet',name:'Violet',color:'#a78bfa'},
+  {id:'neon',name:'Neon',color:'#4ade80'},
+  {id:'ruby',name:'Ruby',color:'#e11d48'},
+  {id:'sunset',name:'Sunset',color:'#fb923c'},
+  {id:'obsidian',name:'Obsidian',color:'#94a3b8'},
+  {id:'mint',name:'Mint',color:'#6ee7b7'}
 ];
 var ACHIEVEMENT_SKINS=[
   {id:'solar',name:'Solar Flare',color:'#f97316',accent:'#fde047',detail:'#fff7ad',pattern:'stripes'},
@@ -1627,13 +1757,16 @@ var ACHIEVEMENT_SKINS=[
   {id:'eclipse',name:'Eclipse',color:'#312e81',accent:'#f472b6',detail:'#f5d0fe',pattern:'stars'},
   {id:'inferno',name:'Inferno',color:'#b91c1c',accent:'#fb923c',detail:'#fed7aa',pattern:'waves'},
   {id:'prism',name:'Prismatic',color:'#9333ea',accent:'#67e8f9',detail:'#f0abfc',pattern:'spots'},
-  {id:'toxic',name:'Toxic Ooze',color:'#4d7c0f',accent:'#bef264',detail:'#ecfccb',pattern:'spots'}
+  {id:'toxic',name:'Toxic Ooze',color:'#4d7c0f',accent:'#bef264',detail:'#ecfccb',pattern:'spots'},
+  {id:'candy',name:'Candy Pop',color:'#ec4899',accent:'#fbcfe8',detail:'#ffffff',pattern:'stripes'},
+  {id:'shadow',name:'Shadow',color:'#1f2937',accent:'#ef4444',detail:'#fca5a5',pattern:'waves'},
+  {id:'aurora',name:'Aurora',color:'#0f766e',accent:'#a3e635',detail:'#d9f99d',pattern:'stars'}
 ];
 function achievementFrameDetails(id){for(var i=0;i<ACHIEVEMENT_FRAMES.length;i++)if(ACHIEVEMENT_FRAMES[i].id===id)return ACHIEVEMENT_FRAMES[i];return null;}
 function achievementSkinDetails(id){for(var i=0;i<ACHIEVEMENT_SKINS.length;i++)if(ACHIEVEMENT_SKINS[i].id===id)return ACHIEVEMENT_SKINS[i];return null;}
-function blankAchievementProgress(){return{goals:0,wins:0,matches:0,hatTricks:0,cleanSheets:0,impossibleWins:0,developerUnlocked:false};}
+function blankAchievementProgress(){var p={developerUnlocked:false};ACHIEVEMENT_STATS.forEach(function(k){p[k]=0;});return p;}
 function cleanAchievementProgress(value){
-  var clean=blankAchievementProgress(),fields=['goals','wins','matches','hatTricks','cleanSheets','impossibleWins'];
+  var clean=blankAchievementProgress(),fields=ACHIEVEMENT_STATS;
   for(var i=0;i<fields.length;i++){var field=fields[i],count=Number(value&&value[field]);clean[field]=isFinite(count)?Math.max(0,Math.floor(count)):0;}
   clean.developerUnlocked=!!(value&&value.developerUnlocked);
   return clean;
@@ -2128,7 +2261,7 @@ function App(){
   var s_my=useState(function(){try{return window.localStorage.getItem('slime_myname')||'';}catch(e){return '';}}),myName=s_my[0],setMyName=s_my[1];
   var s_account=useState(loadAccountProfile),account=s_account[0],setAccount=s_account[1];
   function cleanName(v){return String(v||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12);}
-  function onlinePlayerName(){return cleanName(account.name)||cleanName(myName);}
+  function onlinePlayerName(){return cleanName(account.name)||cleanName(myName)||cleanName(CLOUD.user?cloudUsernameOf(CLOUD.user):'');}
   function saveAccountProfile(profile){
     var next={name:cleanName(profile.name),avatar:cleanAccountAvatar(profile.avatar),linkedPlayerId:typeof profile.linkedPlayerId==='string'?profile.linkedPlayerId:''};
     try{window.localStorage.setItem('slime_account',JSON.stringify(next));}
@@ -2344,7 +2477,7 @@ function App(){
       netSeqRef.current=p.n;netRxRef.current=pnow;if(netLostRef.current){netLostRef.current=false;setNetMsg('');}
       var buf=netBufRef.current;buf.push({t:pnow,l:p.l,r:p.r,b:p.b});if(buf.length>14)buf.shift();
       var lm=netLastMetaRef.current,scs=p.s[0]+'-'+p.s[1];
-      if(lm.sc!==scs){var previousScores=lm.sc?lm.sc.split('-').map(Number):[0,0];lm.sc=scs;setSc({left:p.s[0],right:p.s[1]});statsRef.current.lG=p.s[0];statsRef.current.rG=p.s[1];if(onRoleRef.current==='guest'&&p.s[1]>previousScores[1])for(var goalIndex=previousScores[1];goalIndex<p.s[1];goalIndex++)recordAchievementGoal('right');}
+      if(lm.sc!==scs){var previousScores=lm.sc?lm.sc.split('-').map(Number):[0,0];lm.sc=scs;setSc({left:p.s[0],right:p.s[1]});statsRef.current.lG=p.s[0];statsRef.current.rG=p.s[1];statsRef.current.lBehind=Math.max(statsRef.current.lBehind||0,p.s[1]-p.s[0]);statsRef.current.rBehind=Math.max(statsRef.current.rBehind||0,p.s[0]-p.s[1]);if(onRoleRef.current==='guest'&&p.s[1]>previousScores[1])for(var goalIndex=previousScores[1];goalIndex<p.s[1];goalIndex++)recordAchievementGoal('right');}
       if(lm.tl!==p.t){lm.tl=p.t;tlRef.current=p.t;setTl(p.t);}
       netOrRef.current=p.o||0;var otv=!!p.o;if(lm.ot!==otv){lm.ot=otv;otRef.current=otv;setOt(otv);}
       if(p.g&&!goalFlashRef.current)shakeRef.current=Math.max(shakeRef.current,10);
@@ -2358,7 +2491,7 @@ function App(){
       }else if(!p.rv&&replayActiveRef.current){
         replayActiveRef.current=false;replayFrRef.current=[];replayIdxRef.current=0;goalFlashDoneRef.current=false;frozenRef.current=false;setReplayActive(false);
       }
-      if(p.w&&!goRef.current){goRef.current=true;winRef.current=p.w;setWinner(p.w);setEndStats(p.es||{lG:p.s[0],rG:p.s[1],lMax:0,rMax:0});recordAchievementMatch(p.w);}
+      if(p.w&&!goRef.current){goRef.current=true;winRef.current=p.w;setWinner(p.w);setEndStats(p.es||{lG:p.s[0],rG:p.s[1],lMax:0,rMax:0});if(p.es)statsRef.current.longestRally=p.es.longestRally||0;recordAchievementMatch(p.w);}
     }
     var bf=netBufRef.current;if(!bf.length)return;
     var rt=pnow-70,a=null,b=null;
@@ -2587,10 +2720,17 @@ function App(){
     if(localGoals>=3)next.hatTricks++;
     if(localWon&&opponentGoals===0)next.cleanSheets++;
     if(mode==='single'&&diffRef.current==='impossible'&&localWon)next.impossibleWins++;
+    var localSide=oneSide?achievementSideRef.current:(matchWinner==='left'||matchWinner==='right'?matchWinner:null);
+    if(localWon&&mode==='online')next.onlineWins++;
+    if(localWon&&localSide&&(localSide==='left'?stats.lBehind:stats.rBehind)>=2)next.comebacks++;
+    if(localWon&&localGoals-opponentGoals>=5)next.bigWins++;
+    if((stats.longestRally||0)>=20)next.longRallies++;
+    next.winStreak=localWon?(current.winStreak||0)+1:0;
+    next.bestWinStreak=Math.max(current.bestWinStreak||0,next.winStreak);
     persistAchievementProgress(next);
   }
   function unlockAllAchievements(){
-    persistAchievementProgress({goals:100,wins:50,matches:100,hatTricks:10,cleanSheets:10,impossibleWins:10,developerUnlocked:true});
+    persistAchievementProgress({goals:100,wins:50,matches:100,hatTricks:10,cleanSheets:10,impossibleWins:10,onlineWins:10,comebacks:1,longRallies:1,bigWins:1,winStreak:0,bestWinStreak:5,developerUnlocked:true});
   }
   function getGameSlimeSkins(mode){
     var skins={left:null,right:null},localSkin=achievementSkinDetails(account.avatar.skin);
@@ -2640,9 +2780,17 @@ function App(){
   },[screen,onl.view,focusIdx]);
   useEffect(function(){if(chatListRef.current)chatListRef.current.scrollTop=chatListRef.current.scrollHeight;},[chatMessages]);
   var s_fit=useState(1),fit=s_fit[0],setFit=s_fit[1];
+  // Touch screens get full-size menus and buttons outside the scaled game field.
+  var s_touchUI=useState(function(){try{return window.matchMedia('(pointer:coarse)').matches;}catch(e){return false;}}),touchUI=s_touchUI[0],setTouchUI=s_touchUI[1];
+  useEffect(function(){
+    var mq;try{mq=window.matchMedia('(pointer:coarse)');}catch(e){return;}
+    function onChange(){setTouchUI(mq.matches);}
+    if(mq.addEventListener)mq.addEventListener('change',onChange);else if(mq.addListener)mq.addListener(onChange);
+    return function(){if(mq.removeEventListener)mq.removeEventListener('change',onChange);else if(mq.removeListener)mq.removeListener(onChange);};
+  },[]);
   var s_rs=useState(1),rs=s_rs[0],setRs=s_rs[1],s_uz=useState(1),uiZ=s_uz[0],setUiZ=s_uz[1],s_uk=useState(1),uiK=s_uk[0],setUiK=s_uk[1],rsRef=useRef(1);
   rsRef.current=rs;if(RS!==rs)setRS(rs);
-  useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?GW+8+18+300:GW+8,minFit=online?0.25:0.4,f=Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(PERF_LOW?1:Math.min(4,Math.max(1,Math.ceil(z*d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale]);
+  useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?GW+8+18+300:GW+8,minFit=online?0.25:0.4,f=Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=(touchUI?Math.max(1,Math.min(1.2,window.innerWidth/400)):Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720)))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(PERF_LOW?1:Math.min(4,Math.max(1,Math.ceil(z*d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale,touchUI]);
   useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad(); var perfTimer=setInterval(function(){updatePerf(gameSettings.perfMode);},5000);},[]);
 
   function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(8);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
@@ -2665,6 +2813,7 @@ function App(){
     syncPlayers(dbLoad());
     var acct=loadAccountProfile();setAccount(acct);setMyName(acct.name||'');
     setStickerSlots(loadOnlineStickerSlots());
+    setFriends(loadFriends());
     var gs=loadGameSettings();setGameSettings(gs);GAME_AUDIO_VOLUME=gs.sfxVolume;setSoundEnabled(gs.soundEnabled);soundEnabledRef.current=gs.soundEnabled;
     setCloudVer(function(v){return v+1;});
   }
@@ -2698,6 +2847,52 @@ function App(){
     return attempt.then(function(){return'';}).catch(function(e){patchCloud({busy:false});return cloudErrorText(e);});
   }
   function cloudLogOut(){return cloudPushNow().then(function(){return CLOUD.auth.signOut();}).then(function(){patchCloud({user:'',msg:'',synced:0});});}
+
+  // ── Friends + invites ──
+  var s_friends=useState(loadFriends),friends=s_friends[0],setFriends=s_friends[1];
+  var s_invite=useState(null),incomingInvite=s_invite[0],setIncomingInvite=s_invite[1];
+  // While logged in: mark yourself online every minute and listen for match invites.
+  useEffect(function(){
+    if(!cloud.user)return;
+    cloudHeartbeat();
+    var beat=setInterval(function(){if(document.visibilityState!=='hidden')cloudHeartbeat();},60000);
+    var stop=cloudWatchInvites(function(inv){
+      if(!inv||Date.now()-tsMillis(inv.at)>120000){setIncomingInvite(null);return;}
+      setIncomingInvite(inv);
+    });
+    return function(){clearInterval(beat);if(stop)stop();};
+  },[cloud.user]);
+  function addFriend(username){
+    var name=cleanCloudUsername(username);
+    if(!name)return Promise.resolve('Type a username.');
+    if(name===cloud.user)return Promise.resolve('That’s you!');
+    if(friends.some(function(f){return f.username===name;}))return Promise.resolve(name+' is already your friend.');
+    if(friends.length>=50)return Promise.resolve('You can have up to 50 friends.');
+    return cloudFindPlayer(name).then(function(p){
+      if(!p)return'No player called '+name+'. They need to log in once first.';
+      var next=friends.concat([{uid:p.uid,username:p.username}]);setFriends(next);saveFriends(next);return'';
+    }).catch(function(e){return cloudErrorText(e);});
+  }
+  function removeFriend(uid){var next=friends.filter(function(f){return f.uid!==uid;});setFriends(next);saveFriends(next);}
+  function inviteFriend(friend){
+    if(!hasOnlineName())return;
+    var cs='abcdefghjkmnpqrstuvwxyz23456789',code='';for(var ci=0;ci<4;ci++)code+=cs.charAt(Math.floor(Math.random()*cs.length));
+    setShowPD(false);setScreen('online');
+    openRoom('h',code);
+    cloudSendInvite(friend.uid,code).catch(function(e){setOnl(function(o){return Object.assign({},o,{err:'Could not send the invite: '+cloudErrorText(e)});});});
+  }
+  function acceptInvite(){
+    var inv=incomingInvite;if(!inv)return;
+    setIncomingInvite(null);cloudClearInvite();
+    if(!hasOnlineName())return;
+    setShowPD(false);setShowSettings(false);
+    if(screen==='game')exitToMenu();
+    setScreen('online');
+    setTimeout(function(){openRoom('g',inv.code);},0);
+  }
+  function declineInvite(){setIncomingInvite(null);cloudClearInvite();}
+  // Keep the pop-up (rendered outside App) in step with the latest invite and handlers.
+  useEffect(function(){INVITE_UI.set(incomingInvite,acceptInvite,declineInvite);});
   function resetImpossibleAI(){
   qTableRef.current={};
   qHistRef.current=[];
@@ -2924,6 +3119,7 @@ function App(){
     if(pmRef.current==='training'&&trainingChallengeRef.current!=='aim'){completeTrainingAttempt(false);return;}
     var scoring=goalSide==='left'?'right':'left',st=statsRef.current;
     if(scoring==='left')st.lG++;else st.rG++;
+    st.lBehind=Math.max(st.lBehind||0,st.rG-st.lG);st.rBehind=Math.max(st.rBehind||0,st.lG-st.rG);
     if(pmRef.current!=='training')recordAchievementGoal(scoring);
     if(st.last===scoring){if(scoring==='left'){st.lStr++;st.lMax=Math.max(st.lMax,st.lStr);}else{st.rStr++;st.rMax=Math.max(st.rMax,st.rStr);}}
     else{st.lStr=0;st.rStr=0;if(scoring==='left'){st.lStr=1;st.lMax=Math.max(st.lMax,1);}else{st.rStr=1;st.rMax=Math.max(st.rMax,1);}}
@@ -3273,7 +3469,7 @@ function App(){
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'})},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress)})));
-  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{avatar:account.avatar,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
+  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,onBack:function(){setShowMatchReplay(false);}})));
 
   // ── MENU ─────────────────────────────────────────────────────────────
@@ -3296,7 +3492,7 @@ function App(){
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
-          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.5.9')),
+          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.6.1')),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
@@ -3318,9 +3514,9 @@ function App(){
           })
         ),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',justifyContent:'center',alignItems:'center'}},
-          React.createElement('div',{key:'theme','data-theme-dd':'1',style:{display:'flex',alignItems:'center',gap:8,position:'relative',zIndex:themeOpen?2:0}},
+          React.createElement('div',{key:'theme','data-theme-dd':'1',style:{display:'flex',alignItems:'center',gap:8,position:'relative',zIndex:themeOpen?2:0,flexWrap:touchUI?'wrap':'nowrap',justifyContent:'center'}},
             React.createElement('button',{onClick:toggleTheme,'aria-haspopup':'true','aria-expanded':String(themeOpen),onMouseEnter:function(){setHovCard('theme');},onMouseLeave:function(){setHovCard(null);},style:hovPill('theme',THEME_BG[themeMode])},'Theme '+(themeOpen?'\u25B4':'\u25BE')),
-            React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,width:themeOpen?240:0,opacity:themeOpen?1:0,overflow:'visible',flexShrink:0,transition:'width 0.22s ease,opacity 0.16s ease',zIndex:20,pointerEvents:themeOpen?'auto':'none'}},
+            React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:touchUI?'center':'flex-start',gap:8,width:themeOpen?(touchUI?'100%':240):0,height:touchUI&&!themeOpen?0:undefined,opacity:themeOpen?1:0,overflow:touchUI&&!themeOpen?'hidden':'visible',flexShrink:0,transition:'width 0.22s ease,opacity 0.16s ease',zIndex:20,pointerEvents:themeOpen?'auto':'none'}},
               [['day','Day'],['night','Night'],['japan','Sakura']].map(function(o){
                 var id='theme_'+o[0],cur=themeMode===o[0];
                 return React.createElement('button',{key:id,onClick:function(){setThemeMode(o[0]);setThemeOpen(false);setFocusIdx(8);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign(hovPill(id,THEME_BG[o[0]],{fontSize:14,padding:'10px 12px',whiteSpace:'nowrap',flex:'0 0 auto',boxShadow:cur?'0 0 0 3px rgba(255,255,255,0.85),0 6px 18px rgba(0,0,0,0.4)':undefined}),{transition:'transform 0.13s,box-shadow 0.13s'})},o[1]);
@@ -3636,7 +3832,7 @@ function App(){
     var hudH=50,boxW=GW+2,chatW=300,chatGap=18,layoutW=boxW+chatGap+chatW; // canvas width includes its borders
     function achievementToasts(){
       if(!achToasts.length)return null;
-      return React.createElement('div',{role:'status','aria-live':'polite',style:{position:'fixed',top:'calc(env(safe-area-inset-top,0px) + 14px)',left:'50%',transform:'translateX(-50%)',zIndex:75,display:'flex',flexDirection:'column',gap:8,width:'min(360px,92vw)',pointerEvents:'none'}},
+      return React.createElement('div',{role:'status','aria-live':'polite',style:{position:'fixed',top:touchUI?undefined:'calc(env(safe-area-inset-top,0px) + 14px)',bottom:touchUI?'calc(env(safe-area-inset-bottom,0px) + 14px)':undefined,left:'50%',transform:'translateX(-50%)',zIndex:75,display:'flex',flexDirection:'column',gap:8,width:'min(360px,92vw)',pointerEvents:'none'}},
         achToasts.map(function(id,i){
           var ach=ACHIEVEMENTS.find(function(a){return a.id===id;});if(!ach)return null;
           var fr=achievementFrameDetails(ach.frame),sk=achievementSkinDetails(ach.skin),col=fr?fr.color:sk?sk.color:'#fbbf24';
@@ -3649,37 +3845,8 @@ function App(){
               React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.72)'}},fr?'New frame: '+fr.name:sk?'New skin: '+sk.name:ach.description)));
         }));
     }
-    return React.createElement('div',{key:'game',className:'screen-in',style:baseStyle},React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
-      touchControls(),achievementToasts(),
-      React.createElement('div',{style:{position:'relative',zIndex:1,width:(isOnG?layoutW:boxW)*fit,display:'flex',flexDirection:'column',alignItems:isOnG?'flex-start':'center'}},
-        React.createElement('div',{style:{width:boxW,alignSelf:'flex-start',transform:'scale('+fit+')',transformOrigin:'top left',marginBottom:-(GH+hudH)*(1-fit)}},
-          React.createElement('div',{style:{background:isDay?'linear-gradient(180deg,rgba(24,84,150,0.96),rgba(14,58,112,0.97))':'linear-gradient(180deg,rgba(8,14,40,0.98),rgba(3,7,25,0.98))',borderRadius:'14px 14px 0 0',display:'flex',alignItems:'center',width:boxW,minHeight:hudH,padding:'0 10px',boxSizing:'border-box',borderBottom:'1px solid rgba(255,255,255,0.08)',boxShadow:'0 -2px 24px rgba(0,0,0,0.3)'}},
-            isPractice
-              ?React.createElement('div',{style:{display:'flex',alignItems:'center',width:'100%',gap:8,flexWrap:'wrap'}},
-                  React.createElement('span',{style:{fontWeight:800,fontSize:12,color:accentColor,letterSpacing:'0.08em',textTransform:'uppercase'}},'Practice ('+(activeSide==='left'?'L':'R')+')'),
-                  React.createElement('button',{onClick:function(){var ns=sideRef.current==='right'?'left':'right';setSide(ns);sideRef.current=ns;achievementSideRef.current=ns;setActiveSide(ns);resetPosRef.current(false);},style:hudChip(false)},'Switch'),
-                  React.createElement('span',{style:{color:'rgba(255,255,255,0.55)',fontSize:11}},'R = reset'),
-                  React.createElement('div',{style:{display:'flex',gap:4,flex:1,justifyContent:'center'}},[['regular','Reg'],['air','Air'],['ground','Gnd']].map(function(item){return React.createElement('button',{key:item[0],onClick:function(){setPractMode(item[0]);practModeRef.current=item[0];resetPosRef.current(false);},style:Object.assign(hudChip(false),{background:practMode===item[0]?btnPrimary:'rgba(255,255,255,0.1)'})},item[1]);})),
-                  React.createElement('button',{onClick:toggleUnlimJump,style:hudChip(unlimJump)},'∞ Jump'),
-                  React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'))
-              :React.createElement('div',{style:{display:'flex',alignItems:'center',width:'100%',height:hudH}},
-                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,borderLeft:'4px solid '+(colors.left?colors.left.body:'#1a6bcc'),paddingLeft:8}},
-                    isOnG&&React.createElement(ProfileAvatar,{profile:leftAvatar,size:28}),
-                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),
-                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.left)),
-                  React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:2}},
-                    React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot?'pulse 1s ease-in-out infinite':'none'}},ot?'OVERTIME':gmode==='training'&&trainingChallengeRef.current==='dash'?Math.max(0,10-trainingAttemptRef.current.tries)+' LEFT':fmt(tl)),
-                    React.createElement('div',{style:{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center'}},
-                      (isSingleG||isOnG)&&React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{padding:'2px 8px',fontSize:10,background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'),
-                      !isOnG&&React.createElement('button',{onClick:togglePause,style:hudChip(false,{padding:'2px 8px',fontSize:10})},paused?'Resume':'Pause'),
-                      React.createElement('button',{onClick:function(){var next=!soundEnabledRef.current;soundEnabledRef.current=next;setSoundEnabled(next);},'aria-pressed':soundEnabled,style:hudChip(false,{padding:'2px 8px',fontSize:10})},soundEnabled?'Sound on':'Muted'))),
-                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',borderRight:'4px solid '+(colors.right?colors.right.body:'#e8192c'),paddingRight:8}},
-                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.right),
-                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names.right),
-                    isOnG&&React.createElement(ProfileAvatar,{profile:rightAvatar,size:28})))
-          ),
-          React.createElement('div',{style:{position:'relative',width:GW,height:GH}},
-            React.createElement('canvas',{ref:cvRef,width:Math.round(GW*rs),height:Math.round(GH*rs),style:{display:'block',width:GW,height:GH,border:'1px solid rgba(255,255,255,0.1)',borderTop:'none',boxSizing:'content-box',borderRadius:'0 0 14px 14px',boxShadow:'0 18px 50px rgba(0,0,0,0.45)'}}),
+    // Pause / connection-lost / end-of-match panels. Drawn over the canvas on desktop; full-size and full-screen on touch screens.
+    function gameOverlays(){return React.createElement(React.Fragment,null,
             paused&&!goRef.current&&React.createElement('div',{className:'screen-in',style:{position:'absolute',top:0,left:0,right:0,bottom:0,background:'rgba(3,8,25,0.55)',backdropFilter:'blur(3px)',WebkitBackdropFilter:'blur(3px)',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'0 0 14px 14px'}},
               React.createElement('div',{className:'rise',style:{background:'rgba(5,12,35,0.92)',border:'1px solid rgba(255,255,255,0.16)',borderRadius:22,padding:'22px 34px 20px',textAlign:'center',boxShadow:'0 20px 60px rgba(0,0,0,0.55),0 0 40px rgba(56,189,248,0.16)',minWidth:260}},
                 React.createElement('div',{style:{display:'flex',gap:9,justifyContent:'center',marginBottom:10}},React.createElement('span',{style:{width:12,height:36,borderRadius:5,background:'linear-gradient(180deg,#fff,#9bd8ff)',boxShadow:'0 0 16px rgba(125,211,252,0.6)'}}),React.createElement('span',{style:{width:12,height:36,borderRadius:5,background:'linear-gradient(180deg,#fff,#9bd8ff)',boxShadow:'0 0 16px rgba(125,211,252,0.6)'}})),
@@ -3725,6 +3892,55 @@ function App(){
                     ?React.createElement('button',{onClick:requestOnlineRematch,disabled:!onlineOpponent||rematchRequested,style:pill(btnPrimary,{fontSize:13,padding:'9px 18px',textTransform:'none',letterSpacing:0,opacity:!onlineOpponent||rematchRequested?0.68:1,cursor:!onlineOpponent||rematchRequested?'default':'pointer'})},!onlineOpponent?'Opponent disconnected':rematchRequested?(opponentRematchRequested?'Starting rematch…':'Waiting for opponent…'):opponentRematchRequested?'Accept rematch':'Rematch')
                     :React.createElement('button',{onClick:restartGame,style:pill(btnPrimary,{fontSize:13,padding:'9px 18px',textTransform:'none',letterSpacing:0})},'Restart'),
                   matchFrames.length>0&&React.createElement('button',{onClick:function(){setShowMatchReplay(true);},style:pill('linear-gradient(135deg,#d97706,#b45309)',{fontSize:13,padding:'9px 18px',textTransform:'none',letterSpacing:0})},'Replay'))))
+    );}
+    var overlayOpen=(paused&&!goRef.current)||(netMsg&&!winner)||(winner&&endStats);
+    // Full-size game buttons for touch screens, pinned to the top corner instead of shrinking with the field.
+    function touchHud(){
+      if(overlayOpen)return null;
+      function tb(label,onClick,active,danger){return React.createElement('button',{key:label,type:'button',onClick:onClick,'aria-pressed':active===undefined?undefined:!!active,style:{minWidth:44,height:44,padding:'0 14px',borderRadius:22,border:'1px solid '+(danger?'rgba(248,113,113,0.6)':'rgba(255,255,255,0.4)'),background:danger?'rgba(239,68,68,0.3)':active?btnPrimary:'rgba(5,12,35,0.7)',color:danger?'#fecaca':'#fff',fontFamily:DISP,fontSize:14,letterSpacing:'0.03em',boxShadow:'0 4px 12px rgba(0,0,0,0.35)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)'}},label);}
+      var btns=isPractice
+        ?[tb('Switch side',function(){var ns=sideRef.current==='right'?'left':'right';setSide(ns);sideRef.current=ns;achievementSideRef.current=ns;setActiveSide(ns);resetPosRef.current(false);}),
+          tb('Reset',function(){resetPosRef.current(false);})]
+          .concat([['regular','Regular'],['air','Air'],['ground','Ground']].map(function(item){return tb(item[1],function(){setPractMode(item[0]);practModeRef.current=item[0];resetPosRef.current(false);},practMode===item[0]);}))
+          .concat([tb('∞ Jump',toggleUnlimJump,unlimJump),tb('Exit',exitToMenu,undefined,true)])
+        :[!isOnG&&tb(paused?'Resume':'Pause',togglePause),tb(soundEnabled?'Sound on':'Muted',function(){var next=!soundEnabledRef.current;soundEnabledRef.current=next;setSoundEnabled(next);},soundEnabled),(isSingleG||isOnG||gmode==='multi'||gmode==='training')&&tb('Exit',exitToMenu,undefined,true)];
+      return React.createElement('div',{style:{position:'fixed',top:'calc(env(safe-area-inset-top,0px) + 8px)',right:'calc(env(safe-area-inset-right,0px) + 8px)',left:'calc(env(safe-area-inset-left,0px) + 8px)',zIndex:62,display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end',pointerEvents:'none'}},
+        btns.filter(Boolean).map(function(b){return React.cloneElement(b,{style:Object.assign({},b.props.style,{pointerEvents:'auto'})});}));
+    }
+    return React.createElement('div',{key:'game',className:'screen-in',style:baseStyle},React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
+      touchControls(),achievementToasts(),
+      touchUI&&touchHud(),
+      touchUI&&overlayOpen&&React.createElement('div',{style:{position:'fixed',inset:0,zIndex:65,overflowY:'auto'}},gameOverlays()),
+      React.createElement('div',{style:{position:'relative',zIndex:1,width:(isOnG?layoutW:boxW)*fit,display:'flex',flexDirection:'column',alignItems:isOnG?'flex-start':'center'}},
+        React.createElement('div',{style:{width:boxW,alignSelf:'flex-start',transform:'scale('+fit+')',transformOrigin:'top left',marginBottom:-(GH+hudH)*(1-fit)}},
+          React.createElement('div',{style:{background:isDay?'linear-gradient(180deg,rgba(24,84,150,0.96),rgba(14,58,112,0.97))':'linear-gradient(180deg,rgba(8,14,40,0.98),rgba(3,7,25,0.98))',borderRadius:'14px 14px 0 0',display:'flex',alignItems:'center',width:boxW,minHeight:hudH,padding:'0 10px',boxSizing:'border-box',borderBottom:'1px solid rgba(255,255,255,0.08)',boxShadow:'0 -2px 24px rgba(0,0,0,0.3)'}},
+            isPractice
+              ?React.createElement('div',{style:{display:'flex',alignItems:'center',width:'100%',gap:8,flexWrap:'wrap'}},
+                  React.createElement('span',{style:{fontWeight:800,fontSize:12,color:accentColor,letterSpacing:'0.08em',textTransform:'uppercase'}},'Practice ('+(activeSide==='left'?'L':'R')+')'),
+                  !touchUI&&React.createElement('button',{onClick:function(){var ns=sideRef.current==='right'?'left':'right';setSide(ns);sideRef.current=ns;achievementSideRef.current=ns;setActiveSide(ns);resetPosRef.current(false);},style:hudChip(false)},'Switch'),
+                  !touchUI&&React.createElement('span',{style:{color:'rgba(255,255,255,0.55)',fontSize:11}},'R = reset'),
+                  !touchUI&&React.createElement('div',{style:{display:'flex',gap:4,flex:1,justifyContent:'center'}},[['regular','Reg'],['air','Air'],['ground','Gnd']].map(function(item){return React.createElement('button',{key:item[0],onClick:function(){setPractMode(item[0]);practModeRef.current=item[0];resetPosRef.current(false);},style:Object.assign(hudChip(false),{background:practMode===item[0]?btnPrimary:'rgba(255,255,255,0.1)'})},item[1]);})),
+                  !touchUI&&React.createElement('button',{onClick:toggleUnlimJump,style:hudChip(unlimJump)},'∞ Jump'),
+                  !touchUI&&React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'))
+              :React.createElement('div',{style:{display:'flex',alignItems:'center',width:'100%',height:hudH}},
+                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,borderLeft:'4px solid '+(colors.left?colors.left.body:'#1a6bcc'),paddingLeft:8}},
+                    isOnG&&React.createElement(ProfileAvatar,{profile:leftAvatar,size:28}),
+                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),
+                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.left)),
+                  React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:2}},
+                    React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot?'pulse 1s ease-in-out infinite':'none'}},ot?'OVERTIME':gmode==='training'&&trainingChallengeRef.current==='dash'?Math.max(0,10-trainingAttemptRef.current.tries)+' LEFT':fmt(tl)),
+                    !touchUI&&React.createElement('div',{style:{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center'}},
+                      (isSingleG||isOnG)&&React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{padding:'2px 8px',fontSize:10,background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'),
+                      !isOnG&&React.createElement('button',{onClick:togglePause,style:hudChip(false,{padding:'2px 8px',fontSize:10})},paused?'Resume':'Pause'),
+                      React.createElement('button',{onClick:function(){var next=!soundEnabledRef.current;soundEnabledRef.current=next;setSoundEnabled(next);},'aria-pressed':soundEnabled,style:hudChip(false,{padding:'2px 8px',fontSize:10})},soundEnabled?'Sound on':'Muted'))),
+                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',borderRight:'4px solid '+(colors.right?colors.right.body:'#e8192c'),paddingRight:8}},
+                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.right),
+                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names.right),
+                    isOnG&&React.createElement(ProfileAvatar,{profile:rightAvatar,size:28})))
+          ),
+          React.createElement('div',{style:{position:'relative',width:GW,height:GH}},
+            React.createElement('canvas',{ref:cvRef,width:Math.round(GW*rs),height:Math.round(GH*rs),style:{display:'block',width:GW,height:GH,border:'1px solid rgba(255,255,255,0.1)',borderTop:'none',boxSizing:'content-box',borderRadius:'0 0 14px 14px',boxShadow:'0 18px 50px rgba(0,0,0,0.45)'}}),
+            !touchUI&&gameOverlays()
           )
         ),
         React.createElement('div',{className:isOnG?'':'kbd-hints',style:{marginTop:14,display:'flex',flexDirection:'column',alignItems:'center',gap:6,textAlign:'center',fontSize:12,color:'rgba(255,255,255,0.95)',background:isDay?'rgba(20,80,145,0.8)':'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:16,padding:'9px 18px',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)',boxShadow:'0 8px 24px rgba(0,0,0,0.25)',maxWidth:'100%'}},
@@ -3760,7 +3976,21 @@ function App(){
   return React.createElement('div',{style:baseStyle},bgLayer());
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+// Match-invite pop-up: lives outside App's screens so it can show over any of them. App feeds it through INVITE_UI.
+var INVITE_UI={invite:null,accept:null,decline:null,listeners:[],set:function(inv,accept,decline){this.invite=inv;this.accept=accept;this.decline=decline;this.listeners.forEach(function(f){f(inv);});}};
+function InviteBanner(){
+  var s=useState(INVITE_UI.invite),inv=s[0],setInv=s[1];
+  useEffect(function(){INVITE_UI.listeners.push(setInv);return function(){INVITE_UI.listeners=INVITE_UI.listeners.filter(function(f){return f!==setInv;});};},[]);
+  if(!inv)return null;
+  var who=inv.name||inv.from||'A friend';
+  return React.createElement('div',{role:'alertdialog','aria-label':who+' invited you to play',className:'rise',style:{position:'fixed',left:'50%',top:'calc(env(safe-area-inset-top,0px) + 12px)',transform:'translateX(-50%)',zIndex:90,width:'min(380px,92vw)',boxSizing:'border-box',padding:'12px 14px',borderRadius:16,background:'rgba(5,12,35,0.96)',border:'1px solid #38bdf8',boxShadow:'0 12px 36px rgba(0,0,0,0.5),0 0 20px rgba(56,189,248,0.4)',display:'flex',alignItems:'center',gap:12,color:'#fff',fontFamily:'var(--font-body)'}},
+    React.createElement('div',{style:{flex:1,minWidth:0}},
+      React.createElement('div',{style:{fontSize:10,letterSpacing:'0.14em',textTransform:'uppercase',color:'#7dd3fc',fontWeight:900}},'Match invite'),
+      React.createElement('div',{style:{fontSize:15,fontWeight:900}},who+' wants to play!')),
+    React.createElement('button',{type:'button',onClick:function(){if(INVITE_UI.accept)INVITE_UI.accept();},style:{padding:'9px 16px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Join'),
+    React.createElement('button',{type:'button','aria-label':'Decline invite',onClick:function(){if(INVITE_UI.decline)INVITE_UI.decline();},style:{padding:'9px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},'✕'));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(React.Fragment,null,React.createElement(App),React.createElement(InviteBanner)));
 
 </script>
 
