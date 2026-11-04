@@ -77,6 +77,44 @@ var REPLAY_CHUNK_FRAMES=16;
 var SPIN_F=Math.round(14/TS),DASH_F=Math.round(8/TS),DASH_SPD=SPD*1.8,GDASH_SPD=SPD*4.5,CD_F=180;
 var CEILING_Y=SR+2;
 var REPLAY_SECS=3,REPLAY_FPS=60,REPLAY_MAX=REPLAY_SECS*REPLAY_FPS;
+// Real-world units for match stats (for fun, not exact): the 800-unit field counts as a 40 m mini-pitch,
+// so a top shot (~12 units per frame at 60 fps) reads as roughly 130 km/h.
+var METRES_PER_UNIT=0.05,KMH_PER_SPEED=60*METRES_PER_UNIT*3.6;
+// Instant replay: plays at full speed, then drops into slow motion for the final moments before the goal.
+var REPLAY_SLOWMO_FRAMES=55,REPLAY_SLOWMO_SPEED=0.35;
+function replaySpeedAt(pos,len){return pos>=len-REPLAY_SLOWMO_FRAMES?REPLAY_SLOWMO_SPEED:1;}
+// Blend two recorded frames so slow motion stays smooth. Big jumps (position resets) are not blended.
+function lerpSnap(a,b,t){
+  if(!b||t<=0)return a;
+  function mix(p,q){var o={};for(var k in p){var x=p[k],y=q[k];o[k]=typeof x==='number'&&typeof y==='number'&&Math.abs(y-x)<160?x+(y-x)*t:x;}return o;}
+  return{left:mix(a.left,b.left),right:mix(a.right,b.right),ball:mix(a.ball,b.ball)};
+}
+function replayFrameAt(frames,pos){var i=Math.max(0,Math.min(frames.length-1,Math.floor(pos)));return lerpSnap(frames[i],frames[i+1],pos-i);}
+// Broadcast-style camera for the instant replay: eases in towards the ball as the goal approaches.
+function replayCamera(ctx,RSn,ball,pos,len){
+  var f=len?pos/len:0,e=Math.max(0,Math.min(1,(f-0.4)/0.45)),z=1+0.4*e*e*(3-2*e);
+  if(z<=1.001){ctx.setTransform(RSn,0,0,RSn,0,0);return 1;}
+  var w=GW/z,h=GH/z,left=Math.max(0,Math.min(GW-w,ball.x-w/2)),top=Math.max(0,Math.min(GH-h,ball.y-h*0.55));
+  ctx.setTransform(RSn*z,0,0,RSn*z,-left*RSn*z,-top*RSn*z);
+  return z;
+}
+// "GOAL!" with its glow, painted once and reused: drawing a 40px blur on huge text every frame was causing stutter.
+var GOAL_TEXT_CACHE={};
+function goalTextSprite(scale){
+  var key=scale.toFixed(2);if(GOAL_TEXT_CACHE[key])return GOAL_TEXT_CACHE[key];
+  var fs=112,pad=60,w=Math.ceil(fs*3.4+pad*2),h=Math.ceil(fs*1.2+pad*2),cv=document.createElement('canvas');
+  cv.width=Math.ceil(w*scale);cv.height=Math.ceil(h*scale);var c=cv.getContext('2d');c.scale(scale,scale);
+  c.textAlign='center';c.textBaseline='middle';c.font=fs+'px "Lilita One",sans-serif';
+  c.strokeStyle='rgba(0,0,0,0.5)';c.lineWidth=8;c.strokeText('GOAL!',w/2,h/2);
+  c.fillStyle='#FFD700';c.shadowColor='#FFD700';c.shadowBlur=40;c.fillText('GOAL!',w/2,h/2);
+  cv._w=w;cv._h=h;cv._fs=fs;
+  if(document.fonts&&document.fonts.status!=='loaded')return cv; // don't keep a fallback-font version
+  GOAL_TEXT_CACHE[key]=cv;return cv;
+}
+function drawGoalText(ctx,size,alpha,RSn){
+  var sp=goalTextSprite(Math.min(3,RSn||1)),k=size/sp._fs,w=sp._w*k,h=sp._h*k;
+  ctx.save();ctx.globalAlpha=alpha;ctx.drawImage(sp,GW/2-w/2,GH/2-30-h/2,w,h);ctx.restore();
+}
 var ONLINE_STICKERS=[
   {id:'stephen-curry',name:'Curry',src:'stickers/stephen-curry-steph-curry.gif'},
   {id:'lego-batman',name:'Batman',src:'stickers/lego-batman-falls-in-love.gif'},
@@ -277,7 +315,7 @@ function cloudErrorText(e){
   if(code==='auth/too-many-requests')return'Too many tries. Wait a minute and try again.';
   if(code==='auth/network-request-failed'||code==='unavailable')return'Could not reach the cloud. Check your internet.';
   if(code==='auth/weak-password')return'Pick a stronger password (at least 6 characters).';
-  if(code==='permission-denied')return'The cloud refused the save. Check the Firestore rules.';
+  if(code==='permission-denied')return'The cloud blocked this. Make sure the latest Firestore rules are published.';
   return'Something went wrong ('+(code||'unknown error')+').';
 }
 // Everything that gets synced. AI learning data stays on the device (it is large and per-device).
@@ -877,11 +915,10 @@ function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNig
         if(doFlash&&bounce>0.08){
           var fr=(fni/CROWD_C)|0,fc=fni-fr*CROWD_C,cx=10+fc*(GW-20)/(CROWD_C-1),cy=sTop+(fr+0.5)*tH,shift=bounce*3.2;
           ctx.fillStyle=nightRows[fr];ctx.fillRect(cx-5,cy-9,10,14);
-          var glow=ctx.createRadialGradient(cx,cy-shift,1,cx,cy-shift,12);glow.addColorStop(0,'rgba(255,255,220,'+(0.72*bounce)+')');glow.addColorStop(0.35,'rgba(255,219,130,'+(0.42*bounce)+')');glow.addColorStop(1,'rgba(255,180,90,0)');
-          ctx.fillStyle=glow;ctx.beginPath();ctx.arc(cx,cy-shift,12,0,Math.PI*2);ctx.fill();
+          ctx.globalAlpha=Math.min(1,bounce);ctx.drawImage(fanGlowSprite(),cx-12,cy-shift-12,24,24);ctx.globalAlpha=1;
           ctx.fillStyle=nightCrowd[(fr*7+fc*3)%nightCrowd.length];ctx.beginPath();ctx.arc(cx,cy-shift,4,0,Math.PI*2);ctx.fill();
           ctx.fillStyle='#f0c080';ctx.beginPath();ctx.arc(cx,cy-shift-5,2.5,0,Math.PI*2);ctx.fill();
-          ctx.save();ctx.globalAlpha=bounce*0.8;ctx.strokeStyle='#fff4bf';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(cx,cy-shift-3);ctx.lineTo(cx,cy-shift-9);ctx.moveTo(cx-3,cy-shift-2);ctx.lineTo(cx-6,cy-shift-6);ctx.moveTo(cx+3,cy-shift-2);ctx.lineTo(cx+6,cy-shift-6);ctx.stroke();ctx.restore();
+          // (raised arms come from drawCrowdCheer, drawn on top for every theme)
         }
         FAN_BOUNCE[fni]*=0.84;
       }
@@ -917,8 +954,16 @@ function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNig
   drawBall(ctx,ball,isNight,isJapan);
 }
 
+// Soft glow behind a cheering fan at night, painted once instead of a new gradient per fan per frame.
+var FAN_GLOW=null;
+function fanGlowSprite(){
+  if(FAN_GLOW)return FAN_GLOW;
+  var cv=document.createElement('canvas');cv.width=cv.height=48;var c=cv.getContext('2d'),g=c.createRadialGradient(24,24,2,24,24,24);
+  g.addColorStop(0,'rgba(255,255,220,0.72)');g.addColorStop(0.35,'rgba(255,219,130,0.42)');g.addColorStop(1,'rgba(255,180,90,0)');
+  c.fillStyle=g;c.fillRect(0,0,48,48);return FAN_GLOW=cv;
+}
 function drawCrowdCheer(ctx,fanArr,top,rowHeight,time,cols){
-  var crowd=crowdPalette(cols);
+  var crowd=crowdPalette(cols),arms=[];
   for(var i=0;i<fanArr.length;i++){
     var row=(i/CROWD_C)|0,col=i-row*CROWD_C,x=10+col*(GW-20)/(CROWD_C-1),baseY=top+(row+0.5)*rowHeight;
     fanArr[i]+=FAN_SPD[i]*0.1;if(fanArr[i]>1)fanArr[i]-=1;
@@ -927,8 +972,14 @@ function drawCrowdCheer(ctx,fanArr,top,rowHeight,time,cols){
     if(fanArr[i]>FAN_THR[i]){
       var lift=bounce*3.5,y=baseY-lift;
       ctx.fillStyle=crowd[(row*7+col*3)%crowd.length];ctx.beginPath();ctx.arc(x,y-4,3.3,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle='rgba(255,245,190,0.82)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x-2,y-1);ctx.lineTo(x-6,y-6-lift);ctx.moveTo(x+2,y-1);ctx.lineTo(x+6,y-6-lift);ctx.stroke();
+      arms.push(x,y,lift);
     }
+  }
+  // All raised arms in a single stroke (one draw call instead of one per fan).
+  if(arms.length){
+    ctx.strokeStyle='rgba(255,245,190,0.82)';ctx.lineWidth=1.5;ctx.beginPath();
+    for(var a=0;a<arms.length;a+=3){var ax=arms[a],ay=arms[a+1],al=arms[a+2];ctx.moveTo(ax-2,ay-1);ctx.lineTo(ax-6,ay-6-al);ctx.moveTo(ax+2,ay-1);ctx.lineTo(ax+6,ay-6-al);}
+    ctx.stroke();
   }
 }
 
@@ -1679,27 +1730,94 @@ function CustomiseScreen(props){
 }
 
 function MatchReplayScreen(props){
-  var frames=props.frames,colors=props.colors,names=props.names,onBack=props.onBack;
-  var cvRef=useRef(null),animRef=useRef(null),idxRef=useRef(0),playingRef=useRef(true),lfRef=useRef(0);
-  var si=useState(0),idx=si[0],setIdx=si[1];
-  var sp=useState(true),playing=sp[0],setPlaying=sp[1];
+  var frames=props.frames,colors=props.colors,names=props.names,onBack=props.onBack,theme=props.theme||'night',skins=props.skins||null;
+  var cvRef=useRef(null),posRef=useRef(0),playingRef=useRef(true),speedRef=useRef(1),dragRef=useRef(false);
+  var s_t=useState(0),shownPos=s_t[0],setShownPos=s_t[1];
+  var s_p=useState(true),playing=s_p[0],setPlaying=s_p[1];
+  var s_s=useState(1),speed=s_s[0],setSpeed=s_s[1];
   var fanRef=useRef(Array.from({length:CROWD_N},function(){return Math.random();}));
-  useEffect(function(){function hk(e){if(e.key===' '||e.key==='p'||e.key==='P'){if(idxRef.current>=frames.length-1)idxRef.current=0;playingRef.current=!playingRef.current;setPlaying(playingRef.current);}}window.addEventListener('keydown',hk);return function(){window.removeEventListener('keydown',hk);};},[frames]);
-  useEffect(function(){var alive=true;function loop(now){if(!alive)return;if(now-lfRef.current>=1000/60){var cv=cvRef.current;if(cv&&frames.length>0){var ctx=cv.getContext('2d'),ii=Math.min(idxRef.current,frames.length-1),snap=frames[ii];drawScene(ctx,snap.left,snap.right,snap.ball,colors,'multi','right',false,fanRef.current,false,null,false,false);var prog=frames.length>1?ii/(frames.length-1):1;ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(0,GH-18,GW,18);ctx.fillStyle='rgba(255,255,255,0.15)';ctx.fillRect(4,GH-13,GW-8,8);ctx.fillStyle='#38bdf8';ctx.fillRect(4,GH-13,(GW-8)*prog,8);var sec=Math.floor(ii/REPLAY_FPS),tot=Math.floor(frames.length/REPLAY_FPS);ctx.save();ctx.font='11px "Lilita One",sans-serif';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillStyle='rgba(255,255,255,0.85)';ctx.fillText(sec+'s/'+tot+'s',GW-6,GH-1);ctx.restore();if(playingRef.current){idxRef.current=Math.min(idxRef.current+1,frames.length-1);setIdx(idxRef.current);if(idxRef.current>=frames.length-1)playingRef.current=false;}}lfRef.current=now;}animRef.current=requestAnimationFrame(loop);}animRef.current=requestAnimationFrame(loop);return function(){alive=false;cancelAnimationFrame(animRef.current);};},[frames,colors]);
-  function seek(e){var rect=e.currentTarget.getBoundingClientRect(),x=e.clientX-rect.left,frac=Math.max(0,Math.min(1,x/GW));idxRef.current=Math.floor(frac*(frames.length-1));setIdx(idxRef.current);}
-  function togglePlay(){if(idxRef.current>=frames.length-1)idxRef.current=0;playingRef.current=!playingRef.current;setPlaying(playingRef.current);}
-  function fmt(sv){var m=Math.floor(sv/60),sec=sv%60;return(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
-  return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center'}},
-    React.createElement('div',{style:{background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px 12px 0 0',display:'flex',alignItems:'center',gap:12,padding:'10px 16px',width:GW+8,boxSizing:'border-box'}},
-      React.createElement('span',{style:{color:'#fbbf24',fontWeight:900,fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase'}},'Full Match Replay'),
+  var last=frames.length-1,SPEEDS=[0.25,0.5,1,2];
+  // Goals: the ball touching a back wall below the crossbar. Used for timeline markers and "next goal".
+  var goals=React.useMemo(function(){
+    var out=[];
+    for(var i=0;i<frames.length;i++){var b=frames[i].ball;if((b.x<=BR+1||b.x>=GW-BR-1)&&b.y>GH-GRND-GOALH&&(!out.length||i-out[out.length-1]>90))out.push(i);}
+    return out;
+  },[frames]);
+  function setPos(p){posRef.current=Math.max(0,Math.min(last,p));setShownPos(posRef.current);}
+  function setPlay(on){if(on&&posRef.current>=last)posRef.current=0;playingRef.current=on;setPlaying(on);}
+  function changeSpeed(v){speedRef.current=v;setSpeed(v);}
+  function jumpGoal(dir){
+    var cur=posRef.current,target=null;
+    if(dir>0){for(var i=0;i<goals.length;i++)if(goals[i]-150>cur+5){target=goals[i]-150;break;}}
+    else{for(var j=goals.length-1;j>=0;j--)if(goals[j]-150<cur-30){target=goals[j]-150;break;}}
+    if(target!==null){setPos(Math.max(0,target));setPlay(true);}
+  }
+  useEffect(function(){
+    function hk(e){
+      var k=e.key.toLowerCase();
+      if(k===' '||k==='p'){e.preventDefault();setPlay(!playingRef.current);}
+      else if(k==='arrowright'||k==='d'){e.preventDefault();setPos(posRef.current+300);}
+      else if(k==='arrowleft'||k==='a'){e.preventDefault();setPos(posRef.current-300);}
+      else if(k==='.'){setPlay(false);setPos(posRef.current+1);}
+      else if(k===','){setPlay(false);setPos(posRef.current-1);}
+      else if(k>='1'&&k<='4'){changeSpeed(SPEEDS[Number(k)-1]);}
+      else if(k==='n'){jumpGoal(1);}
+      else if(k==='escape'){e.preventDefault();onBack();}
+    }
+    window.addEventListener('keydown',hk);return function(){window.removeEventListener('keydown',hk);};
+  },[frames,goals]);
+  useEffect(function(){
+    var alive=true,raf=0,prev=0,lastUi=0;
+    function loop(now){
+      if(!alive)return;
+      var dt=prev?Math.min(100,now-prev):16.7;prev=now;
+      if(playingRef.current&&!dragRef.current){
+        posRef.current=Math.min(last,posRef.current+dt/(1000/REPLAY_FPS)*speedRef.current);
+        if(posRef.current>=last){playingRef.current=false;setPlaying(false);}
+      }
+      var cv=cvRef.current;
+      if(cv&&frames.length){
+        var k=cv.width/GW,ctx=cv.getContext('2d');ctx.setTransform(k,0,0,k,0,0);
+        var snap=replayFrameAt(frames,posRef.current);
+        drawScene(ctx,snap.left,snap.right,snap.ball,colors,'multi','right',false,fanRef.current,false,null,theme==='night',theme==='japan',skins);
+      }
+      if(now-lastUi>120){lastUi=now;setShownPos(posRef.current);} // keep the React UI light: a few updates a second
+      raf=requestAnimationFrame(loop);
+    }
+    raf=requestAnimationFrame(loop);
+    return function(){alive=false;cancelAnimationFrame(raf);};
+  },[frames,colors,theme]);
+  function fmt(sv){sv=Math.floor(sv);var m=Math.floor(sv/60),sec=sv%60;return(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
+  function scrubTo(e){var r=e.currentTarget.getBoundingClientRect();setPos((e.clientX-r.left)/r.width*last);}
+  var btn=function(active){return{padding:'7px 14px',minHeight:34,background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,'+(active?'0.6':'0.2')+')',borderRadius:50,color:'#fff',fontWeight:800,cursor:'pointer',fontSize:12};};
+  var dpr=Math.min(2,window.devicePixelRatio||1);
+  return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',width:'min(808px,96vw)'}},
+    React.createElement('div',{style:{background:'rgba(5,12,35,0.92)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'12px 12px 0 0',display:'flex',alignItems:'center',flexWrap:'wrap',gap:'6px 12px',padding:'10px 14px',width:'100%',boxSizing:'border-box'}},
+      React.createElement('span',{style:{color:'#fbbf24',fontWeight:900,fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase'}},'Match Replay'),
       React.createElement('span',{style:{color:'rgba(255,255,255,0.65)',fontSize:12}},names.left+' vs '+names.right),
       React.createElement('div',{style:{flex:1}}),
-      React.createElement('span',{style:{color:'rgba(255,255,255,0.7)',fontSize:12,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums'}},fmt(Math.floor(idx/60))+' / '+fmt(Math.floor(frames.length/60))),
-      React.createElement('button',{onClick:togglePlay,style:{padding:'5px 14px',background:'linear-gradient(135deg,#38bdf8,#0369a1)',border:'none',borderRadius:50,color:'#fff',fontWeight:700,cursor:'pointer',fontSize:12}},playing?'Pause':'Play'),
-      React.createElement('button',{onClick:onBack,style:{padding:'5px 14px',background:'rgba(255,255,255,0.1)',border:'none',borderRadius:50,color:'#fff',cursor:'pointer',fontSize:12}},'Back')
-    ),
-    React.createElement('div',{style:{cursor:'pointer'},onClick:seek},React.createElement('canvas',{ref:cvRef,width:GW,height:GH,style:{display:'block',border:'1px solid rgba(255,255,255,0.08)',borderTop:'none',boxSizing:'content-box'}})),
-    React.createElement('p',{style:{color:'rgba(255,255,255,0.5)',fontSize:12,marginTop:8}},'Click to seek · Space/P to pause')
+      React.createElement('span',{style:{color:'rgba(255,255,255,0.8)',fontSize:13,fontVariantNumeric:'tabular-nums'}},fmt(shownPos/REPLAY_FPS)+' / '+fmt(last/REPLAY_FPS)),
+      React.createElement('button',{type:'button',onClick:onBack,style:btn(false)},'Back')),
+    React.createElement('canvas',{ref:cvRef,width:Math.round(GW*dpr),height:Math.round(GH*dpr),onClick:function(){setPlay(!playingRef.current);},style:{display:'block',width:'100%',aspectRatio:GW+'/'+GH,cursor:'pointer',border:'1px solid rgba(255,255,255,0.08)',borderTop:'none',boxSizing:'border-box',background:'#000'}}),
+    // Timeline: drag to scrub; gold ticks mark goals.
+    React.createElement('div',{role:'slider','aria-label':'Replay position','aria-valuemin':0,'aria-valuemax':Math.round(last/REPLAY_FPS),'aria-valuenow':Math.round(shownPos/REPLAY_FPS),tabIndex:0,
+      onPointerDown:function(e){dragRef.current=true;try{e.currentTarget.setPointerCapture(e.pointerId);}catch(err){}scrubTo(e);},
+      onPointerMove:function(e){if(dragRef.current)scrubTo(e);},
+      onPointerUp:function(){dragRef.current=false;},onPointerCancel:function(){dragRef.current=false;},
+      style:{position:'relative',width:'100%',height:28,background:'rgba(5,12,35,0.92)',cursor:'pointer',touchAction:'none'}},
+      React.createElement('div',{style:{position:'absolute',left:10,right:10,top:11,height:6,borderRadius:3,background:'rgba(255,255,255,0.15)'}},
+        React.createElement('div',{style:{width:(last?shownPos/last*100:0)+'%',height:'100%',borderRadius:3,background:'#38bdf8'}}),
+        goals.map(function(g){return React.createElement('span',{key:g,title:'Goal',style:{position:'absolute',left:(g/last*100)+'%',top:-4,width:3,height:14,marginLeft:-1,borderRadius:2,background:'#fbbf24'}});}),
+        React.createElement('span',{style:{position:'absolute',left:(last?shownPos/last*100:0)+'%',top:-5,width:16,height:16,marginLeft:-8,borderRadius:'50%',background:'#fff',boxShadow:'0 1px 4px rgba(0,0,0,0.5)'}}))),
+    React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',alignItems:'center',background:'rgba(5,12,35,0.92)',borderRadius:'0 0 12px 12px',padding:'8px 12px 12px',width:'100%',boxSizing:'border-box'}},
+      React.createElement('button',{type:'button','aria-label':'Back 5 seconds',onClick:function(){setPos(posRef.current-300);},style:btn(false)},'⏪ 5s'),
+      React.createElement('button',{type:'button',onClick:function(){setPlay(!playingRef.current);},style:Object.assign(btn(true),{minWidth:84})},playing?'⏸ Pause':'▶ Play'),
+      React.createElement('button',{type:'button','aria-label':'Forward 5 seconds',onClick:function(){setPos(posRef.current+300);},style:btn(false)},'5s ⏩'),
+      goals.length>0&&React.createElement('button',{type:'button',onClick:function(){jumpGoal(-1);},style:btn(false)},'← Goal'),
+      goals.length>0&&React.createElement('button',{type:'button',onClick:function(){jumpGoal(1);},style:btn(false)},'Goal →'),
+      React.createElement('span',{style:{width:8}}),
+      SPEEDS.map(function(v){return React.createElement('button',{key:v,type:'button','aria-pressed':speed===v,onClick:function(){changeSpeed(v);},style:btn(speed===v)},(v===0.25?'¼':v===0.5?'½':v)+'×');})),
+    React.createElement('p',{className:'kbd-hints',style:{color:'rgba(255,255,255,0.55)',fontSize:12,marginTop:8,textAlign:'center'}},'Space pause · ←/→ skip 5s · , . step a frame · 1–4 speed · N next goal · Esc back')
   );
 }
 
@@ -3254,12 +3372,18 @@ function App(){
     // Physics is tuned for 60 steps a second. When the browser only gives ~30
     // frames a second (battery saver, Arc/Chrome energy saver), run the missed
     // steps so the game keeps its normal speed instead of going slow-motion.
-    var STEP_MS=1000/60;
+    var STEP_MS=1000/60,skipCanvas=document.createElement('canvas');skipCanvas.width=skipCanvas.height=1;
     function loop(now){
       if(!alive)return;
       if(!lfRef.current||now-lfRef.current>250)lfRef.current=now-STEP_MS;
       var due=Math.min(4,Math.floor((now-lfRef.current+2)/STEP_MS));
-      for(var si=0;si<due&&alive;si++){lfRef.current+=STEP_MS;tick(now);}
+      // Catch-up steps still run all the game logic, but only the last step of a frame paints the
+      // real canvas (the others paint a 1x1 scratch canvas). Otherwise a slow frame (like the GOAL!
+      // burst) made the next frame do 2-4 full redraws and stutter even more.
+      var realCanvas=cvRef.current;
+      try{
+        for(var si=0;si<due&&alive;si++){lfRef.current+=STEP_MS;cvRef.current=si<due-1&&realCanvas?skipCanvas:realCanvas;tick(now);}
+      }finally{if(cvRef.current===skipCanvas)cvRef.current=realCanvas;}
       if(now-lfRef.current>STEP_MS*4)lfRef.current=now;
       animRef.current=requestAnimationFrame(loop);
     }
@@ -3306,13 +3430,16 @@ function App(){
 
         if(mode==='online'&&onRoleRef.current==='guest'){
           guestStep();
-          if(replayActiveRef.current&&replayIdxRef.current<replayFrRef.current.length){
-            applySnap(replayFrRef.current[replayIdxRef.current]);replayIdxRef.current++;
+          if(replayActiveRef.current&&replayIdxRef.current<replayFrRef.current.length-1){
+            var grf=replayFrRef.current,gpos=replayIdxRef.current;
+            applySnap(replayFrameAt(grf,gpos));replayIdxRef.current=gpos+replaySpeedAt(gpos,grf.length);
           }
           var gcv=cvRef.current;
           if(gcv){var gctx=gcv.getContext('2d');gctx.setTransform(RSn,0,0,RSn,0,0);gctx.save();var gshk=shakeRef.current;if(gshk>0.4){gctx.translate((Math.random()-0.5)*gshk,(Math.random()-0.5)*gshk);shakeRef.current=gshk*0.86;}else shakeRef.current=0;
+            if(replayActiveRef.current){gctx.restore();gctx.save();replayCamera(gctx,RSn,ball,replayIdxRef.current,replayFrRef.current.length);}
             drawScene(gctx,ls,rs,ball,cols,'online','right',false,fanRef.current,replayActiveRef.current?false:goalFlashRef.current,netGlRef.current,tm==='night',tm==='japan',getGameSlimeSkins('online'));
-            if(goalFlashRef.current){var gfn=netGfRef.current,gfa2=Math.max(0,0.5*(1-gfn/55));gctx.fillStyle='rgba(0,0,0,'+gfa2+')';gctx.fillRect(0,0,GW,GH);var gfs2=Math.min(112,72+gfn*3),gfp2=0.88+0.12*Math.sin(gfn*0.35);gctx.save();gctx.textAlign='center';gctx.textBaseline='middle';gctx.font=Math.round(gfs2*gfp2)+'px "Lilita One",sans-serif';gctx.strokeStyle='rgba(0,0,0,0.5)';gctx.lineWidth=8;gctx.strokeText('GOAL!',GW/2,GH/2-30);gctx.fillStyle='#FFD700';gctx.shadowColor='#FFD700';gctx.shadowBlur=40;gctx.fillText('GOAL!',GW/2,GH/2-30);gctx.restore();}
+            if(replayActiveRef.current){gctx.setTransform(RSn,0,0,RSn,0,0);if(replaySpeedAt(replayIdxRef.current,replayFrRef.current.length)<1){gctx.save();gctx.font='18px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,255,255,'+(0.6+0.3*Math.sin(now*0.008))+')';gctx.fillText('SLOW-MO',GW/2,40);gctx.restore();}}
+            if(goalFlashRef.current){var gfn=netGfRef.current,gfa2=Math.max(0,0.5*(1-gfn/55));gctx.fillStyle='rgba(0,0,0,'+gfa2+')';gctx.fillRect(0,0,GW,GH);var gfs2=Math.min(112,72+gfn*3),gfp2=0.88+0.12*Math.sin(gfn*0.35);drawGoalText(gctx,gfs2*gfp2,1,RSn);}
             if(replayActiveRef.current){var grt=replayFrRef.current.length,grp=grt?replayIdxRef.current/grt:0;gctx.fillStyle='rgba(0,0,0,0.55)';gctx.fillRect(0,0,GW,32);gctx.save();gctx.font='16px "Lilita One",sans-serif';gctx.textAlign='left';gctx.textBaseline='middle';gctx.fillStyle='#fbbf24';gctx.shadowColor='#fbbf24';gctx.shadowBlur=8;gctx.fillText('INSTANT REPLAY',10,16);gctx.restore();gctx.fillStyle='rgba(255,255,255,0.15)';gctx.fillRect(0,28,GW,4);gctx.fillStyle='#38bdf8';gctx.fillRect(0,28,GW*grp,4);}
             if(!replayActiveRef.current&&netRfRef.current>-999&&netRfRef.current<62&&!goRef.current)drawReady(gctx,netRfRef.current,statsRef.current.lG,statsRef.current.rG,cols);
             var gtl=tlRef.current;if(!replayActiveRef.current&&((gtl>0&&gtl<=10)||(gtl===0&&netOrRef.current!==2))&&!goRef.current){gctx.save();gctx.font='88px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='middle';gctx.fillStyle='rgba(255,255,255,0.95)';gctx.shadowColor='rgba(0,0,0,0.6)';gctx.shadowBlur=12;gctx.fillText(String(gtl),GW/2,GH/2-80);gctx.restore();}
@@ -3331,8 +3458,11 @@ function App(){
         }
 
         if(replayActiveRef.current){
-          if(goalFlashDoneRef.current){var ridx=replayIdxRef.current;if(ridx<replayFrRef.current.length){applySnap(replayFrRef.current[ridx]);replayIdxRef.current++;}else endReplay();}
-          var cv0=cvRef.current;if(cv0){var ctx0=cv0.getContext('2d');drawScene(ctx0,ls,rs,ball,cols,mode,hSide,practRef.current,fanRef.current,false,null,tm==='night',tm==='japan',getGameSlimeSkins(mode));var rtot=replayFrRef.current.length,rprog=rtot>0?replayIdxRef.current/rtot:0;ctx0.fillStyle='rgba(0,0,0,0.55)';ctx0.fillRect(0,0,GW,32);ctx0.save();ctx0.font='16px "Lilita One",sans-serif';ctx0.textAlign='left';ctx0.textBaseline='middle';ctx0.fillStyle='#fbbf24';ctx0.shadowColor='#fbbf24';ctx0.shadowBlur=8;ctx0.fillText('INSTANT REPLAY',10,16);ctx0.restore();var scorer2=replayScorerRef.current,modeNow=pmRef.current,skipHint=modeNow==='single'?'W/↑ to skip':scorer2==='left'?'W to skip (P1)':'↑ to skip (P2)';ctx0.save();ctx0.font='13px "Lilita One",sans-serif';ctx0.textAlign='right';ctx0.textBaseline='middle';ctx0.fillStyle='rgba(255,255,255,0.7)';ctx0.fillText(skipHint,GW-10,16);ctx0.restore();ctx0.fillStyle='rgba(255,255,255,0.15)';ctx0.fillRect(0,28,GW,4);ctx0.fillStyle='#38bdf8';ctx0.fillRect(0,28,GW*rprog,4);}
+          var rfr=replayFrRef.current,rpos=replayIdxRef.current;
+          if(goalFlashDoneRef.current){if(rpos<rfr.length-1){applySnap(replayFrameAt(rfr,rpos));replayIdxRef.current=rpos+replaySpeedAt(rpos,rfr.length);}else endReplay();}
+          var cv0=cvRef.current;if(cv0&&replayActiveRef.current){var ctx0=cv0.getContext('2d');replayCamera(ctx0,RSn,ball,rpos,rfr.length);drawScene(ctx0,ls,rs,ball,cols,mode,hSide,practRef.current,fanRef.current,false,null,tm==='night',tm==='japan',getGameSlimeSkins(mode));ctx0.setTransform(RSn,0,0,RSn,0,0);
+            if(replaySpeedAt(rpos,rfr.length)<1){ctx0.save();ctx0.font='18px "Lilita One",sans-serif';ctx0.textAlign='center';ctx0.textBaseline='top';ctx0.fillStyle='rgba(255,255,255,'+(0.6+0.3*Math.sin(now*0.008))+')';ctx0.fillText('SLOW-MO',GW/2,40);ctx0.restore();}
+            var rtot=rfr.length,rprog=rtot>0?Math.min(1,rpos/(rtot-1)):0;ctx0.fillStyle='rgba(0,0,0,0.55)';ctx0.fillRect(0,0,GW,32);ctx0.save();ctx0.font='16px "Lilita One",sans-serif';ctx0.textAlign='left';ctx0.textBaseline='middle';ctx0.fillStyle='#fbbf24';ctx0.shadowColor='#fbbf24';ctx0.shadowBlur=8;ctx0.fillText('INSTANT REPLAY',10,16);ctx0.restore();var scorer2=replayScorerRef.current,modeNow=pmRef.current,skipHint=modeNow==='single'?'W/↑ to skip':scorer2==='left'?'W to skip (P1)':'↑ to skip (P2)';ctx0.save();ctx0.font='13px "Lilita One",sans-serif';ctx0.textAlign='right';ctx0.textBaseline='middle';ctx0.fillStyle='rgba(255,255,255,0.7)';ctx0.fillText(skipHint,GW-10,16);ctx0.restore();ctx0.fillStyle='rgba(255,255,255,0.15)';ctx0.fillRect(0,28,GW,4);ctx0.fillStyle='#38bdf8';ctx0.fillRect(0,28,GW*rprog,4);}
           return;
         }
 
@@ -3342,10 +3472,7 @@ function App(){
           if(cv1){var ctx1=cv1.getContext('2d');ctx1.setTransform(RSn,0,0,RSn,0,0);ctx1.save();var shk1=shakeRef.current;if(shk1>0.4){ctx1.translate((Math.random()-0.5)*shk1,(Math.random()-0.5)*shk1);shakeRef.current=shk1*0.88;}else shakeRef.current=0;drawScene(ctx1,ls,rs,ball,cols,mode,hSide,practRef.current,fanRef.current,true,null,tm==='night',tm==='japan',getGameSlimeSkins(mode),mode==='training'&&trainingChallengeRef.current==='aim');drawParticles(ctx1,particlesRef.current);
             var gfr=goalFlashFrRef.current,gfa=Math.max(0,0.5*(1-gfr/55));ctx1.fillStyle='rgba(0,0,0,'+gfa+')';ctx1.fillRect(0,0,GW,GH);
             var gfs=Math.min(112,72+gfr*3),gfp=0.88+0.12*Math.sin(gfr*0.35);
-            ctx1.save();ctx1.textAlign='center';ctx1.textBaseline='middle';
-            ctx1.font=Math.round(gfs*gfp)+'px "Lilita One",sans-serif';
-            ctx1.strokeStyle='rgba(0,0,0,0.5)';ctx1.lineWidth=8;ctx1.strokeText('GOAL!',GW/2,GH/2-30);
-            ctx1.fillStyle='rgba(255,215,0,'+Math.min(1,gfr/4)+')';ctx1.shadowColor='#FFD700';ctx1.shadowBlur=40;ctx1.fillText('GOAL!',GW/2,GH/2-30);ctx1.restore();ctx1.restore();}
+            drawGoalText(ctx1,gfs*gfp,Math.min(1,gfr/4),RSn);ctx1.restore();}
           return;
         }
 
@@ -3470,7 +3597,7 @@ function App(){
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'})},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress)})));
   if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
-  if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,onBack:function(){setShowMatchReplay(false);}})));
+  if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,theme:themeMode,skins:getGameSlimeSkins(lastPM.current),onBack:function(){setShowMatchReplay(false);}})));
 
   // ── MENU ─────────────────────────────────────────────────────────────
   if(screen==='menu'){
@@ -3492,7 +3619,7 @@ function App(){
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
-          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.6.1')),
+          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.6.3')),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
@@ -3884,7 +4011,7 @@ function App(){
                         React.createElement('td',{style:{fontWeight:row[3]?900:700,color:row[3]?'#ffffff':'rgba(255,255,255,0.8)',fontSize:row[3]?22:14}},row[2]));
                     }))),
                 gmode!=='training'&&React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:14}},
-                  [['Fastest shot',Math.round((endStats.fastestShot||0)*60)+' units/s'],['Longest goal',Math.round(endStats.longestGoal||0)+' units'],['Saves',endStats.saves||0],['Longest rally',(endStats.longestRally||0).toFixed(1)+' s']].map(function(item){return React.createElement('div',{key:item[0],style:{padding:'7px 8px',borderRadius:9,background:'rgba(255,255,255,0.07)',textAlign:'center'}},React.createElement('div',{style:{fontSize:9,color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:800}},item[0]),React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff',marginTop:2}},item[1]));})),
+                  [['Fastest shot',Math.round((endStats.fastestShot||0)*KMH_PER_SPEED)+' km/h'],['Longest goal',Math.round((endStats.longestGoal||0)*METRES_PER_UNIT)+' m'],['Saves',endStats.saves||0],['Longest rally',(endStats.longestRally||0).toFixed(1)+' s']].map(function(item){return React.createElement('div',{key:item[0],style:{padding:'7px 8px',borderRadius:9,background:'rgba(255,255,255,0.07)',textAlign:'center'}},React.createElement('div',{style:{fontSize:9,color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:800}},item[0]),React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff',marginTop:2}},item[1]));})),
                 gmode==='training'&&trainingResult&&React.createElement('div',{style:{textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.76)',marginBottom:14}},'Bronze, silver, and gold each require a higher score. Try again to improve your medal.'),
                 React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}},
                   React.createElement('button',{onClick:exitToMenu,style:pill('rgba(255,255,255,0.12)',{fontSize:13,padding:'9px 18px',textTransform:'none',letterSpacing:0})},'Menu'),
