@@ -73,7 +73,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.6.8';
+var GAME_VERSION='v24.6.9';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3032,7 +3032,16 @@ function App(){
   // Touch screens get full-size menus and buttons outside the scaled game field.
   var s_touchUI=useState(function(){try{return window.matchMedia('(pointer:coarse)').matches;}catch(e){return false;}}),touchUI=s_touchUI[0],setTouchUI=s_touchUI[1];
   var s_land=useState(function(){return window.innerWidth>window.innerHeight;}),landscape=s_land[0],setLandscape=s_land[1];
-  useEffect(function(){function onResize(){setLandscape(window.innerWidth>window.innerHeight);}window.addEventListener('resize',onResize);return function(){window.removeEventListener('resize',onResize);};},[]);
+  // Desktop menu is locked to the window, so shrink it a little if its content is taller than the window.
+  var menuWrapRef=useRef(null),s_mfit=useState(1),menuFit=s_mfit[0],setMenuFit=s_mfit[1];
+  React.useLayoutEffect(function(){
+    var el=menuWrapRef.current;if(!el||touchUI||screen!=='menu')return;
+    var applied=uiZ*menuFit,natural=el.getBoundingClientRect().height/applied,avail=window.innerHeight-60; // screen has 20px padding top and bottom, plus a little breathing room
+    var want=Math.max(0.5,Math.min(1,avail/(natural*uiZ)));
+    if(Math.abs(want-menuFit)>0.01)setMenuFit(want);
+  });
+  var s_rtick=useState(0),setResizeTick=s_rtick[1];
+  useEffect(function(){function onResize(){setLandscape(window.innerWidth>window.innerHeight);setResizeTick(function(n){return n+1;});}window.addEventListener('resize',onResize);return function(){window.removeEventListener('resize',onResize);};},[]);
   useEffect(function(){
     var mq;try{mq=window.matchMedia('(pointer:coarse)');}catch(e){return;}
     function onChange(){setTouchUI(mq.matches);}
@@ -3758,7 +3767,7 @@ function App(){
       {key:'playerdata',label:'Stats & Social',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
-      React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:22})},
+      React.createElement('div',{ref:menuWrapRef,className:'rise',style:Object.assign({},wrapStyle,{gap:22},touchUI?null:{zoom:uiZ*menuFit})},
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
@@ -3766,15 +3775,13 @@ function App(){
         // Daily challenge card
         (function(){
           var dch=todaysChallenge(),done=dailyDoneToday(dailyState),streak=dailyStreakNow(dailyState);
-          return React.createElement('div',{role:'note','aria-label':'Daily challenge: '+dch.title+'. '+dch.desc+(done?' Completed.':''),style:{display:'flex',alignItems:'center',gap:12,width:'min(681px, 100%)',boxSizing:'border-box',padding:'10px 14px',borderRadius:16,background:done?'rgba(34,197,94,0.16)':'rgba(5,12,35,0.72)',border:'1px solid '+(done?'rgba(74,222,128,0.6)':'rgba(249,115,22,0.55)'),boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}},
-            React.createElement('div',{'aria-hidden':'true',style:{fontSize:24,flex:'0 0 auto'}},done?'✅':'📅'),
-            React.createElement('div',{style:{flex:1,minWidth:0,textAlign:'left'}},
-              React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:done?'#86efac':'#fdba74'}},done?'Daily challenge done':'Daily challenge'),
-              React.createElement('div',{style:{fontSize:15,fontWeight:900,color:'#fff'}},dch.title),
+          return React.createElement('div',{role:'note','aria-label':'Daily challenge: '+dch.title+'. '+dch.desc+(done?' Completed.':''),style:{display:'flex',alignItems:'center',gap:10,width:'min(681px, 100%)',boxSizing:'border-box',padding:'6px 14px',marginTop:-8,marginBottom:-6,borderRadius:14,background:done?'rgba(34,197,94,0.16)':'rgba(5,12,35,0.72)',border:'1px solid '+(done?'rgba(74,222,128,0.6)':'rgba(249,115,22,0.55)'),boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}},
+            React.createElement('div',{'aria-hidden':'true',style:{fontSize:20,flex:'0 0 auto'}},done?'✅':'📅'),
+            React.createElement('div',{style:{flex:1,minWidth:0,textAlign:'left',lineHeight:1.25}},
+              React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff'}},
+                React.createElement('span',{style:{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:done?'#86efac':'#fdba74',marginRight:8}},done?'Daily done':'Daily challenge'),dch.title),
               React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.75)'}},done?'Nice! A new challenge unlocks tomorrow.':dch.desc)),
-            React.createElement('div',{title:'Daily streak',style:{flex:'0 0 auto',textAlign:'center',minWidth:44}},
-              React.createElement('div',{style:{fontSize:18,fontWeight:900,color:streak?'#fdba74':'rgba(255,255,255,0.45)'}},'🔥'+streak),
-              React.createElement('div',{style:{fontSize:9,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.55)',fontWeight:800}},'Streak')));
+            React.createElement('div',{title:'Daily streak','aria-label':'Streak '+streak,style:{flex:'0 0 auto',fontSize:16,fontWeight:900,color:streak?'#fdba74':'rgba(255,255,255,0.45)'}},'🔥'+streak));
         })(),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
