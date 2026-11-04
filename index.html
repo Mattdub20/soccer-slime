@@ -224,7 +224,104 @@ function skinFx(P,from,skin){
 function emitLand(P,x,y,vy){var it=Math.min(1,(vy-5)/10);if(it<=0)return;for(var i=0;i<Math.floor(3+it*5);i++){var s=(Math.random()<0.5?-1:1),sp=1+Math.random()*2.5*it;P.push(mkP(x+s*SR*0.5*Math.random(),y,s*sp,-Math.random()*1.6,'rgba(255,255,255,0.55)',12+Math.random()*8,1.6+Math.random()*1.4));}}
 
 function dbLoad(){try{var r=window.localStorage.getItem('slime_db');if(r){var loaded=JSON.parse(r);if(Array.isArray(loaded)){for(var i=0;i<loaded.length;i++)if(typeof loaded[i].draws!=='number')loaded[i].draws=0;return loaded;}}}catch(e){}return[];}
-function dbSave(a){try{window.localStorage.setItem('slime_db',JSON.stringify(a));}catch(e){}}
+function dbSave(a){try{window.localStorage.setItem('slime_db',JSON.stringify(a));}catch(e){}cloudQueueSave();}
+
+// ─── Cloud save (Firebase) ────────────────────────────────────────────────
+// Paste your Firebase web app config here to turn on cloud accounts, e.g.
+// {apiKey:'...',authDomain:'...',projectId:'...',appId:'...'}. Leave null to keep saves on this device only.
+// Firebase stores the passwords (hashed); the game never sees or keeps them.
+var FIREBASE_CONFIG={
+  apiKey:'AIzaSyA3TsBasCR238llT5WOZwF0Cw4WJNU3Xo8',
+  authDomain:'slime-soccer-mli.firebaseapp.com',
+  projectId:'slime-soccer-mli',
+  storageBucket:'slime-soccer-mli.firebasestorage.app',
+  messagingSenderId:'966456687628',
+  appId:'1:966456687628:web:a13b553e924b938ded0229'
+};
+var CLOUD_SDK='https://www.gstatic.com/firebasejs/10.12.2/';
+var CLOUD={user:null,listeners:[],initPromise:null,saveTimer:0,paused:false};
+function cloudEnabled(){return !!(FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey);}
+function cloudLoadScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){rej(new Error('Could not load '+src));};document.head.appendChild(s);});}
+function cloudInit(){
+  if(!cloudEnabled())return Promise.resolve(false);
+  if(CLOUD.initPromise)return CLOUD.initPromise;
+  CLOUD.initPromise=cloudLoadScript(CLOUD_SDK+'firebase-app-compat.js')
+    .then(function(){return Promise.all([cloudLoadScript(CLOUD_SDK+'firebase-auth-compat.js'),cloudLoadScript(CLOUD_SDK+'firebase-firestore-compat.js')]);})
+    .then(function(){
+      firebase.initializeApp(FIREBASE_CONFIG);CLOUD.auth=firebase.auth();CLOUD.db=firebase.firestore();
+      CLOUD.auth.onAuthStateChanged(function(u){CLOUD.user=u;CLOUD.authKnown=true;CLOUD.listeners.forEach(function(f){f(u);});});
+      return true;
+    })
+    .catch(function(e){console.warn('Cloud save unavailable.',e);CLOUD.initPromise=null;return false;});
+  return CLOUD.initPromise;
+}
+// Usernames are turned into a placeholder email for Firebase's username/password sign-in. No emails are ever sent.
+function cloudEmail(username){return username+'@players.example.com';}
+function cloudUsernameOf(user){return user&&user.email?user.email.split('@')[0]:'';}
+function cleanCloudUsername(v){return String(v||'').trim().toLowerCase();}
+function cloudCheckLogin(username,password){
+  if(!/^[a-z0-9_]{3,16}$/.test(username))return'Usernames are 3–16 letters, numbers or _.';
+  if(String(password||'').length<6)return'Passwords need at least 6 characters.';
+  return'';
+}
+function cloudErrorText(e){
+  var code=e&&e.code||'';
+  if(code==='auth/email-already-in-use')return'That username is taken. Try another, or log in.';
+  if(code==='auth/invalid-credential'||code==='auth/wrong-password'||code==='auth/user-not-found'||code==='auth/invalid-login-credentials')return'Wrong username or password.';
+  if(code==='auth/too-many-requests')return'Too many tries. Wait a minute and try again.';
+  if(code==='auth/network-request-failed'||code==='unavailable')return'Could not reach the cloud. Check your internet.';
+  if(code==='auth/weak-password')return'Pick a stronger password (at least 6 characters).';
+  if(code==='permission-denied')return'The cloud refused the save. Check the Firestore rules.';
+  return'Something went wrong ('+(code||'unknown error')+').';
+}
+// Everything that gets synced. AI learning data stays on the device (it is large and per-device).
+function readLocalSave(){return{achievements:loadAchievementProgress(),players:dbLoad(),account:loadAccountProfile(),stickers:loadOnlineStickerSlots(),settings:loadGameSettings()};}
+// Never lose progress: keep the higher achievement counts, and the longer history for each local player.
+function mergeSaves(local,cloud){
+  if(!cloud)return local;
+  var a=cleanAchievementProgress(local.achievements),b=cleanAchievementProgress(cloud.achievements),ach=blankAchievementProgress();
+  Object.keys(ach).forEach(function(k){ach[k]=k==='developerUnlocked'?(a[k]||b[k]):Math.max(a[k],b[k]);});
+  var byId={};
+  (cloud.players||[]).concat(local.players||[]).forEach(function(p){
+    if(!p||!p.id)return;var cur=byId[p.id];
+    if(!cur||(p.hist||[]).length>(cur.hist||[]).length)byId[p.id]=p;
+  });
+  return{
+    achievements:ach,
+    players:Object.keys(byId).map(function(id){return byId[id];}).slice(0,20),
+    account:cloud.account||local.account,
+    stickers:cloud.stickers||local.stickers,
+    settings:cloud.settings||local.settings
+  };
+}
+function writeLocalSave(save){
+  try{
+    window.localStorage.setItem('slime_achievements',JSON.stringify(save.achievements));
+    window.localStorage.setItem('slime_db',JSON.stringify(save.players));
+    window.localStorage.setItem('slime_account',JSON.stringify(save.account));
+    window.localStorage.setItem('slime_sticker_slots',JSON.stringify(save.stickers));
+    window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(save.settings));
+  }catch(e){console.warn('Could not store the cloud save on this device.',e);}
+}
+function cloudDoc(){return CLOUD.db.collection('saves').doc(CLOUD.user.uid);}
+function cloudPull(){
+  return cloudDoc().get().then(function(snap){
+    if(!snap.exists)return null;
+    try{return JSON.parse(snap.data().data);}catch(e){return null;}
+  });
+}
+function cloudPushNow(){
+  clearTimeout(CLOUD.saveTimer);
+  if(!CLOUD.user||!CLOUD.db)return Promise.resolve(false);
+  return cloudDoc().set({data:JSON.stringify(readLocalSave()),username:cloudUsernameOf(CLOUD.user),updatedAt:firebase.firestore.FieldValue.serverTimestamp()})
+    .then(function(){CLOUD.lastSync=Date.now();if(CLOUD.onSynced)CLOUD.onSynced(true);return true;})
+    .catch(function(e){console.warn('Cloud save failed.',e);if(CLOUD.onSynced)CLOUD.onSynced(false,e);return false;});
+}
+// Called after any local save; batches changes into one upload a couple of seconds later.
+function cloudQueueSave(){
+  if(!CLOUD.user||CLOUD.paused)return;
+  clearTimeout(CLOUD.saveTimer);CLOUD.saveTimer=setTimeout(cloudPushNow,2500);
+}
 function dbMk(name){return{id:'p'+Date.now(),name:name,wins:0,losses:0,draws:0,gf:0,ga:0,streak:0,maxStreak:0,hist:[]};}
 function dbH2H(p1,p2){var o={w:0,l:0,d:0,gf:0,ga:0,bw:null,bl:null,streak:0,streakWho:null,lines:{}};if(!p1||!p2)return o;for(var i=0;i<p1.hist.length;i++){var m=p1.hist[i];if(m.opp!==p2.id)continue;if(m.r==='w'){o.w++;if(o.streakWho===p1.id)o.streak++;else{o.streak=1;o.streakWho=p1.id;}}else if(m.r==='l'){o.l++;if(o.streakWho===p2.id)o.streak++;else{o.streak=1;o.streakWho=p2.id;}}else{o.d++;o.streak=0;o.streakWho=null;}o.gf+=m.gf;o.ga+=m.ga;var sc=m.gf+'-'+m.ga;o.lines[sc]=(o.lines[sc]||0)+1;var df=m.gf-m.ga;if(df>0&&(!o.bw||df>o.bw.d))o.bw={gf:m.gf,ga:m.ga,d:df};if(df<0&&(!o.bl||df<o.bl.d))o.bl={gf:m.gf,ga:m.ga,d:df};}return o;}
 function dbRecord(arr,id1,id2,g1,g2){var p1=null,p2=null;for(var i=0;i<arr.length;i++){if(arr[i].id===id1)p1=arr[i];if(arr[i].id===id2)p2=arr[i];}if(!p1||!p2)return;var ts=Date.now();if(g1>g2){p1.wins++;p2.losses++;p1.streak++;p2.streak=0;if(p1.streak>p1.maxStreak)p1.maxStreak=p1.streak;p1.hist.push({opp:id2,r:'w',gf:g1,ga:g2,ts:ts});p2.hist.push({opp:id1,r:'l',gf:g2,ga:g1,ts:ts});}else if(g1<g2){p2.wins++;p1.losses++;p2.streak++;p1.streak=0;if(p2.streak>p2.maxStreak)p2.maxStreak=p2.streak;p1.hist.push({opp:id2,r:'l',gf:g1,ga:g2,ts:ts});p2.hist.push({opp:id1,r:'w',gf:g2,ga:g1,ts:ts});}else{p1.draws=(p1.draws||0)+1;p2.draws=(p2.draws||0)+1;p1.streak=0;p2.streak=0;p1.hist.push({opp:id2,r:'d',gf:g1,ga:g2,ts:ts});p2.hist.push({opp:id1,r:'d',gf:g2,ga:g1,ts:ts});}p1.gf+=g1;p1.ga+=g2;p2.gf+=g2;p2.ga+=g1;}
@@ -1657,6 +1754,38 @@ function AccountScreen(props){
   var s_er=useState(''),error=s_er[0],setError=s_er[1];
   var s_ok=useState(''),notice=s_ok[0],setNotice=s_ok[1];
   var localPlayers=props.players||[];
+  var cloud=props.cloud||{};
+  var s_cu=useState(''),cloudName=s_cu[0],setCloudName=s_cu[1];
+  var s_cp=useState(''),cloudPass=s_cp[0],setCloudPass=s_cp[1];
+  var s_ce=useState(''),cloudErr=s_ce[0],setCloudErr=s_ce[1];
+  function cloudSubmit(create){
+    if(cloud.busy)return;
+    setCloudErr('');
+    props.onCloudLogIn(cloudName,cloudPass,create).then(function(err){if(err)setCloudErr(err);else setCloudPass('');});
+  }
+  function cloudSection(){
+    var box={width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',gap:8};
+    var field={flex:'1 1 140px',minWidth:0,fontFamily:'var(--font-body)',fontSize:15,padding:'9px 12px',borderRadius:10,border:'1px solid rgba(255,255,255,0.28)',background:'rgba(0,0,0,0.3)',color:'#fff',boxSizing:'border-box'};
+    var btn=function(bg){return{padding:'9px 16px',borderRadius:50,border:'1px solid rgba(255,255,255,0.35)',background:bg,color:'#fff',fontWeight:900,fontSize:12,cursor:cloud.busy?'wait':'pointer',opacity:cloud.busy?0.6:1};};
+    var title=React.createElement('div',{style:{fontSize:12,fontWeight:800}},'Cloud save');
+    if(!cloudEnabled())return React.createElement('div',{style:box},title,React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.6)'}},'Cloud accounts are not set up for this copy of the game yet. Progress is saved on this device.'));
+    if(!cloud.ready)return React.createElement('div',{style:box},title,React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.6)'}},'Connecting to the cloud…'));
+    if(cloud.user)return React.createElement('div',{style:box},title,
+      React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.8)'}},'Logged in as ',React.createElement('strong',{style:{color:'#fff'}},cloud.user),' · ',cloud.busy?'syncing…':cloud.msg?React.createElement('span',{style:{color:'#fca5a5'}},cloud.msg):cloud.synced?'saved to the cloud ✓':'up to date'),
+      React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.6)'}},'Achievements, local players, your profile, stickers and settings save automatically. Log in on another device to pick up where you left off.'),
+      React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap'}},
+        React.createElement('button',{type:'button',disabled:cloud.busy,onClick:function(){props.onCloudSync();},style:btn('rgba(255,255,255,0.13)')},'Sync now'),
+        React.createElement('button',{type:'button',disabled:cloud.busy,onClick:function(){props.onCloudLogOut();},style:btn('rgba(239,68,68,0.25)')},'Log out')));
+    return React.createElement('div',{style:box},title,
+      React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.68)'}},'Log in to save your achievements, local players and profile online and use them on any device.'),
+      React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap'}},
+        React.createElement('input',{'data-cloud':'1',type:'text',autoComplete:'username',autoCapitalize:'none',spellCheck:false,maxLength:16,placeholder:'Username','aria-label':'Cloud username',value:cloudName,onChange:function(e){setCloudName(e.target.value);setCloudErr('');},onKeyDown:function(e){if(e.key==='Enter'){e.preventDefault();cloudSubmit(false);}},style:field}),
+        React.createElement('input',{'data-cloud':'1',type:'password',autoComplete:'current-password',placeholder:'Password','aria-label':'Cloud password',value:cloudPass,onChange:function(e){setCloudPass(e.target.value);setCloudErr('');},onKeyDown:function(e){if(e.key==='Enter'){e.preventDefault();cloudSubmit(false);}},style:field})),
+      cloudErr&&React.createElement('div',{role:'alert',style:{fontSize:12,color:'#fecaca'}},cloudErr),
+      React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap'}},
+        React.createElement('button',{type:'button',disabled:cloud.busy,onClick:function(){cloudSubmit(false);},style:btn('linear-gradient(135deg,#0ea5e9,#0369a1)')},cloud.busy?'Please wait…':'Log in'),
+        React.createElement('button',{type:'button',disabled:cloud.busy,onClick:function(){cloudSubmit(true);},style:btn('rgba(255,255,255,0.13)')},'Create account')));
+  }
   var s_link=useState(function(){var id=initial.linkedPlayerId||'';return localPlayers.some(function(p){return p.id===id;})?id:'';}),linkedPlayerId=s_link[0],setLinkedPlayerId=s_link[1];
   var unlockedFrames=props.unlockedFrames||[];
   var unlockedSkins=props.unlockedSkins||[];
@@ -1694,7 +1823,8 @@ function AccountScreen(props){
       }
       if(key==='enter'||key===' '){e.preventDefault();e.stopPropagation();startEditingName();return;}
     }
-    if(key==='escape'){e.preventDefault();e.stopPropagation();props.onBack();return;}
+    var inCloudField=target.getAttribute&&target.getAttribute('data-cloud');
+    if(key==='escape'){e.preventDefault();e.stopPropagation();if(inCloudField){var loginBtn=target.parentNode.parentNode.querySelector('button');if(loginBtn)loginBtn.focus();}else props.onBack();return;}
     if(key==='tab'){
       var controls=accountControls();
       if(!controls.length)return;
@@ -1704,6 +1834,7 @@ function AccountScreen(props){
       controls[(index+(e.shiftKey?-1:1)+controls.length)%controls.length].focus();
       return;
     }
+    if(inCloudField&&key!=='arrowup'&&key!=='arrowdown')return; // typing in the login boxes
     if(target.type==='range'&&(key==='arrowleft'||key==='arrowright'))return;
     if(target.tagName==='SELECT'&&(key==='enter'||key===' ')){e.preventDefault();try{target.showPicker();}catch(err){}return;}
     var dx=(key==='arrowright'||key==='d')?1:(key==='arrowleft'||key==='a')?-1:0,dy=(key==='arrowdown'||key==='s')?1:(key==='arrowup'||key==='w')?-1:0;
@@ -1754,6 +1885,7 @@ function AccountScreen(props){
       React.createElement('p',{id:'account-keyboard-help',style:{margin:'-8px 0 0',fontSize:11,color:'rgba(255,255,255,0.68)',textAlign:'center'}},'Arrow keys / WASD to move · Enter or Space to select · Esc to return'),
       React.createElement('label',{style:{display:'flex',flexDirection:'column',gap:6,width:'100%',fontSize:12,fontWeight:800,letterSpacing:'0.08em',textTransform:'uppercase'}},'Player name',
         React.createElement('input',{ref:nameRef,value:name,maxLength:12,readOnly:!editingName,'aria-description':editingName?'Press Enter when done':'Press Enter or Space to edit',placeholder:editingName?'Type a name for online play':'Press Enter to edit your name',onMouseDown:function(){if(!editingName)startEditingName();},onBlur:function(){setEditingName(false);},onChange:function(e){setName(e.target.value);setError('');},style:{fontFamily:'var(--font-body)',fontSize:17,padding:'10px 12px',borderRadius:12,border:'1px solid '+(editingName?'#7dd3fc':'rgba(255,255,255,0.28)'),background:editingName?'rgba(0,0,0,0.45)':'rgba(0,0,0,0.3)',color:'#fff',boxSizing:'border-box',cursor:editingName?'text':'pointer',caretColor:editingName?'auto':'transparent'}})),
+      cloudSection(),
       React.createElement('div',{style:{display:'flex',alignItems:'center',gap:14,width:'100%',padding:'12px 0',borderTop:'1px solid rgba(255,255,255,0.12)',borderBottom:'1px solid rgba(255,255,255,0.12)'}},
         React.createElement(ProfileAvatar,{profile:avatar,size:76}),
         React.createElement('div',{style:{flex:1,minWidth:0,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}},
@@ -2001,7 +2133,7 @@ function App(){
     var next={name:cleanName(profile.name),avatar:cleanAccountAvatar(profile.avatar),linkedPlayerId:typeof profile.linkedPlayerId==='string'?profile.linkedPlayerId:''};
     try{window.localStorage.setItem('slime_account',JSON.stringify(next));}
     catch(e){return'Could not save your account in this browser. Check available site storage and try again.';}
-    setAccount(next);
+    setAccount(next);cloudQueueSave();
     if(next.name){setMyName(next.name);try{window.localStorage.setItem('slime_myname',next.name);}catch(e){}}
     else{setMyName('');try{window.localStorage.removeItem('slime_myname');}catch(e){}}
     return'';
@@ -2013,7 +2145,7 @@ function App(){
     else if(next.length<5)next.push(id);
     else{setOnl(function(o){return Object.assign({},o,{err:'All five sticker keys are assigned. Remove one first.'});});return;}
     setStickerSlots(next);
-    try{window.localStorage.setItem('slime_sticker_slots',JSON.stringify(next));}
+    try{window.localStorage.setItem('slime_sticker_slots',JSON.stringify(next));cloudQueueSave();}
     catch(e){setOnl(function(o){return Object.assign({},o,{err:'Sticker keys could not be saved in this browser, but your current choices will still work.'});});return;}
     setOnl(function(o){return o.err?Object.assign({},o,{err:''}):o;});
   }
@@ -2420,7 +2552,7 @@ function App(){
   function persistAchievementProgress(next){
     var clean=cleanAchievementProgress(next);
     achievementProgressRef.current=clean;setAchievementProgress(clean);
-    try{window.localStorage.setItem('slime_achievements',JSON.stringify(clean));setAchievementSaveError('');}
+    try{window.localStorage.setItem('slime_achievements',JSON.stringify(clean));setAchievementSaveError('');cloudQueueSave();}
     catch(e){setAchievementSaveError('Achievement progress could not be saved in this browser. Check available site storage.');}
   }
   function linkedLocalPlayerId(){
@@ -2519,9 +2651,53 @@ function App(){
     setGameSettings(next);GAME_AUDIO_VOLUME=next.sfxVolume;
     if(Object.prototype.hasOwnProperty.call(patch,'defaultSide')){setSide(next.defaultSide);sideRef.current=next.defaultSide;}
     if(Object.prototype.hasOwnProperty.call(patch,'soundEnabled')){setSoundEnabled(next.soundEnabled);soundEnabledRef.current=next.soundEnabled;}
-    try{window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(next));setSettingsSaveError('');}
+    try{window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(next));setSettingsSaveError('');cloudQueueSave();}
     catch(error){console.error('Game settings could not be saved.',error);setSettingsSaveError('Settings could not be saved on this device.');}
   }
+
+  // ── Cloud account ──
+  var s_cloud=useState({ready:false,user:'',busy:false,msg:'',synced:0}),cloud=s_cloud[0],setCloud=s_cloud[1];
+  var s_cloudVer=useState(0),cloudVer=s_cloudVer[0],setCloudVer=s_cloudVer[1];
+  function patchCloud(p){setCloud(function(c){return Object.assign({},c,p);});}
+  // Push a merged save into every piece of state that was loaded from this device.
+  function applySave(){
+    var ach=loadAchievementProgress();achievementProgressRef.current=ach;setAchievementProgress(ach);
+    syncPlayers(dbLoad());
+    var acct=loadAccountProfile();setAccount(acct);setMyName(acct.name||'');
+    setStickerSlots(loadOnlineStickerSlots());
+    var gs=loadGameSettings();setGameSettings(gs);GAME_AUDIO_VOLUME=gs.sfxVolume;setSoundEnabled(gs.soundEnabled);soundEnabledRef.current=gs.soundEnabled;
+    setCloudVer(function(v){return v+1;});
+  }
+  useEffect(function(){
+    var alive=true;
+    CLOUD.onSynced=function(ok,e){if(alive)patchCloud(ok?{synced:Date.now(),msg:''}:{msg:cloudErrorText(e)});};
+    function onUser(u){
+      if(!alive)return;
+      if(!u){patchCloud({user:'',busy:false});return;}
+      patchCloud({user:cloudUsernameOf(u),busy:true,msg:'Syncing your progress…'});
+      CLOUD.paused=true;
+      cloudPull().then(function(remote){
+        writeLocalSave(mergeSaves(readLocalSave(),remote));applySave();
+        CLOUD.paused=false;return cloudPushNow();
+      }).then(function(){if(alive)patchCloud({busy:false});})
+        .catch(function(e){CLOUD.paused=false;if(alive)patchCloud({busy:false,msg:cloudErrorText(e)});});
+    }
+    cloudInit().then(function(ok){
+      if(!alive||!ok)return;
+      patchCloud({ready:true});
+      CLOUD.listeners.push(onUser);
+      if(CLOUD.authKnown)onUser(CLOUD.user);
+    });
+    return function(){alive=false;CLOUD.listeners=CLOUD.listeners.filter(function(f){return f!==onUser;});};
+  },[]);
+  function cloudLogIn(username,password,create){
+    var name=cleanCloudUsername(username),err=cloudCheckLogin(name,password);
+    if(err)return Promise.resolve(err);
+    patchCloud({busy:true,msg:''});
+    var email=cloudEmail(name),attempt=create?CLOUD.auth.createUserWithEmailAndPassword(email,password):CLOUD.auth.signInWithEmailAndPassword(email,password);
+    return attempt.then(function(){return'';}).catch(function(e){patchCloud({busy:false});return cloudErrorText(e);});
+  }
+  function cloudLogOut(){return cloudPushNow().then(function(){return CLOUD.auth.signOut();}).then(function(){patchCloud({user:'',msg:'',synced:0});});}
   function resetImpossibleAI(){
   qTableRef.current={};
   qHistRef.current=[];
@@ -3096,7 +3272,7 @@ function App(){
 
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'})},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
-  if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress)})));
+  if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress)})));
   if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{avatar:account.avatar,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,onBack:function(){setShowMatchReplay(false);}})));
 
@@ -3120,7 +3296,7 @@ function App(){
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
-          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.5.7')),
+          React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},'v24.5.9')),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
