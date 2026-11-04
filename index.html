@@ -73,7 +73,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.6.7';
+var GAME_VERSION='v24.6.8';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -282,6 +282,33 @@ function skinFx(P,from,skin){
     if(fx.slow){p.vx*=0.6;p.vy*=0.6;p.life*=1.4;p.maxLife=p.life;}
   }
 }
+// Ball trail colour for a trail cosmetic ('none' = the classic gold, red in Sakura).
+function trailColor(style,isJapan,t){
+  if(style==='rainbow')return hslToHex((t*0.25)%360,90,62);
+  if(style==='fire')return ['#f97316','#facc15','#ef4444'][Math.floor(t/90)%3];
+  if(style==='ice')return ['#a5f3fc','#e0f2fe','#67e8f9'][Math.floor(t/90)%3];
+  if(style==='neon')return '#4ade80';
+  return isJapan?'#cc0000':'#FFD700';
+}
+// Extra goal celebration on top of the normal goal burst.
+function emitCelebration(P,style){
+  var i,a,sp;
+  if(style==='fireworks'){
+    for(var b=0;b<4;b++){var cx=120+Math.random()*(GW-240),cy=60+Math.random()*120,hue=Math.random()*360;
+      for(i=0;i<28;i++){a=i/28*Math.PI*2;sp=2+Math.random()*2.5;var p=mkP(cx,cy,Math.cos(a)*sp,Math.sin(a)*sp,hslToHex(hue+Math.random()*40,95,65),45+Math.random()*20,2.5);p.grav=0.05;p.shape='star';P.push(p);}}
+  }else if(style==='shockwave'){
+    for(i=0;i<64;i++){a=i/64*Math.PI*2;var q=mkP(GW/2,GH/2-30,Math.cos(a)*9,Math.sin(a)*9,i%2?'#ffffff':'#fbbf24',30,3);q.grav=0;q.shape='pixel';P.push(q);}
+  }else if(style==='starfall'){
+    for(i=0;i<50;i++){var s=mkP(Math.random()*GW,-10-Math.random()*120,(Math.random()-0.5)*0.8,2+Math.random()*2.5,i%3?'#fde68a':'#ffffff',70+Math.random()*30,2.5+Math.random()*1.5);s.grav=0.03;s.shape='star';P.push(s);}
+  }
+}
+// Victory pose for the winning slime on the end screen. t counts frames since the match ended.
+function poseStep(sl,pose,t,dirToCentre){
+  var onGround=sl.y>=GH-GRND-1;
+  if(pose==='hop'){if(onGround&&t%36===0)sl.vy=JUMP*0.6;}
+  else if(pose==='shimmy'){sl.vx=Math.sin(t*0.25)*3;if(onGround&&t%48===0)sl.vy=JUMP*0.3;}
+  else if(pose==='spin'){if(onGround&&t%70===0){sl.vy=JUMP*0.65;sl.isSpinning=true;sl.spinPhase=0;sl.spinSnapBack=false;sl.spinAngle=0;sl.spinTarget=dirToCentre*Math.PI*2;}}
+}
 function emitLand(P,x,y,vy){var it=Math.min(1,(vy-5)/10);if(it<=0)return;for(var i=0;i<Math.floor(3+it*5);i++){var s=(Math.random()<0.5?-1:1),sp=1+Math.random()*2.5*it;P.push(mkP(x+s*SR*0.5*Math.random(),y,s*sp,-Math.random()*1.6,'rgba(255,255,255,0.55)',12+Math.random()*8,1.6+Math.random()*1.4));}}
 
 function dbLoad(){try{var r=window.localStorage.getItem('slime_db');if(r){var loaded=JSON.parse(r);if(Array.isArray(loaded)){for(var i=0;i<loaded.length;i++)if(typeof loaded[i].draws!=='number')loaded[i].draws=0;return loaded;}}}catch(e){}return[];}
@@ -336,7 +363,7 @@ function cloudErrorText(e){
   return'Something went wrong ('+(code||'unknown error')+').';
 }
 // Everything that gets synced. AI learning data stays on the device (it is large and per-device).
-function readLocalSave(){return{achievements:loadAchievementProgress(),players:dbLoad(),account:loadAccountProfile(),stickers:loadOnlineStickerSlots(),settings:loadGameSettings(),friends:loadFriends()};}
+function readLocalSave(){return{achievements:loadAchievementProgress(),players:dbLoad(),account:loadAccountProfile(),stickers:loadOnlineStickerSlots(),settings:loadGameSettings(),friends:loadFriends(),daily:loadDaily()};}
 // Never lose progress: keep the higher achievement counts, and the longer history for each local player.
 function mergeSaves(local,cloud){
   if(!cloud)return local;
@@ -353,7 +380,8 @@ function mergeSaves(local,cloud){
     account:cloud.account||local.account,
     stickers:cloud.stickers||local.stickers,
     settings:cloud.settings||local.settings,
-    friends:(function(){var seen={},out=[];(cloud.friends||[]).concat(local.friends||[]).forEach(function(f){if(f&&f.uid&&!seen[f.uid]){seen[f.uid]=1;out.push(f);}});return out.slice(0,50);})()
+    friends:(function(){var seen={},out=[];(cloud.friends||[]).concat(local.friends||[]).forEach(function(f){if(f&&f.uid&&!seen[f.uid]){seen[f.uid]=1;out.push(f);}});return out.slice(0,50);})(),
+    daily:cloud.daily&&(cloud.daily.lastDone||'')>((local.daily&&local.daily.lastDone)||'')?cloud.daily:(local.daily||{lastDone:'',streak:0})
   };
 }
 function writeLocalSave(save){
@@ -364,6 +392,7 @@ function writeLocalSave(save){
     window.localStorage.setItem('slime_sticker_slots',JSON.stringify(save.stickers));
     window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(save.settings));
     window.localStorage.setItem('slime_friends',JSON.stringify(save.friends||[]));
+    if(save.daily)window.localStorage.setItem('slime_daily',JSON.stringify(save.daily));
   }catch(e){console.warn('Could not store the cloud save on this device.',e);}
 }
 function cloudDoc(){return CLOUD.db.collection('saves').doc(CLOUD.user.uid);}
@@ -1563,7 +1592,7 @@ function PlayerDataScreen(props){
         React.createElement('div',{style:{fontSize:21,fontWeight:900,color:'#fbbf24'}},unlockedCount+' / '+ACHIEVEMENTS.length+' achievements'),
         React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.72)',marginTop:4}},'Earn frames and exclusive slime skins by scoring, winning, and sticking with the game. Equip them from Your Account.')),
       ACHIEVEMENTS.map(function(achievement){
-        var complete=isAchievementUnlocked(achievementProgress,achievement),progress=Math.min(achievementProgress[achievement.stat],achievement.target),frameReward=achievementFrameDetails(achievement.frame),skinReward=achievementSkinDetails(achievement.skin),rewardColor=frameReward?frameReward.color:skinReward?skinReward.color:null;
+        var complete=isAchievementUnlocked(achievementProgress,achievement),progress=Math.min(achievementProgress[achievement.stat],achievement.target),frameReward=achievementFrameDetails(achievement.frame),skinReward=achievementSkinDetails(achievement.skin),cosReward=achievementCosmetic(achievement),rewardColor=frameReward?frameReward.color:skinReward?skinReward.color:cosReward?'#fbbf24':null;
         return React.createElement('div',{key:achievement.id,style:Object.assign({},panelSty,{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',marginBottom:7,borderColor:complete?'rgba(251,191,36,0.42)':'rgba(255,255,255,0.1)'})},
           skinReward
             ?React.createElement('button',{type:'button','data-skin-preview':'1',className:'skin-pv','aria-label':'Preview the '+skinReward.name+' slime skin',title:'Preview skin',onClick:function(){setPreviewAchievement(achievement.id);},style:{width:40,height:40,borderRadius:'50%',flex:'0 0 40px',padding:0,overflow:'hidden',cursor:'pointer',border:'3px solid '+(complete?rewardColor:'rgba(255,255,255,0.28)'),boxShadow:complete?'0 0 10px '+rewardColor:'none',boxSizing:'border-box',background:'#16213e',opacity:complete?1:0.6}},
@@ -1575,12 +1604,14 @@ function PlayerDataScreen(props){
             :frameReward
               ?React.createElement('div',{title:frameReward.name+' frame',style:{flex:'0 0 40px',opacity:complete?1:0.6}},
                   React.createElement(ProfileAvatar,{profile:Object.assign({},cleanAccountAvatar(props.avatar),{frame:frameReward.id}),size:40}))
-              :React.createElement('div',{style:{width:34,height:34,borderRadius:'50%',flex:'0 0 34px',margin:'0 3px',border:'3px solid rgba(255,255,255,0.2)',boxSizing:'border-box'}}),
+              :cosReward&&cosReward.item
+                ?React.createElement('div',{title:cosReward.item.name,'aria-hidden':'true',style:{width:40,height:40,flex:'0 0 40px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,background:'#16213e',border:'3px solid '+(complete?rewardColor:'rgba(255,255,255,0.28)'),boxShadow:complete?'0 0 10px '+rewardColor:'none',boxSizing:'border-box',opacity:complete?1:0.6}},cosReward.item.icon)
+                :React.createElement('div',{style:{width:34,height:34,borderRadius:'50%',flex:'0 0 34px',margin:'0 3px',border:'3px solid rgba(255,255,255,0.2)',boxSizing:'border-box'}}),
           React.createElement('div',{style:{minWidth:0,flex:1}},
             React.createElement('div',{style:{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8}},
               React.createElement('strong',{style:{fontSize:14,color:complete?'#fff':'rgba(255,255,255,0.82)'}},achievement.title),
               React.createElement('span',{style:{fontSize:11,fontWeight:800,color:complete?'#4ade80':'rgba(255,255,255,0.55)',whiteSpace:'nowrap'}},complete?'Unlocked':progress+' / '+achievement.target)),
-            React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.66)',marginTop:3}},achievement.description+(frameReward?' Reward: '+frameReward.name+' frame.':'')+(skinReward?' Reward: '+skinReward.name+' slime skin.':'')),
+            React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.66)',marginTop:3}},achievement.description+(frameReward?' Reward: '+frameReward.name+' frame.':'')+(skinReward?' Reward: '+skinReward.name+' slime skin.':'')+(cosReward&&cosReward.item?' Reward: '+cosReward.item.name+' '+COSMETICS[cosReward.kind].label.toLowerCase()+'.':'')),
             React.createElement('div',{style:{height:4,marginTop:8,borderRadius:4,background:'rgba(255,255,255,0.12)',overflow:'hidden'}},React.createElement('div',{style:{width:(complete?100:Math.round(progress/achievement.target*100))+'%',height:'100%',background:complete&&rewardColor?rewardColor:'#38bdf8',transition:'width 0.2s'}}))
           )
         );
@@ -1869,10 +1900,20 @@ var ACHIEVEMENTS=[
   {id:'long_rally',title:'Marathon Rally',description:'Keep a rally going for 20 seconds in a match.',stat:'longRallies',target:1,frame:'mint'},
   {id:'big_win',title:'Demolition',description:'Win a match by 5 or more goals.',stat:'bigWins',target:1,skin:'candy'},
   {id:'win_streak_5',title:'Unstoppable',description:'Win 5 matches in a row.',stat:'bestWinStreak',target:5,skin:'shadow'},
-  {id:'online_wins_10',title:'Network Legend',description:'Win 10 online matches.',stat:'onlineWins',target:10,skin:'aurora'}
+  {id:'online_wins_10',title:'Network Legend',description:'Win 10 online matches.',stat:'onlineWins',target:10,skin:'aurora'},
+  {id:'daily_1',title:'Daily Grind',description:'Complete a daily challenge.',stat:'dailyDone',target:1,pose:'hop'},
+  {id:'daily_streak_3',title:'On a Roll',description:'Complete daily challenges 3 days in a row.',stat:'bestDailyStreak',target:3,celebration:'fireworks'},
+  {id:'daily_10',title:'Habit Forming',description:'Complete 10 daily challenges.',stat:'dailyDone',target:10,trail:'rainbow'},
+  {id:'daily_streak_7',title:'Week Warrior',description:'Complete daily challenges 7 days in a row.',stat:'bestDailyStreak',target:7,celebration:'starfall'},
+  {id:'win_streak_3',title:'Triple Threat',description:'Win 3 matches in a row.',stat:'bestWinStreak',target:3,pose:'spin'},
+  {id:'wins_15',title:'Hot Streak',description:'Win 15 matches.',stat:'wins',target:15,trail:'fire'},
+  {id:'clean_sheets_5',title:'Ice Cold',description:'Win 5 matches without conceding.',stat:'cleanSheets',target:5,trail:'ice'},
+  {id:'online_wins_3',title:'Plugged In',description:'Win 3 online matches.',stat:'onlineWins',target:3,trail:'neon'},
+  {id:'goals_75',title:'Shockwave',description:'Score 75 goals across matches.',stat:'goals',target:75,celebration:'shockwave'},
+  {id:'matches_30',title:'Regular',description:'Complete 30 matches.',stat:'matches',target:30,pose:'shimmy'}
 ];
 // Counters saved for achievements (all whole numbers). winStreak is the current run; bestWinStreak the record.
-var ACHIEVEMENT_STATS=['goals','wins','matches','hatTricks','cleanSheets','impossibleWins','onlineWins','comebacks','longRallies','bigWins','winStreak','bestWinStreak'];
+var ACHIEVEMENT_STATS=['goals','wins','matches','hatTricks','cleanSheets','impossibleWins','onlineWins','comebacks','longRallies','bigWins','winStreak','bestWinStreak','dailyDone','bestDailyStreak'];
 var ACHIEVEMENT_FRAMES=[
   {id:'sky',name:'Skyline',color:'#38bdf8'},
   {id:'flame',name:'Flame',color:'#fb7185'},
@@ -1926,13 +1967,51 @@ function unlockedAchievementSkins(progress){
   for(var i=0;i<ACHIEVEMENTS.length;i++)if(ACHIEVEMENTS[i].skin&&isAchievementUnlocked(progress,ACHIEVEMENTS[i])&&unlocked.indexOf(ACHIEVEMENTS[i].skin)<0)unlocked.push(ACHIEVEMENTS[i].skin);
   return unlocked;
 }
-function defaultAccountAvatar(){return{kind:'slime',color:'#e8192c',theme:'night',frame:'none',skin:'none'};}
+// ─── Daily challenge ──────────────────────────────────────────────────────
+// One challenge per calendar day (same for everyone on that date), checked when a match ends.
+// c = {mode, diff, won, goals, against, margin, behind, rally, ot}
+var DAILY_CHALLENGES=[
+  {id:'beat_hard',title:'Beat the Machine',desc:'Win a match against Hard or Impossible AI.',check:function(c){return c.won&&c.mode==='single'&&(c.diff==='hard'||c.diff==='impossible');}},
+  {id:'win_by_3',title:'Statement Win',desc:'Win a match by 3 or more goals.',check:function(c){return c.won&&c.margin>=3;}},
+  {id:'shut_out',title:'Shut Out',desc:'Win a match without conceding a goal.',check:function(c){return c.won&&c.against===0;}},
+  {id:'goal_fest',title:'Goal Fest',desc:'Score 5 goals in one match.',check:function(c){return c.goals>=5;}},
+  {id:'keep_it_up',title:'Keep It Up',desc:'Have a rally that lasts 15 seconds.',check:function(c){return c.rally>=15;}},
+  {id:'never_give_up',title:'Never Give Up',desc:'Win a match after falling behind.',check:function(c){return c.won&&c.behind>=1;}},
+  {id:'hat_trick_win',title:'Hat Trick Hero',desc:'Score 3 or more goals and win.',check:function(c){return c.won&&c.goals>=3;}},
+  {id:'sudden_death',title:'Sudden Death',desc:'Win a match in overtime.',check:function(c){return c.won&&c.ot;}},
+  {id:'online_victor',title:'Online Victor',desc:'Win an online match.',check:function(c){return c.won&&c.mode==='online';}},
+  {id:'mission_impossible',title:'Mission Impossible',desc:'Beat the Impossible AI.',check:function(c){return c.won&&c.mode==='single'&&c.diff==='impossible';}}
+];
+function dayKey(d){d=d||new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function yesterdayKey(){var d=new Date();d.setDate(d.getDate()-1);return dayKey(d);}
+function todaysChallenge(){var k=dayKey(),h=0;for(var i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))>>>0;return DAILY_CHALLENGES[h%DAILY_CHALLENGES.length];}
+// Saved state: lastDone = date of the last completed challenge, streak = days in a row ending on lastDone.
+function loadDaily(){try{var d=JSON.parse(window.localStorage.getItem('slime_daily')||'null');if(d&&typeof d==='object')return{lastDone:typeof d.lastDone==='string'?d.lastDone:'',streak:Math.max(0,d.streak|0)};}catch(e){}return{lastDone:'',streak:0};}
+function saveDaily(d){try{window.localStorage.setItem('slime_daily',JSON.stringify(d));}catch(e){}cloudQueueSave();}
+function dailyDoneToday(d){return (d||loadDaily()).lastDone===dayKey();}
+// The streak only counts if it reaches today or yesterday; otherwise it has lapsed.
+function dailyStreakNow(d){d=d||loadDaily();return d.lastDone===dayKey()||d.lastDone===yesterdayKey()?d.streak:0;}
+
+// ─── Cosmetic unlocks: goal celebrations, ball trails, victory poses ───────
+var COSMETICS={
+  celebration:{label:'Goal celebration',items:[{id:'fireworks',name:'Fireworks',icon:'🎆'},{id:'shockwave',name:'Shockwave',icon:'💥'},{id:'starfall',name:'Starfall',icon:'🌠'}]},
+  trail:{label:'Ball trail',items:[{id:'rainbow',name:'Rainbow',icon:'🌈'},{id:'fire',name:'Fire',icon:'🔥'},{id:'ice',name:'Ice',icon:'❄️'},{id:'neon',name:'Neon',icon:'💚'}]},
+  pose:{label:'Victory pose',items:[{id:'hop',name:'Victory Hop',icon:'🦘'},{id:'spin',name:'Spin',icon:'🌀'},{id:'shimmy',name:'Shimmy',icon:'💃'}]}
+};
+var COSMETIC_KINDS=['celebration','trail','pose'];
+function cosmeticDetails(kind,id){var list=COSMETICS[kind]?COSMETICS[kind].items:[];for(var i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
+function achievementCosmetic(a){for(var i=0;i<COSMETIC_KINDS.length;i++){var k=COSMETIC_KINDS[i];if(a[k])return{kind:k,item:cosmeticDetails(k,a[k])};}return null;}
+function unlockedCosmetics(progress,kind){
+  var out=[];for(var i=0;i<ACHIEVEMENTS.length;i++){var a=ACHIEVEMENTS[i];if(a[kind]&&isAchievementUnlocked(progress,a)&&out.indexOf(a[kind])<0)out.push(a[kind]);}return out;
+}
+function defaultAccountAvatar(){return{kind:'slime',color:'#e8192c',theme:'night',frame:'none',skin:'none',celebration:'none',trail:'none',pose:'none'};}
 function cleanAccountAvatar(value){
   var theme=value&&['day','night','japan'].indexOf(value.theme)>=0?value.theme:'night';
   var frame=value&&value.frame==='none'?'none':achievementFrameDetails(value&&value.frame)?value.frame:'none';
   var skin=value&&value.skin==='none'?'none':achievementSkinDetails(value&&value.skin)?value.skin:'none';
-  if(value&&value.kind==='photo'&&typeof value.image==='string'&&value.image.indexOf('data:image/jpeg;base64,')===0&&value.image.length<=180000)return{kind:'photo',image:value.image,theme:theme,frame:frame,skin:skin};
-  return{kind:'slime',color:value?normHex(value.color):'#e8192c',theme:theme,frame:frame,skin:skin};
+  var extra={};COSMETIC_KINDS.forEach(function(k){extra[k]=value&&cosmeticDetails(k,value[k])?value[k]:'none';});
+  if(value&&value.kind==='photo'&&typeof value.image==='string'&&value.image.indexOf('data:image/jpeg;base64,')===0&&value.image.length<=180000)return Object.assign({kind:'photo',image:value.image,theme:theme,frame:frame,skin:skin},extra);
+  return Object.assign({kind:'slime',color:value?normHex(value.color):'#e8192c',theme:theme,frame:frame,skin:skin},extra);
 }
 function loadAccountProfile(){
   try{
@@ -2197,6 +2276,16 @@ function AccountScreen(props){
               React.createElement(ProfileAvatar,{profile:{kind:'slime',color:avatar.color||'#e8192c',theme:avatar.theme||'night',frame:'none',skin:skin.id},size:30}),skin.name);
           })),
         unlockedSkins.length===0&&React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.64)',textAlign:'center',marginTop:6}},'Earn long-term achievements to unlock in-game slime designs.')),
+      React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',gap:10}},
+        React.createElement('div',{style:{fontSize:12,fontWeight:800}},'Celebrations, trails & poses'),
+        COSMETIC_KINDS.map(function(kind){
+          var owned=(props.unlockedCosmetics&&props.unlockedCosmetics[kind])||[],current=avatar[kind]||'none';
+          var options=[{id:'none',name:'Classic',icon:'○'}].concat(COSMETICS[kind].items.filter(function(it){return owned.indexOf(it.id)>=0;}));
+          return React.createElement('div',{key:kind,style:{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}},
+            React.createElement('span',{style:{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.7)',minWidth:110}},COSMETICS[kind].label),
+            options.map(function(it){var on=current===it.id;return React.createElement('button',{key:it.id,type:'button','aria-pressed':on,onClick:function(){var p={};p[kind]=it.id;updateAvatar(p);},style:{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:20,border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer'}},React.createElement('span',{'aria-hidden':'true'},it.icon),it.name);}),
+            owned.length===0&&React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)'}},'Unlock with achievements & daily challenges'));
+        })),
       React.createElement('input',{ref:fileRef,type:'file',accept:'image/jpeg,image/png,image/webp,image/gif,image/svg+xml',onChange:selectPhoto,style:{display:'none'}}),
       photo&&React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,borderRadius:14,background:'rgba(0,0,0,0.2)'}},
         React.createElement('div',{style:{fontSize:12,fontWeight:900}},'Frame your photo'),
@@ -2588,7 +2677,7 @@ function App(){
   },[screen,gmode,winner,rematchRequested]);
   function hostStep(){
     var pnow=performance.now(),gp=netFind('g');
-    if(gp){remoteSkinRef.current=cleanAccountAvatar(gp.a).skin;netLastInRef.current=pnow;if(netLostRef.current){netLostRef.current=false;frozenRef.current=false;setNetMsg('');}if(gp.i){var iv=gp.i;netInRef.current={m:iv[0]|0,jc:iv[1]|0,dc:iv[2]|0,rc:iv[3]|0};}}
+    if(gp){remoteSkinRef.current=cleanAccountAvatar(gp.a).skin;remoteCosRef.current=gp.a;netLastInRef.current=pnow;if(netLostRef.current){netLostRef.current=false;frozenRef.current=false;setNetMsg('');}if(gp.i){var iv=gp.i;netInRef.current={m:iv[0]|0,jc:iv[1]|0,dc:iv[2]|0,rc:iv[3]|0};}}
     else if(pnow-netLastInRef.current>4000&&!goRef.current&&!netLostRef.current){netLostRef.current=true;frozenRef.current=true;setNetMsg('Your opponent left the match');}
     var tx=replayTxRef.current;
     if(tx){
@@ -2610,7 +2699,7 @@ function App(){
   function guestStep(){
     var pnow=performance.now(),hp=netFind('h');
     if(!hp){if(pnow-netRxRef.current>4000&&!netLostRef.current){netLostRef.current=true;setNetMsg('The host left the match');}return;}
-    remoteSkinRef.current=cleanAccountAvatar(hp.a).skin;
+    remoteSkinRef.current=cleanAccountAvatar(hp.a).skin;remoteCosRef.current=hp.a;
     if(hp.st==='play'&&hp.mid!==netMidRef.current){netMidRef.current=hp.mid;startGame(hp.dur||'2min','online',DC,{left:cleanName(hp.n)||'Host',right:onlinePlayerName()||'You'},'right','regular',null,null,{scoreLimit:hp.sl||0,overtime:hp.ot!==false});return;}
     var p=hp.p;
     if(p&&p.m===netMidRef.current&&p.n>netSeqRef.current){
@@ -2773,12 +2862,14 @@ function App(){
   var s_win=useState(null),winner=s_win[0],setWinner=s_win[1];
   // Achievements unlocked during a match, shown as cards once it ends.
   var s_achToast=useState([]),achToasts=s_achToast[0],setAchToasts=s_achToast[1];
-  var achStartRef=useRef(null);
+  var achStartRef=useRef(null),dailyJustDoneRef=useRef(false);
+  var s_daily=useState(loadDaily),dailyState=s_daily[0],setDailyState=s_daily[1];
   function unlockedAchievementIds(progress){return ACHIEVEMENTS.filter(function(a){return isAchievementUnlocked(progress,a);}).map(function(a){return a.id;});}
   useEffect(function(){
     if(!winner||!achStartRef.current)return;
     var before=achStartRef.current;achStartRef.current=null;
     var fresh=unlockedAchievementIds(achievementProgressRef.current).filter(function(id){return before.indexOf(id)<0;});
+    if(dailyJustDoneRef.current){dailyJustDoneRef.current=false;fresh.unshift('__daily');}
     if(!fresh.length)return;
     setAchToasts(fresh);
     var timer=setTimeout(function(){setAchToasts([]);},7000);
@@ -2867,10 +2958,28 @@ function App(){
     if((stats.longestRally||0)>=20)next.longRallies++;
     next.winStreak=localWon?(current.winStreak||0)+1:0;
     next.bestWinStreak=Math.max(current.bestWinStreak||0,next.winStreak);
+    // Daily challenge: tick it off once per day.
+    var daily=loadDaily(),challenge=todaysChallenge();
+    if(!dailyDoneToday(daily)&&challenge.check({mode:mode,diff:diffRef.current,won:!!localWon,goals:localGoals,against:opponentGoals,margin:localGoals-opponentGoals,behind:localSide?(localSide==='left'?stats.lBehind:stats.rBehind)||0:0,rally:stats.longestRally||0,ot:!!otRef.current})){
+      var streak=daily.lastDone===yesterdayKey()?daily.streak+1:1;
+      daily={lastDone:dayKey(),streak:streak};saveDaily(daily);setDailyState(daily);
+      next.dailyDone=(current.dailyDone||0)+1;next.bestDailyStreak=Math.max(current.bestDailyStreak||0,streak);
+      dailyJustDoneRef.current=true;
+    }
     persistAchievementProgress(next);
   }
   function unlockAllAchievements(){
-    persistAchievementProgress({goals:100,wins:50,matches:100,hatTricks:10,cleanSheets:10,impossibleWins:10,onlineWins:10,comebacks:1,longRallies:1,bigWins:1,winStreak:0,bestWinStreak:5,developerUnlocked:true});
+    persistAchievementProgress({goals:100,wins:50,matches:100,hatTricks:10,cleanSheets:10,impossibleWins:10,onlineWins:10,comebacks:1,longRallies:1,bigWins:1,winStreak:0,bestWinStreak:5,dailyDone:10,bestDailyStreak:7,developerUnlocked:true});
+  }
+  // Who has which celebration / trail / victory pose this match (only things the owner has unlocked).
+  var remoteCosRef=useRef(null),lastTouchRef=useRef(null);
+  function getGameCosmetics(mode){
+    var none={celebration:'none',trail:'none',pose:'none'},mine={};
+    COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&unlockedCosmetics(achievementProgress,k).indexOf(id)>=0?id:'none';});
+    var out={left:none,right:none};
+    if(mode==='online'){var them=remoteCosRef.current?cleanAccountAvatar(remoteCosRef.current):none,theirs={celebration:them.celebration,trail:them.trail,pose:them.pose};if(onRoleRef.current==='host'){out.left=mine;out.right=theirs;}else{out.left=theirs;out.right=mine;}}
+    else if(achievementSideRef.current==='left'||achievementSideRef.current==='right')out[achievementSideRef.current]=mine;
+    return out;
   }
   function getGameSlimeSkins(mode){
     var skins={left:null,right:null},localSkin=achievementSkinDetails(account.avatar.skin);
@@ -2959,7 +3068,7 @@ function App(){
     syncPlayers(dbLoad());
     var acct=loadAccountProfile();setAccount(acct);setMyName(acct.name||'');
     setStickerSlots(loadOnlineStickerSlots());
-    setFriends(loadFriends());
+    setFriends(loadFriends());setDailyState(loadDaily());
     var gs=loadGameSettings();setGameSettings(gs);GAME_AUDIO_VOLUME=gs.sfxVolume;setSoundEnabled(gs.soundEnabled);soundEnabledRef.current=gs.soundEnabled;
     setCloudVer(function(v){return v+1;});
   }
@@ -3229,7 +3338,7 @@ function App(){
   resetPosRef.current=resetPos;
 
   function endReplay(){replayActiveRef.current=false;replayFrRef.current=[];replayIdxRef.current=0;goalFlashRef.current=false;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;flashRef.current=false;setReplayActive(false);setGoalFlash(false);resetPosRef.current(pmRef.current!=='online');kRef.current['w']=false;kRef.current['arrowup']=false;jrRef.current['w']=true;jrRef.current['arrowup']=true;clearTimeout(postRpRef.current);var pendingWinner=pendingWinRef.current;pendingWinRef.current=null;if(pendingWinner)triggerWin(pendingWinner);else if(pmRef.current==='multi')startReady();else if(!pausedRef.current)frozenRef.current=false;}
-  function triggerWin(ws){var finalStats=statsRef.current;finalStats.longestRally=Math.max(finalStats.longestRally||0,(finalStats.rallyFrames||0)/60);recordAchievementMatch(ws);winRef.current=ws;setWinner(ws);goRef.current=true;flashRef.current=true;var ls=gsRef.current.left,rs=gsRef.current.right;ls.vx=0;ls.vy=0;ls.isSpinning=false;rs.vx=0;rs.vy=0;matchRecActiveRef.current=false;setMatchFrames(matchRecRef.current.slice());setMatchColors(Object.assign({},colRef.current));setMatchNames(Object.assign({},lastNm.current));setTimeout(function(){flashRef.current=false;},4000);var es=Object.assign({},finalStats);setEndStats(es);if(pmRef.current==='multi'&&p1IdRef.current&&p2IdRef.current){var upd=dbPlayers.slice();dbRecord(upd,p1IdRef.current,p2IdRef.current,es.lG,es.rG);setDbPlayers(upd);dbSave(upd);}}
+  function triggerWin(ws){frozenRef.current=false;/* keep physics running on the end screen so the winner's victory pose plays */var finalStats=statsRef.current;finalStats.longestRally=Math.max(finalStats.longestRally||0,(finalStats.rallyFrames||0)/60);recordAchievementMatch(ws);winRef.current=ws;setWinner(ws);goRef.current=true;flashRef.current=true;var ls=gsRef.current.left,rs=gsRef.current.right;ls.vx=0;ls.vy=0;ls.isSpinning=false;rs.vx=0;rs.vy=0;matchRecActiveRef.current=false;setMatchFrames(matchRecRef.current.slice());setMatchColors(Object.assign({},colRef.current));setMatchNames(Object.assign({},lastNm.current));setTimeout(function(){flashRef.current=false;},4000);var es=Object.assign({},finalStats);setEndStats(es);if(pmRef.current==='multi'&&p1IdRef.current&&p2IdRef.current){var upd=dbPlayers.slice();dbRecord(upd,p1IdRef.current,p2IdRef.current,es.lG,es.rG);setDbPlayers(upd);dbSave(upd);}}
   function finishTraining(){
     if(goRef.current)return;
     var challenge=trainingChallengeRef.current||'aim',score=trainingScoreRef.current;
@@ -3241,7 +3350,7 @@ function App(){
     shakeRef.current=Math.max(shakeRef.current,10);
     frozenRef.current=true;goalFlashRef.current=true;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;flashRef.current=true;setGoalFlash(true);
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
-    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,scoring==='left'?colRef.current.left.body:colRef.current.right.body);skinFx(particlesRef.current,gp0,getGameSlimeSkins(pmRef.current)[scoring]);
+    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,scoring==='left'?colRef.current.left.body:colRef.current.right.body);skinFx(particlesRef.current,gp0,getGameSlimeSkins(pmRef.current)[scoring]);emitCelebration(particlesRef.current,getGameCosmetics(pmRef.current)[scoring].celebration);
     var frames=replayBufRef.current.slice();replayBufRef.current=[];replayScorerRef.current=scoring;otReadyRef.current=false;
     if(pmRef.current==='online'&&onRoleRef.current==='host'&&frames.length){
       var packed=frames.map(packReplayFrame),chunks=[];
@@ -3322,7 +3431,7 @@ function App(){
       else netPresence({rm:null});}
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
     statsRef.current={lG:0,rG:0,lStr:0,rStr:0,lMax:0,rMax:0,last:null,fastestShot:0,longestGoal:0,saves:0,longestRally:0,rallyFrames:0,saveCooldown:0,shotStartX:GW/2};
-    matchAchievementsRecordedRef.current=false;setAchToasts([]);achStartRef.current=prac||mode==='training'?null:unlockedAchievementIds(achievementProgressRef.current);trainingChallengeRef.current=mode==='training'?trainingChallengeRef.current:null;
+    matchAchievementsRecordedRef.current=false;setAchToasts([]);dailyJustDoneRef.current=false;lastTouchRef.current=null;gsRef.current.left._poseT=0;gsRef.current.right._poseT=0;achStartRef.current=prac||mode==='training'?null:unlockedAchievementIds(achievementProgressRef.current);trainingChallengeRef.current=mode==='training'?trainingChallengeRef.current:null;
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
     colRef.current=c;pmRef.current=mode;practRef.current=prac;unlimJumpRef.current=false;setUnlimJump(false);
     clearTimeout(postRpRef.current);frozenRef.current=false;pausedRef.current=false;goRef.current=false;flashRef.current=false;goalFlashRef.current=false;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;otRef.current=false;otReadyRef.current=false;
@@ -3422,7 +3531,7 @@ function App(){
        try{
         var kk=Object.assign({},kRef.current),jr=jrRef.current;
         var ls=gsRef.current.left,rs=gsRef.current.right,ball=gsRef.current.ball;
-        var mode=pmRef.current,gameOver=goRef.current,hSide=sideRef.current,cols=colRef.current,fxSkins=getGameSlimeSkins(mode),fxP=particlesRef.current,fx0;
+        var mode=pmRef.current,gameOver=goRef.current,hSide=sideRef.current,cols=colRef.current,fxSkins=getGameSlimeSkins(mode),fxCos=getGameCosmetics(mode),fxP=particlesRef.current,fx0;
         var controllerKeys={};
         if(typeof navigator!=='undefined'&&navigator.getGamepads){
           var pads=[];
@@ -3545,6 +3654,7 @@ function App(){
             if(sl.spinPhase===1&&sl.y>=GH-GRND-1){sl.isSpinning=true;sl.spinTarget=0;sl.spinSnapBack=false;sl.spinLandingCooldown=true;sl.spinPhase=0;sl.dashFrames=0;sl.dashDir=0;sl.spinDipY=0;}
             if(sl.isSpinning){var step=(3*Math.PI/4)/(sl.spinSnapBack?Math.ceil(SPIN_F/(5*0.85*0.5)):SPIN_F),rem=sl.spinTarget-sl.spinAngle;if(Math.abs(rem)<=step){sl.spinAngle=sl.spinTarget;if(sl.spinSnapBack){sl.isSpinning=false;sl.dashFrames=0;sl.spinSnapBack=false;sl.spinDipY=0;if(sl.spinLandingCooldown){if(!unlimRef.current)sl.dashCooldown=CD_F;sl.spinLandingCooldown=false;}}else if(sl.spinPhase===1){var isLs=sl===ls,dHeld=isLs?kk['s']:kk['arrowdown'];if(!dHeld){var dir2=isLs?(kk['d']?1:kk['a']?-1:1):(kk['arrowright']?1:kk['arrowleft']?-1:-1);sl.spinTarget=0;sl.spinSnapBack=true;sl.spinLandingCooldown=false;sl.spinPhase=0;sl.dashFrames=DASH_F;sl.dashDir=dir2;sl.spinDipY=0;sl.vx=dir2*GDASH_SPD*0.5;if(!unlimRef.current)sl.dashCooldown=CD_F;}}else{sl.isSpinning=false;sl.dashFrames=0;sl.spinSnapBack=false;sl.spinDipY=0;if(sl.spinLandingCooldown){if(!unlimRef.current)sl.dashCooldown=CD_F;sl.spinLandingCooldown=false;}}}else{var isLm=sl===ls,dHeldM=isLm?kk['s']:kk['arrowdown'],atHold=sl.spinPhase===1&&Math.abs(sl.spinAngle-sl.spinTarget)<step&&dHeldM;if(!atHold){sl.spinAngle+=Math.sign(rem)*step;sl.spinDipY=sl.spinPhase===1?Math.sin(Math.abs(sl.spinAngle)/(3*Math.PI/4)*Math.PI)*18:0;}}}
             if(sl.dashFrames>0){sl.dashFrames--;var dspd=sl.groundDash?GDASH_SPD:DASH_SPD;if(sl.dashDir!==0){sl.vx=sl.dashDir*dspd;if(sl.dashFrames===DASH_F-1){var isLd=sl===ls;fx0=fxP.length;emitDash(fxP,sl.x,sl.y,sl.dashDir,isLd?cols.left.body:cols.right.body,mode==='single'&&((hSide==='right'&&isLd)||(hSide==='left'&&!isLd)));skinFx(fxP,fx0,fxSkins[isLd?'left':'right']);}}if(sl.dashFrames===0)sl.groundDash=false;}
+            if(gameOver&&winRef.current===(sl===ls?'left':'right')){sl._poseT=(sl._poseT||0)+1;poseStep(sl,fxCos[winRef.current].pose,sl._poseT,sl===ls?1:-1);}
             if(!gameOver)sl.vy+=GRAV;else{sl.vx*=0.9;sl.vy=Math.min(sl.vy+GRAV,4);}
             sl.x+=sl.vx;sl.y+=sl.vy;if(sl.x<SR)sl.x=SR;if(sl.x>GW-SR)sl.x=GW-SR;if(sl.y<CEILING_Y){sl.y=CEILING_Y;if(sl.vy<0)sl.vy=-sl.vy*0.4;}if(sl.y>GH-GRND){if(sl.vy>5){sl.squash=Math.min(1,sl.vy/13);fx0=fxP.length;emitLand(fxP,sl.x,GH-GRND,sl.vy);skinFx(fxP,fx0,fxSkins[sl===ls?'left':'right']);}sl.y=GH-GRND;sl.vy=0;sl.vx*=0.85;sl.hasDoubleJumped=false;sl.ballRefreshJump=false;}
             if(!practRef.current&&!gameOver){var isL2=sl===ls,inOwn=(isL2&&sl.x<GOALW)||(!isL2&&sl.x>GW-GOALW);if(inOwn){sl.goalLineTime+=1/60;if(sl.goalLineTime>=1)scoreGoalRef.current(isL2?'left':'right');}else sl.goalLineTime=0;}
@@ -3554,7 +3664,7 @@ function App(){
           if(!practRef.current){var sdx=rs.x-ls.x,sdy=rs.y-ls.y,sdd=Math.sqrt(sdx*sdx+sdy*sdy);if(sdd<SR*2&&sdd>0){var mY=(ls.y+rs.y)/2;if(mY<=ls.y||Math.abs(sdy)<SR){var ov=(SR*2-sdd)/2,snx=sdx/sdd,sny=sdy/sdd;ls.x-=snx*ov;rs.x+=snx*ov;if(ls.x<SR)ls.x=SR;if(rs.x>GW-SR)rs.x=GW-SR;var dot=(ls.vx-rs.vx)*snx+(ls.vy-rs.vy)*sny;if(dot>0){var imp=dot*0.9;ls.vx-=imp*snx;rs.vx+=imp*snx;if(ls.y<GH-GRND-2&&rs.y<GH-GRND-2){ls.vy-=imp*sny*0.5;rs.vy+=imp*sny*0.5;}}}}}
           ball.vy+=GRAV;ball.vx*=BDAMP;ball.x+=ball.vx;ball.y+=ball.vy;ball.spin=(ball.spin||0)*0.996;ball.ang=(ball.ang||0)+ball.spin;
           var bspd=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy);
-          if(bspd>2.5){ballTrailRef.current.push({x:ball.x,y:ball.y,life:1.0,r:BR*(0.3+bspd/MAXBS*0.55),isJapan:tm==='japan'});}
+          if(bspd>2.5){var trailStyle=lastTouchRef.current?fxCos[lastTouchRef.current].trail:'none';ballTrailRef.current.push({x:ball.x,y:ball.y,life:1.0,r:BR*(0.3+bspd/MAXBS*0.55)*(trailStyle==='none'?1:1.15),c:trailColor(trailStyle,tm==='japan',now)});}
           var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=0.2;if(bt[bti].life<=0)bt.splice(bti,1);}
           if(ball.x<BR){var wh1=Math.abs(ball.vx);ball.x=BR;ball.vx=-ball.vx*0.88;ball.vy+=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;emitWall(particlesRef.current,ball.x,ball.y,wh1);}
           if(ball.x>GW-BR){var wh2=Math.abs(ball.vx);ball.x=GW-BR;ball.vx=-ball.vx*0.88;ball.vy-=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;emitWall(particlesRef.current,ball.x,ball.y,wh2);}
@@ -3571,7 +3681,7 @@ function App(){
             var isLeftSlime=csl===ls,nearGoal=isLeftSlime?ball.x<GW*0.35:ball.x>GW*0.65;
             var isSave=nearGoal&&(isLeftSlime?incomingVx< -3:incomingVx>3)&&statsRef.current.saveCooldown<=0;
             if(isSave){statsRef.current.saves++;statsRef.current.saveCooldown=45;if(soundEnabledRef.current)playGameSound('save');}
-            if(!unlimJumpRef.current&&csl.hasDoubleJumped&&csl.y<GH-GRND-1)csl.ballRefreshJump=true;var ang=csl.spinAngle||0,lX=bxc*Math.cos(-ang)-byc*Math.sin(-ang),lY=bxc*Math.sin(-ang)+byc*Math.cos(-ang);var cA=Math.atan2(byc,bxc);ball.x=csl.x+Math.cos(cA)*(SR+BR+1);ball.y=(csl.y+cdY)+Math.sin(cA)*(SR+BR+1);var ngnd=csl.y>=GH-GRND-5&&ball.y>=GH-GRND-SR-BR*3;if(csl.vy>3&&ngnd&&lY<=0){var pDir=lX>=0?1:-1,impk=Math.abs(csl.vy)+Math.abs(csl.vx);ball.vx=pDir*(6*TS+impk*0.6+Math.abs(csl.vx)*0.4);ball.vy=-Math.max(8*TS,impk*0.5);continue;}var rvx=ball.vx-csl.vx,rvy=ball.vy-csl.vy,dotb=rvx*Math.cos(cA)+rvy*Math.sin(cA);if(dotb<0){var sb=csl.isSpinning?1.4:1,re=1.2*sb;ball.vx-=(1+re)*dotb*Math.cos(cA);ball.vy-=(1+re)*dotb*Math.sin(cA);ball.vx+=csl.vx*0.4;ball.vy+=csl.vy*0.4;var tvx=-Math.sin(cA),tvy=Math.cos(cA),rvt=(ball.vx-csl.vx)*tvx+(ball.vy-csl.vy)*tvy;ball.spin=Math.max(-0.6,Math.min(0.6,(ball.spin||0)*0.4+rvt/BR*0.3));var ns=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy),cap=MAXBS*sb;if(ns>cap){ball.vx*=cap/ns;ball.vy*=cap/ns;}var isLk=csl===ls;fx0=fxP.length;emitKick(fxP,ball.x,ball.y,ball.vx,ball.vy,isLk?colRef.current.left.body:colRef.current.right.body);skinFx(fxP,fx0,fxSkins[isLk?'left':'right']);if(soundEnabledRef.current&&performance.now()-lastSoundAtRef.current>100){playGameSound('kick');lastSoundAtRef.current=performance.now();}statsRef.current.shotStartX=ball.x;statsRef.current.fastestShot=Math.max(statsRef.current.fastestShot,Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy));}}
+            if(!unlimJumpRef.current&&csl.hasDoubleJumped&&csl.y<GH-GRND-1)csl.ballRefreshJump=true;var ang=csl.spinAngle||0,lX=bxc*Math.cos(-ang)-byc*Math.sin(-ang),lY=bxc*Math.sin(-ang)+byc*Math.cos(-ang);var cA=Math.atan2(byc,bxc);ball.x=csl.x+Math.cos(cA)*(SR+BR+1);ball.y=(csl.y+cdY)+Math.sin(cA)*(SR+BR+1);var ngnd=csl.y>=GH-GRND-5&&ball.y>=GH-GRND-SR-BR*3;if(csl.vy>3&&ngnd&&lY<=0){var pDir=lX>=0?1:-1,impk=Math.abs(csl.vy)+Math.abs(csl.vx);ball.vx=pDir*(6*TS+impk*0.6+Math.abs(csl.vx)*0.4);ball.vy=-Math.max(8*TS,impk*0.5);continue;}var rvx=ball.vx-csl.vx,rvy=ball.vy-csl.vy,dotb=rvx*Math.cos(cA)+rvy*Math.sin(cA);if(dotb<0){var sb=csl.isSpinning?1.4:1,re=1.2*sb;ball.vx-=(1+re)*dotb*Math.cos(cA);ball.vy-=(1+re)*dotb*Math.sin(cA);ball.vx+=csl.vx*0.4;ball.vy+=csl.vy*0.4;var tvx=-Math.sin(cA),tvy=Math.cos(cA),rvt=(ball.vx-csl.vx)*tvx+(ball.vy-csl.vy)*tvy;ball.spin=Math.max(-0.6,Math.min(0.6,(ball.spin||0)*0.4+rvt/BR*0.3));var ns=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy),cap=MAXBS*sb;if(ns>cap){ball.vx*=cap/ns;ball.vy*=cap/ns;}var isLk=csl===ls;lastTouchRef.current=isLk?'left':'right';fx0=fxP.length;emitKick(fxP,ball.x,ball.y,ball.vx,ball.vy,isLk?colRef.current.left.body:colRef.current.right.body);skinFx(fxP,fx0,fxSkins[isLk?'left':'right']);if(soundEnabledRef.current&&performance.now()-lastSoundAtRef.current>100){playGameSound('kick');lastSoundAtRef.current=performance.now();}statsRef.current.shotStartX=ball.x;statsRef.current.fastestShot=Math.max(statsRef.current.fastestShot,Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy));}}
           var snap2=snapState();replayBufRef.current.push(snap2);if(replayBufRef.current.length>REPLAY_MAX)replayBufRef.current.shift();if(matchRecActiveRef.current)matchRecRef.current.push(snap2);
           if(mode==='single'&&!gameOver&&diffRef.current==='impossible'){var humSl=hSide==='right'?rs:ls,humF=hSide==='left'?1:-1;humanBufRef.current.push({relX:cl1((ball.x-humSl.x)/(GW/2)*humF),relY:cl1((ball.y-humSl.y)/(GH/2)),bvx:ball.vx*humF,jump:humSl.vy<-9,dash:humSl.dashFrames>0});if(humanBufRef.current.length>HP_WINDOW)humanBufRef.current.shift();}
         }
@@ -3582,7 +3692,7 @@ function App(){
           ctx.setTransform(RSn,0,0,RSn,0,0);ctx.save();var shk=shakeRef.current;if(shk>0.4){ctx.translate((Math.random()-0.5)*shk,(Math.random()-0.5)*shk);shakeRef.current=shk*0.84;}else shakeRef.current=0;
           drawScene(ctx,ls2,rs2,ball2,cols2,mode2,sideRef.current,practRef.current,fanRef.current,flashRef.current,[ls2.goalLineTime,rs2.goalLineTime],tm2==='night',tm2==='japan',getGameSlimeSkins(mode2),mode2==='training'&&trainingChallengeRef.current==='aim');
           var tr=ballTrailRef.current;
-          for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.4;ctx.fillStyle=tr[tri].isJapan?'#cc0000':'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
+          for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.4;ctx.fillStyle=tr[tri].c||'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
           drawParticles(ctx,particlesRef.current);
           var rd=readyRef.current;if(rd&&!goRef.current){if(!pausedRef.current)rd.fr++;if(rd.fr===30){shakeRef.current=Math.max(shakeRef.current,6);if(!pausedRef.current&&!goRef.current)frozenRef.current=false;}if(rd.fr>=62)readyRef.current=null;else drawReady(ctx,rd.fr,statsRef.current.lG,statsRef.current.rG,cols2);}
           var tlv=tlRef.current;
@@ -3628,7 +3738,7 @@ function App(){
 
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:lockedScreen()},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
-  if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress)})));
+  if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress),unlockedCosmetics:{celebration:unlockedCosmetics(achievementProgress,'celebration'),trail:unlockedCosmetics(achievementProgress,'trail'),pose:unlockedCosmetics(achievementProgress,'pose')}})));
   if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,theme:themeMode,skins:getGameSlimeSkins(lastPM.current),onBack:function(){setShowMatchReplay(false);}})));
 
@@ -3653,6 +3763,19 @@ function App(){
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
           React.createElement('p',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',textTransform:'uppercase',margin:'10px 0 0',fontWeight:800,textShadow:softText}},GAME_VERSION)),
+        // Daily challenge card
+        (function(){
+          var dch=todaysChallenge(),done=dailyDoneToday(dailyState),streak=dailyStreakNow(dailyState);
+          return React.createElement('div',{role:'note','aria-label':'Daily challenge: '+dch.title+'. '+dch.desc+(done?' Completed.':''),style:{display:'flex',alignItems:'center',gap:12,width:'min(681px, 100%)',boxSizing:'border-box',padding:'10px 14px',borderRadius:16,background:done?'rgba(34,197,94,0.16)':'rgba(5,12,35,0.72)',border:'1px solid '+(done?'rgba(74,222,128,0.6)':'rgba(249,115,22,0.55)'),boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}},
+            React.createElement('div',{'aria-hidden':'true',style:{fontSize:24,flex:'0 0 auto'}},done?'✅':'📅'),
+            React.createElement('div',{style:{flex:1,minWidth:0,textAlign:'left'}},
+              React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:done?'#86efac':'#fdba74'}},done?'Daily challenge done':'Daily challenge'),
+              React.createElement('div',{style:{fontSize:15,fontWeight:900,color:'#fff'}},dch.title),
+              React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.75)'}},done?'Nice! A new challenge unlocks tomorrow.':dch.desc)),
+            React.createElement('div',{title:'Daily streak',style:{flex:'0 0 auto',textAlign:'center',minWidth:44}},
+              React.createElement('div',{style:{fontSize:18,fontWeight:900,color:streak?'#fdba74':'rgba(255,255,255,0.45)'}},'🔥'+streak),
+              React.createElement('div',{style:{fontSize:9,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.55)',fontWeight:800}},'Streak')));
+        })(),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
@@ -3994,15 +4117,25 @@ function App(){
       if(!achToasts.length)return null;
       return React.createElement('div',{role:'status','aria-live':'polite',style:{position:'fixed',top:touchUI?undefined:'calc(env(safe-area-inset-top,0px) + 14px)',bottom:touchUI?'calc(env(safe-area-inset-bottom,0px) + 14px)':undefined,left:'50%',transform:'translateX(-50%)',zIndex:75,display:'flex',flexDirection:'column',gap:8,width:'min(360px,92vw)',pointerEvents:'none'}},
         achToasts.map(function(id,i){
+          if(id==='__daily'){
+            var dch=todaysChallenge(),dst=dailyStreakNow(dailyState);
+            return React.createElement('div',{key:id,className:'rise',onClick:function(){setAchToasts(function(list){return list.filter(function(x){return x!==id;});});},style:{pointerEvents:'auto',cursor:'pointer',display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:16,background:'rgba(5,12,35,0.94)',border:'1px solid #f97316',boxShadow:'0 10px 30px rgba(0,0,0,0.45),0 0 18px rgba(249,115,22,0.45)'}},
+              React.createElement('div',{'aria-hidden':'true',style:{width:40,height:40,flex:'0 0 40px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,background:'#16213e',border:'3px solid #f97316',boxSizing:'border-box'}},'🔥'),
+              React.createElement('div',{style:{minWidth:0,flex:1}},
+                React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:'#fdba74'}},'Daily challenge complete'),
+                React.createElement('div',{style:{fontFamily:DISP,fontSize:18,color:'#fff',lineHeight:1.15}},dch.title),
+                React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.72)'}},'Streak: '+dst+(dst===1?' day':' days')+' · come back tomorrow for a new one')));
+          }
           var ach=ACHIEVEMENTS.find(function(a){return a.id===id;});if(!ach)return null;
-          var fr=achievementFrameDetails(ach.frame),sk=achievementSkinDetails(ach.skin),col=fr?fr.color:sk?sk.color:'#fbbf24';
+          var fr=achievementFrameDetails(ach.frame),sk=achievementSkinDetails(ach.skin),cr=achievementCosmetic(ach),col=fr?fr.color:sk?sk.color:'#fbbf24';
           return React.createElement('div',{key:id,className:'rise',onClick:function(){setAchToasts(function(list){return list.filter(function(x){return x!==id;});});},style:{animationDelay:(i*0.12)+'s',pointerEvents:'auto',cursor:'pointer',display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:16,background:'rgba(5,12,35,0.94)',border:'1px solid '+col,boxShadow:'0 10px 30px rgba(0,0,0,0.45),0 0 18px '+col+'66'}},
             sk?React.createElement('div',{style:{width:40,height:40,flex:'0 0 40px',borderRadius:'50%',overflow:'hidden',border:'3px solid '+col,boxSizing:'border-box'}},React.createElement(SkinBadge,{skin:sk.id,size:34}))
+              :cr&&cr.item?React.createElement('div',{'aria-hidden':'true',style:{width:40,height:40,flex:'0 0 40px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,background:'#16213e',border:'3px solid '+col,boxSizing:'border-box'}},cr.item.icon)
               :React.createElement(ProfileAvatar,{profile:Object.assign({},account.avatar,{frame:fr?fr.id:'none'}),size:40}),
             React.createElement('div',{style:{minWidth:0,flex:1}},
               React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:col}},'Achievement unlocked'),
               React.createElement('div',{style:{fontFamily:DISP,fontSize:18,color:'#fff',lineHeight:1.15}},ach.title),
-              React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.72)'}},fr?'New frame: '+fr.name:sk?'New skin: '+sk.name:ach.description)));
+              React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.72)'}},fr?'New frame: '+fr.name:sk?'New skin: '+sk.name:cr&&cr.item?'New '+COSMETICS[cr.kind].label.toLowerCase()+': '+cr.item.name:ach.description)));
         }));
     }
     // Pause / connection-lost / end-of-match panels. Drawn over the canvas on desktop; full-size and full-screen on touch screens.
