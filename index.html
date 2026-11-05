@@ -73,7 +73,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.7.1';
+var GAME_VERSION='v24.7.3';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -1691,13 +1691,109 @@ function GuideScreenshot(props){
   return React.createElement('canvas',{ref:cvRef,width:800,height:400,role:'img','aria-label':props.label,style:{display:'block',width:'100%',height:'auto',aspectRatio:'2 / 1',borderRadius:9,border:'1px solid rgba(255,255,255,0.12)'}});
 }
 
+// Animated controls demo for How to Play: a slime acts out each move while the matching keys light up.
+var DEMO_STEPS=[
+  {name:'Move',tip:'Hold left or right to move.',dur:100},
+  {name:'Jump',tip:'Tap jump to hop up.',dur:62},
+  {name:'Double jump',tip:'Press jump again in mid-air for a second jump.',dur:82},
+  {name:'Ground dash',tip:'Press dash on the ground for a quick burst of speed.',dur:72},
+  {name:'Air spin dash',tip:'In the air, hold dash to tilt, then let go to dash forward.',dur:96},
+  {name:'Hit the ball',tip:'Get under the ball and jump into it to send it flying.',dur:130}
+];
+function GuideControlsDemo(props){
+  var kb=props.keybinds||DEFAULT_KEYBINDS,canvasRef=useRef(null);
+  var s_st=useState({step:0,keys:[]}),view=s_st[0],setView=s_st[1];
+  useEffect(function(){
+    var canvas=canvasRef.current;if(!canvas)return;var ctx=canvas.getContext('2d');if(!ctx)return;
+    var k=Math.min(2,window.devicePixelRatio||1);canvas.width=GW*k;canvas.height=GH*k;
+    var sl=mkSlime(300),other=mkSlime(-500),ball={x:-100,y:-100,vx:0,vy:0,ang:0},parts=[],fans=Array.from({length:CROWD_N},function(){return 0.2;});
+    var step=0,t=0,keys=[],lastSig='',raf=0,last=0,acc=0,alive=true;
+    var reduce=false;try{reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+    function startStep(i){step=i;t=0;Object.assign(sl,mkSlime(i===5?250:300));parts.length=0;ball={x:-100,y:-100,vx:0,vy:0,ang:0};if(i===5)ball={x:330,y:60,vx:0,vy:0,ang:0};}
+    function spinTowards(){
+      var spStep=(3*Math.PI/4)/(sl.spinSnapBack?Math.ceil(SPIN_F/(5*0.85*0.5)):SPIN_F),rem=sl.spinTarget-sl.spinAngle;
+      if(Math.abs(rem)<=spStep){sl.spinAngle=sl.spinTarget;if(sl.spinSnapBack){sl.isSpinning=false;sl.spinSnapBack=false;sl.spinDipY=0;}}
+      else{sl.spinAngle+=Math.sign(rem)*spStep;sl.spinDipY=sl.spinPhase===1?Math.sin(Math.abs(sl.spinAngle)/(3*Math.PI/4)*Math.PI)*18:0;}
+    }
+    function tick(){
+      keys=[];var ground=sl.y>=GH-GRND-1;
+      if(step===0){if(t<50){keys=['right'];sl.vx=SPD;}else{keys=['left'];sl.vx=-SPD;}}
+      else if(step===1){if(t<10)keys=['jump'];if(t===0)sl.vy=JUMP;sl.vx=0;}
+      else if(step===2){if(t<10||(t>=24&&t<34))keys=['jump'];if(t===0)sl.vy=JUMP;if(t===24)sl.vy=JUMP*0.85;sl.vx=0;}
+      else if(step===3){if(t<14)keys=['dash','right'];if(t===0){sl.dashFrames=DASH_F;}if(sl.dashFrames>0){sl.dashFrames--;sl.vx=GDASH_SPD;if(t===0)emitDash(parts,sl.x,sl.y,1,'#1a6bcc',false);}else sl.vx*=0.85;}
+      else if(step===4){
+        if(t<8)keys=['jump'];if(t===0)sl.vy=JUMP;
+        if(t>=12&&t<40)keys=['dash'];
+        if(t===12){sl.isSpinning=true;sl.spinAngle=0;sl.spinTarget=-(3*Math.PI/4);sl.spinPhase=1;}
+        if(t===40){sl.spinTarget=0;sl.spinSnapBack=true;sl.spinPhase=0;sl.spinDipY=0;sl.dashFrames=DASH_F;emitDash(parts,sl.x,sl.y,1,'#1a6bcc',false);}
+        if(sl.dashFrames>0){sl.dashFrames--;sl.vx=DASH_SPD;}else sl.vx*=0.9;
+        if(sl.isSpinning)spinTowards();
+        if(sl.spinPhase===1)sl.vy=Math.min(sl.vy,1.2); // float while tilted, like in the game
+      }
+      else if(step===5){
+        var under=ball.x-6;
+        if(Math.abs(sl.x-under)>4&&ground){keys=[sl.x<under?'right':'left'];sl.vx=sl.x<under?SPD:-SPD;}else sl.vx=0;
+        if(ground&&ball.vy>0&&GH-GRND-ball.y<150&&GH-GRND-ball.y>95&&Math.abs(sl.x-ball.x)<30){sl.vy=JUMP;}
+        if(sl.vy<0&&t<200)keys=keys.concat(['jump']);
+        ball.vy+=GRAV;ball.x+=ball.vx;ball.y+=ball.vy;ball.vx*=BDAMP;
+        if(ball.y>GH-GRND-BR){ball.y=GH-GRND-BR;ball.vy=-ball.vy*BBOUND;}
+        if(ball.x>GW-BR){ball.x=GW-BR;ball.vx=-ball.vx*0.88;}
+        var dx=ball.x-sl.x,dy=ball.y-sl.y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<SR+BR&&dy<0){var nx=dx/d,ny=dy/d,sp=Math.max(9,Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy));ball.vx=nx*sp+1.5;ball.vy=ny*sp;ball.x=sl.x+nx*(SR+BR+1);ball.y=sl.y+ny*(SR+BR+1);emitKick(parts,ball.x,ball.y,ball.vx,ball.vy,'#1a6bcc');}
+      }
+      sl.vy+=GRAV;sl.x+=sl.vx;sl.y+=sl.vy;
+      if(sl.x<SR)sl.x=SR;if(sl.x>GW-SR)sl.x=GW-SR;
+      if(sl.y>GH-GRND){if(sl.vy>5)sl.squash=Math.min(1,sl.vy/13);sl.y=GH-GRND;sl.vy=0;if(sl.spinPhase===1){sl.spinPhase=0;sl.spinTarget=0;sl.spinSnapBack=true;}}
+      if(sl.squash>0)sl.squash=Math.max(0,sl.squash-0.09);
+      t++;if(t>=DEMO_STEPS[step].dur)startStep((step+1)%DEMO_STEPS.length);
+      var sig=step+':'+keys.join(',');if(sig!==lastSig){lastSig=sig;setView({step:step,keys:keys.slice()});}
+    }
+    function draw(){
+      ctx.setTransform(k,0,0,k,0,0);
+      drawScene(ctx,sl,other,ball,DC,'practice','left',true,fans,false,null,props.theme==='night',props.theme==='japan',null);
+      drawParticles(ctx,parts);
+    }
+    function loop(now){
+      if(!alive)return;
+      if(!last)last=now;acc+=Math.min(100,now-last);last=now;
+      while(acc>=1000/60){tick();acc-=1000/60;}
+      draw();raf=requestAnimationFrame(loop);
+    }
+    startStep(0);
+    if(reduce){draw();return;}
+    raf=requestAnimationFrame(loop);
+    return function(){alive=false;cancelAnimationFrame(raf);};
+  },[props.theme]);
+  var cur=DEMO_STEPS[view.step];
+  function cap(action,label){
+    var on=view.keys.indexOf(action)>=0;
+    return React.createElement('div',{key:action,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:3}},
+      React.createElement('div',{style:{minWidth:46,height:46,padding:'0 8px',boxSizing:'border-box',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,fontFamily:'var(--font-display)',fontSize:18,color:on?'#0b1430':'#fff',background:on?'#fbbf24':'rgba(255,255,255,0.12)',border:'1px solid '+(on?'#fde68a':'rgba(255,255,255,0.3)'),borderBottomWidth:on?1:4,transform:on?'translateY(3px)':'none',boxShadow:on?'0 0 16px rgba(251,191,36,0.7)':'none',transition:'background 0.08s,transform 0.08s'}},keyLabel(kb.p1[action])),
+      React.createElement('div',{style:{fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',color:on?'#fde68a':'rgba(255,255,255,0.6)',fontWeight:800}},label));
+  }
+  return React.createElement('div',{style:{background:'rgba(5,12,35,0.8)',border:'1px solid rgba(251,191,36,0.35)',borderRadius:12,padding:12}},
+    React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}},
+      React.createElement('div',{style:{color:'#fbbf24',fontWeight:700,fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase'}},'Controls · '+(view.step+1)+'/'+DEMO_STEPS.length+' · '+cur.name),
+      props.onReplay&&React.createElement('button',{type:'button',onClick:props.onReplay,style:{padding:'5px 12px',borderRadius:50,border:'1px solid rgba(251,191,36,0.6)',background:'rgba(251,191,36,0.14)',color:'#fde68a',fontSize:11,fontWeight:900,cursor:'pointer',whiteSpace:'nowrap'}},'↺ Replay tutorial')),
+    React.createElement('canvas',{ref:canvasRef,role:'img','aria-label':'Animated demo: '+cur.name+'. '+cur.tip,style:{display:'block',width:'100%',aspectRatio:'2 / 1',borderRadius:9,border:'1px solid rgba(255,255,255,0.12)'}}),
+    React.createElement('div',{'aria-live':'polite',style:{color:'rgba(255,255,255,0.88)',fontSize:13,lineHeight:1.45,margin:'8px 0 10px',minHeight:38}},cur.tip+(props.touch?' On a phone, use the on-screen pad and buttons.':'')),
+    // Laid out like the keyboard: jump on top, left / dash / right underneath (the WASD and arrow-key shape).
+    React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,auto)',gap:'6px 8px',justifyContent:'center',justifyItems:'center'}},
+      React.createElement('div',{style:{gridColumn:2}},cap('jump','Jump')),
+      React.createElement('div',{style:{gridColumn:1,gridRow:2}},cap('left','Left')),
+      React.createElement('div',{style:{gridColumn:2,gridRow:2}},cap('dash','Dash')),
+      React.createElement('div',{style:{gridColumn:3,gridRow:2}},cap('right','Right'))),
+    React.createElement('div',{style:{display:'flex',gap:6,justifyContent:'center',marginTop:10}},DEMO_STEPS.map(function(s,i){return React.createElement('span',{key:i,title:s.name,style:{width:i===view.step?18:7,height:7,borderRadius:4,background:i===view.step?'#fbbf24':'rgba(255,255,255,0.25)',transition:'width 0.2s'}});})));
+}
 function GuideScreen(props){
   var onBack=props.onBack;
+  var s_run=useState(0),demoRun=s_run[0],setDemoRun=s_run[1]; // bumping this restarts the controls demo from step 1
   useEffect(function(){function h(e){if(e.key==='Escape')onBack();}window.addEventListener('keydown',h);return function(){window.removeEventListener('keydown',h);};},[onBack]);
-  var S=[{t:'Objective',b:'Score more goals before time runs out. At 0:00, overtime rules apply based on your match settings.',shot:'objective'},{t:'P1 Controls',b:'Move: A/D  Jump: W (double jump in air)  Dash: S',shot:'p1'},{t:'P2 Controls',b:'Move: arrows  Jump: up  Dash: down',shot:'p2'},{t:'Extra keys',b:'J: toggle unlimited jump in Practice only. P/Space: pause outside Practice.',shot:'keys'},{t:'Controller and touch',b:'Connect a gamepad before or during a match: left stick or D-pad moves, A jumps, and B dashes. On phones and tablets, use the on-screen arrows, jump, and dash buttons.',shot:'keys'},{t:'AI difficulty',b:'Easy is relaxed. Hard uses varied tactics, cuts off angles and defends high balls. Impossible also learns from every goal and studies how you score.',shot:'ai'},{t:'Match options',b:'Before a match, choose unlimited scoring or a 3, 5, or 10-goal limit and enable or disable overtime. Choose the arena with the Day, Night, or Sakura theme controls. In online play the host chooses the score limit and overtime rules.',shot:'objective'},{t:'Overtime (0:00)',b:'When overtime is enabled, play continues at 0:00 regardless of the score. The first goal in overtime wins the match. Turn overtime off in match options to end the match when time runs out.',shot:'overtime'},{t:'Replay',b:'After each goal in multiplayer. Scorer skips with jump key.',shot:'replay'},{t:'Training challenges',b:'Practice aiming shots, jump and dash timing, and saving goals in 45-second drills. Score enough points for bronze, silver, or gold medals.',shot:'practice'},{t:'After the match',b:'Review the score and best streak, plus fastest shot, longest goal, saves, and longest rally.',shot:'objective'},{t:'Practice',b:'No opponent, no timer. R to reset. Toggle unlimited jump with J or the ∞ Jump button.',shot:'practice'},{t:'Camping Penalty',b:'Stay in your own goal 1s = opponent gets free goal.',shot:'camping'}];
+  var S=[{t:'Objective',b:'Score more goals before time runs out. At 0:00, overtime rules apply based on your match settings.',shot:'objective'},{t:'P1 Controls',b:(function(k){return'Move: '+keyLabel(k.left)+'/'+keyLabel(k.right)+'  Jump: '+keyLabel(k.jump)+' (double jump in air)  Dash: '+keyLabel(k.dash);})((props.keybinds||DEFAULT_KEYBINDS).p1),shot:'p1'},{t:'P2 Controls',b:(function(k){return'Move: '+keyLabel(k.left)+'/'+keyLabel(k.right)+'  Jump: '+keyLabel(k.jump)+'  Dash: '+keyLabel(k.dash);})((props.keybinds||DEFAULT_KEYBINDS).p2),shot:'p2'},{t:'Extra keys',b:'J: toggle unlimited jump in Practice only. P/Space: pause outside Practice.',shot:'keys'},{t:'Controller and touch',b:'Connect a gamepad before or during a match: left stick or D-pad moves, A jumps, and B dashes. On phones and tablets, use the on-screen arrows, jump, and dash buttons.',shot:'keys'},{t:'AI difficulty',b:'Easy is relaxed. Hard uses varied tactics, cuts off angles and defends high balls. Impossible also learns from every goal and studies how you score.',shot:'ai'},{t:'Match options',b:'Before a match, choose unlimited scoring or a 3, 5, or 10-goal limit and enable or disable overtime. Choose the arena with the Day, Night, or Sakura theme controls. In online play the host chooses the score limit and overtime rules.',shot:'objective'},{t:'Overtime (0:00)',b:'When overtime is enabled, play continues at 0:00 regardless of the score. The first goal in overtime wins the match. Turn overtime off in match options to end the match when time runs out.',shot:'overtime'},{t:'Replay',b:'After each goal in multiplayer. Scorer skips with jump key.',shot:'replay'},{t:'Training challenges',b:'Practice aiming shots, jump and dash timing, and saving goals in 45-second drills. Score enough points for bronze, silver, or gold medals.',shot:'practice'},{t:'After the match',b:'Review the score and best streak, plus fastest shot, longest goal, saves, and longest rally.',shot:'objective'},{t:'Practice',b:'No opponent, no timer. R to reset. Toggle unlimited jump with J or the ∞ Jump button.',shot:'practice'},{t:'Camping Penalty',b:'Stay in your own goal 1s = opponent gets free goal.',shot:'camping'}];
   return React.createElement('div',{style:{maxWidth:500,width:'100%',height:'100%',minHeight:0,margin:'0 auto',padding:'4px 0',boxSizing:'border-box',display:'flex',flexDirection:'column',alignItems:'center',overflow:'hidden'}},
     React.createElement('h2',{style:{flex:'0 0 auto',fontFamily:'var(--font-display)',color:'#fff',fontSize:34,fontWeight:700,margin:'0 0 8px',textShadow:'0 0 20px rgba(56,189,248,0.6)',letterSpacing:'0.04em',textAlign:'center'}},'How to Play'),
     React.createElement('div',{style:{flex:'1 1 0',minHeight:0,overflowY:'auto',overscrollBehavior:'contain',display:'flex',flexDirection:'column',gap:10,padding:'0 6px',width:'100%',boxSizing:'border-box'}},
+      React.createElement(GuideControlsDemo,{key:'demo-'+demoRun,theme:props.theme,keybinds:props.keybinds,touch:props.touch,onReplay:function(){setDemoRun(function(n){return n+1;});}}),
       S.map(function(s,i){return React.createElement('div',{key:i,style:{background:'rgba(5,12,35,0.75)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:12,padding:12}},React.createElement('div',{style:{color:'#fbbf24',fontWeight:700,fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:4}},s.t),React.createElement('div',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,lineHeight:1.55,marginBottom:10}},s.b),React.createElement(GuideScreenshot,{kind:s.shot,theme:props.theme,label:s.t+' gameplay visualization'}));})
     ),
     React.createElement('button',{onClick:onBack,style:Object.assign({flex:'0 0 auto',marginTop:8,padding:'10px 36px',background:'linear-gradient(135deg,#64748b,#334155)',border:'none',borderRadius:50,color:'#fff',fontWeight:700,fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase',cursor:'pointer',boxShadow:'0 4px 15px rgba(0,0,0,0.35)'},props.focusSty?props.focusSty('back'):{})},'Back')
@@ -2501,6 +2597,14 @@ function SettingsScreen(props){
 }
 function App(){
   var s_done=useState(false),introDone=s_done[0],setIntroDone=s_done[1];
+  // First visit: offer the How to Play tutorial once.
+  var s_tut=useState(function(){try{return !window.localStorage.getItem('slime_tut_seen');}catch(e){return false;}}),tutPrompt=s_tut[0],setTutPrompt=s_tut[1];
+  function answerTutorial(show){try{window.localStorage.setItem('slime_tut_seen','1');}catch(e){}setTutPrompt(false);if(show)setScreen('guide');}
+  useEffect(function(){
+    if(!tutPrompt||!introDone||screen!=='menu')return;
+    function onKey(e){if(e.key==='Escape'){e.preventDefault();answerTutorial(false);}}
+    window.addEventListener('keydown',onKey);return function(){window.removeEventListener('keydown',onKey);};
+  },[tutPrompt,introDone,screen]);
   var cvRef=useRef(null),animRef=useRef(null),lfRef=useRef(0);
   var kRef=useRef({}),jrRef=useRef({});
   var jumpHeldRef=useRef({left:false,right:false});
@@ -3364,7 +3468,7 @@ function App(){
     var btns=getMenuButtons(),grid=getNavGrid();
     if(!btns.length)return;
     function onNav(e){
-      if(showPD||showSettings)return;
+      if(showPD||showSettings||(tutPrompt&&screen==='menu'))return;
       var key=e.key.toLowerCase();
       if(e.target.tagName==='INPUT'&&(screen!=='online'||(key!=='arrowup'&&key!=='arrowdown'&&key!=='escape')))return;
       if(screen==='practice_select'&&(key==='1'||key==='2'||key==='3')){
@@ -3870,6 +3974,14 @@ function App(){
       {key:'playerdata',label:'Stats & Social',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
+      tutPrompt&&React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'tut-title',style:{position:'fixed',inset:0,zIndex:70,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'rgba(2,6,20,0.65)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)'}},
+        React.createElement('div',{className:'rise',style:{width:'min(380px,92vw)',boxSizing:'border-box',padding:'22px 22px 18px',borderRadius:20,background:'rgba(5,12,35,0.96)',border:'1px solid rgba(251,191,36,0.5)',boxShadow:'0 20px 60px rgba(0,0,0,0.55)',textAlign:'center'}},
+          React.createElement('div',{'aria-hidden':'true',style:{fontSize:34,marginBottom:4}},'⚽'),
+          React.createElement('h2',{id:'tut-title',style:{fontFamily:DISP,fontSize:26,margin:'0 0 6px',color:'#fff'}},'New to Soccer Slime?'),
+          React.createElement('p',{style:{margin:'0 0 16px',fontSize:13,lineHeight:1.5,color:'rgba(255,255,255,0.8)'}},'Want a quick tutorial? It shows every move with the keys to press. You can always find it later under How to Play.'),
+          React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}},
+            React.createElement('button',{type:'button',autoFocus:true,onClick:function(){answerTutorial(true);},style:pill('linear-gradient(135deg,#22c55e,#15803d)',{fontSize:14,padding:'11px 24px'})},'Show me how'),
+            React.createElement('button',{type:'button',onClick:function(){answerTutorial(false);},style:pill('rgba(255,255,255,0.12)',{fontSize:14,padding:'11px 22px',border:'1px solid rgba(255,255,255,0.3)'})},'Skip')))),
       React.createElement('div',{ref:menuWrapRef,className:'rise',style:Object.assign({},wrapStyle,{gap:22},touchUI?null:{zoom:uiZ*menuFit})},
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
@@ -4033,7 +4145,7 @@ function App(){
     return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
   }
 
-  if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{theme:themeMode,onBack:function(){setScreen('menu');},focusSty:focusSty})));
+  if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{theme:themeMode,keybinds:gameSettings.keybinds,touch:touchUI,onBack:function(){setScreen('menu');},focusSty:focusSty})));
 
   // ── PLAYER SELECT ────────────────────────────────────────────────────
   if(screen==='player_select')return React.createElement('div',{key:'player-select',className:'screen-in',style:baseStyle},bgLayer(),
