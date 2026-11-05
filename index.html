@@ -94,7 +94,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.8.0';
+var GAME_VERSION='v24.8.2';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3190,7 +3190,7 @@ function App(){
     persistAchievementProgress({goals:100,wins:50,matches:100,hatTricks:10,cleanSheets:10,impossibleWins:10,onlineWins:10,comebacks:1,longRallies:1,bigWins:1,winStreak:0,bestWinStreak:5,dailyDone:10,bestDailyStreak:7,developerUnlocked:true});
   }
   // Who has which celebration / trail / victory pose this match (only things the owner has unlocked).
-  var remoteCosRef=useRef(null),lastTouchRef=useRef(null),impMemRef=useRef({land:null,prevOurs:null});
+  var remoteCosRef=useRef(null),lastTouchRef=useRef(null),impMemRef=useRef({land:null,prevOurs:null}),practGoalRef=useRef(null);
   function getGameCosmetics(mode){
     var none={celebration:'none',trail:'none',pose:'none'},mine={};
     COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&unlockedCosmetics(achievementProgress,k).indexOf(id)>=0?id:'none';});
@@ -3604,7 +3604,7 @@ function App(){
   }
   function scoreGoal(goalSide){
     if(replayActiveRef.current||goalFlashRef.current||frozenRef.current)return;
-    if(practRef.current){resetPosRef.current(false);return;}
+    if(practRef.current){var pb=gsRef.current.ball,pst=statsRef.current;practGoalRef.current={kmh:Math.round(Math.sqrt(pb.vx*pb.vx+pb.vy*pb.vy)*KMH_PER_SPEED),m:Math.round(Math.abs((goalSide==='left'?0:GW)-(pst.shotStartX===undefined?GW/2:pst.shotStartX))*METRES_PER_UNIT),at:performance.now()};resetPosRef.current(false);return;}
     if(goRef.current)return;
     if(pmRef.current==='training'&&trainingChallengeRef.current!=='aim'){completeTrainingAttempt(false);return;}
     var scoring=goalSide==='left'?'right':'left',st=statsRef.current;
@@ -3663,7 +3663,7 @@ function App(){
       if(onRoleRef.current==='host'){netMidRef.current++;var gpp=netFind('g');netPrevRef.current=(gpp&&gpp.i)?{jc:gpp.i[1]|0,dc:gpp.i[2]|0,rc:gpp.i[3]|0,pu:0,pd:0}:{jc:0,dc:0,rc:0,pu:0,pd:0};netPresence({st:'play',mid:netMidRef.current,dur:duration,sl:scoreLimitRef.current,ot:overtimeEnabledRef.current,p:null,rm:null});}
       else netPresence({rm:null});}
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
-    statsRef.current={lG:0,rG:0,lStr:0,rStr:0,lMax:0,rMax:0,last:null,fastestShot:0,longestGoal:0,saves:0,longestRally:0,rallyFrames:0,saveCooldown:0,shotStartX:GW/2};
+    practGoalRef.current=null;statsRef.current={lG:0,rG:0,lStr:0,rStr:0,lMax:0,rMax:0,last:null,fastestShot:0,longestGoal:0,saves:0,longestRally:0,rallyFrames:0,saveCooldown:0,shotStartX:GW/2};
     matchAchievementsRecordedRef.current=false;setAchToasts([]);dailyJustDoneRef.current=false;lastTouchRef.current=null;impMemRef.current={land:null,prevOurs:null};gsRef.current.left._poseT=0;gsRef.current.right._poseT=0;achStartRef.current=prac||mode==='training'?null:unlockedAchievementIds(achievementProgressRef.current);trainingChallengeRef.current=mode==='training'?trainingChallengeRef.current:null;
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
     colRef.current=c;pmRef.current=mode;practRef.current=prac;unlimJumpRef.current=false;setUnlimJump(false);
@@ -3971,6 +3971,15 @@ function App(){
           var rd=readyRef.current;if(rd&&!goRef.current){if(!pausedRef.current)rd.fr++;if(rd.fr===30){shakeRef.current=Math.max(shakeRef.current,6);if(!pausedRef.current&&!goRef.current)frozenRef.current=false;}if(rd.fr>=62)readyRef.current=null;else drawReady(ctx,rd.fr,statsRef.current.lG,statsRef.current.rG,cols2);}
           var tlv=tlRef.current;
           if((tlv>0&&tlv<=10||(tlv===0&&!(otRef.current&&otReadyRef.current)))&&!goRef.current&&!practRef.current){ctx.save();ctx.font='88px "Lilita One",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=tlv===0?'rgba(255,80,80,0.95)':'rgba(255,255,255,0.95)';ctx.shadowColor=tlv===0?'#ff4444':'rgba(0,0,0,0.6)';ctx.shadowBlur=tlv===0?30:12;ctx.fillText(tlv===0?'0':String(tlv),GW/2,GH/2-80);ctx.restore();}
+          // Practice: live ball speed in the top-right corner of the pitch, plus the last goal's speed and distance.
+          if(practRef.current){var pbl=gsRef.current.ball,pvy=pbl.y>=GH-GRND-BR-2&&Math.abs(pbl.vy)<1.5?0:pbl.vy,pkmh=Math.round(Math.sqrt(pbl.vx*pbl.vx+pvy*pvy)*KMH_PER_SPEED);if(pkmh<2)pkmh=0;var _pk=pkmh,pg=practGoalRef.current,fresh=pg&&performance.now()-pg.at<1500;
+            ctx.save();ctx.textBaseline='middle';
+            function pbox(y,hgt,wid){ctx.fillStyle='rgba(5,12,35,0.6)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(GW-wid-10,y,wid,hgt,8);else ctx.rect(GW-wid-10,y,wid,hgt);ctx.fill();}
+            pbox(10,30,150);ctx.font='11px "Lilita One",sans-serif';ctx.textAlign='left';ctx.fillStyle='rgba(255,255,255,0.6)';ctx.fillText('BALL',GW-150,25.5);
+            ctx.font='18px "Lilita One",sans-serif';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.fillText(pkmh+' km/h',GW-20,25.5);
+            if(pg){pbox(44,44,150);ctx.font='11px "Lilita One",sans-serif';ctx.textAlign='left';ctx.fillStyle=fresh?'#fde68a':'rgba(255,255,255,0.6)';ctx.fillText('LAST GOAL',GW-150,56);
+              ctx.font='16px "Lilita One",sans-serif';ctx.fillStyle=fresh?'#fbbf24':'#fff';ctx.fillText(pg.kmh+' km/h',GW-150,76);ctx.textAlign='right';ctx.fillText(pg.m+' m',GW-20,76);}
+            ctx.restore();}
           if(otRef.current&&!goRef.current){ctx.save();ctx.font='22px "Lilita One",sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle='rgba(255,100,100,0.9)';ctx.shadowColor='#ff4444';ctx.shadowBlur=10;ctx.fillText('OVERTIME',GW/2,8);ctx.restore();}
           ctx.restore();
         }
