@@ -13,6 +13,13 @@ button{font-family:inherit}
 @keyframes screenIn{from{opacity:0}to{opacity:1}}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes introTitle{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+html.lock-scroll,html.lock-scroll body{overflow:hidden!important;overscroll-behavior:none;height:100%;position:fixed;inset:0;width:100%}
+@keyframes introLetter{0%{opacity:0;transform:translateY(-140%) rotate(var(--r)) scale(1.6)}60%{opacity:1;transform:translateY(8%) rotate(0) scale(.94)}80%{transform:translateY(-4%) scale(1.03)}100%{opacity:1;transform:none}}
+@keyframes introFlash{0%{opacity:0}12%{opacity:.85}100%{opacity:0}}
+@keyframes introShake{0%,100%{transform:none}15%{transform:translate(-9px,6px)}30%{transform:translate(8px,-7px)}45%{transform:translate(-6px,-4px)}60%{transform:translate(5px,5px)}80%{transform:translate(-2px,2px)}}
+@keyframes introGlow{0%,100%{text-shadow:0 0 30px rgba(56,189,248,.8),0 5px 0 rgba(0,40,100,.45)}50%{text-shadow:0 0 60px rgba(125,211,252,1),0 0 110px rgba(56,189,248,.6),0 5px 0 rgba(0,40,100,.45)}}
+@keyframes introOut{to{opacity:0;transform:scale(1.12)}}
+@keyframes introBars{0%{transform:scaleY(1)}100%{transform:scaleY(0)}}
 @keyframes introWelcome{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #7dd3fc;outline-offset:2px}
 button:active{filter:brightness(.92)}
@@ -73,7 +80,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.7.6';
+var GAME_VERSION='v24.7.7';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -1384,6 +1391,31 @@ function IntroScreen(props){
       for(var pi=0;pi<28;pi++){var px=(pi*113+time*0.025)%840-20,py=(pi*67+time*0.04)%365;ctx.save();ctx.translate(px,py);ctx.rotate(time*0.001+pi);ctx.fillStyle='rgba(255,220,232,'+(0.5+(pi%4)*0.1)+')';ctx.beginPath();ctx.ellipse(0,0,5,2.4,0,0,Math.PI*2);ctx.fill();ctx.restore();}
       ctx.restore();
     }
+    // Fireworks over the night city, then a confetti blast when the title lands. Worked out from the time alone, no state.
+    var FW=[[3.5,190,90,'#38bdf8'],[3.95,560,70,'#f472b6'],[4.4,380,60,'#fbbf24'],[4.85,650,110,'#4ade80'],[5.3,140,70,'#c084fc'],[5.6,470,95,'#f87171']];
+    var CONF=['#fbbf24','#38bdf8','#f472b6','#4ade80','#ffffff','#f87171'];
+    function drawFx(t){
+      ctx.save();
+      for(var f=0;f<FW.length;f++){
+        var b=FW[f],launch=b[0]-0.55,dt=t-b[0];
+        if(t>launch&&t<b[0]){var k=(t-launch)/0.55;ctx.fillStyle='rgba(255,240,200,0.9)';ctx.beginPath();ctx.arc(b[1],400-(400-b[2])*(1-(1-k)*(1-k)),2,0,Math.PI*2);ctx.fill();}
+        if(dt>0&&dt<1.4){
+          var a=1-dt/1.4;ctx.fillStyle=b[3];
+          if(dt<0.12){ctx.globalAlpha=(0.12-dt)/0.12*0.5;ctx.beginPath();ctx.arc(b[1],b[2],50,0,Math.PI*2);ctx.fill();}
+          ctx.globalAlpha=a;
+          for(var p=0;p<36;p++){var ang=p/36*Math.PI*2,sp=95+(p%3)*30,d=sp*dt*(1-dt*0.3),x=b[1]+Math.cos(ang)*d,y=b[2]+Math.sin(ang)*d+40*dt*dt;ctx.fillRect(x-1.5,y-1.5,3,3);}
+        }
+      }
+      ctx.globalAlpha=1;
+      var ct=t-3.45;
+      if(ct>0&&ct<3){
+        for(var c=0;c<90;c++){
+          var sx=150+(c*37)%260,vy=260+(c*53)%230,x=c%2?sx*ct:800-sx*ct,y=400-vy*ct+170*ct*ct;
+          ctx.save();ctx.translate(x,y);ctx.rotate(ct*(4+c%5)+c);ctx.globalAlpha=Math.max(0,1-ct/3);ctx.fillStyle=CONF[c%CONF.length];ctx.fillRect(-4,-2,8,4);ctx.restore();
+        }
+      }
+      ctx.restore();
+    }
     function loop(now){
       if(!alive||doneRef.current)return;
       var elapsed=now-start;
@@ -1409,16 +1441,26 @@ function IntroScreen(props){
       var introBall={x:ballFrom.x+(ballTo.x-ballFrom.x)*ballMix,y:ballFrom.y+(ballTo.y-ballFrom.y)*ballMix,ang:ballFrom.ang+(ballTo.ang-ballFrom.ang)*ballMix};
       drawBall(ctx,introBall,current==='night',current==='japan');
       ctx.restore();
+      drawFx(elapsed/1000);
       animRef.current=requestAnimationFrame(loop);
     }
     resize();animRef.current=requestAnimationFrame(loop);
     window.addEventListener('resize',resize);
     return function(){alive=false;window.removeEventListener('resize',resize);if(animRef.current)cancelAnimationFrame(animRef.current);};
   },[]);
-  var skipHint=React.createElement('p',{style:{position:'absolute',bottom:20,left:0,right:0,textAlign:'center',color:'rgba(255,255,255,0.72)',fontSize:13,margin:0,letterSpacing:'0.08em',textShadow:'0 2px 6px rgba(0,0,0,0.7)'}},'Press Space to skip');
+  var touch=false;try{touch=window.matchMedia('(pointer:coarse)').matches;}catch(e){}
+  var skipHint=React.createElement('p',{style:{position:'absolute',bottom:'calc(env(safe-area-inset-bottom,0px) + 20px)',left:0,right:0,textAlign:'center',color:'rgba(255,255,255,0.72)',fontSize:13,margin:0,letterSpacing:'0.08em',textShadow:'0 2px 6px rgba(0,0,0,0.7)'}},touch?'Tap to skip':'Press Space to skip');
   var welcome=React.createElement('div',{style:{position:'absolute',left:0,right:0,top:'17%',textAlign:'center',fontFamily:'var(--font-title)',fontSize:'clamp(24px,5vw,42px)',fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase',color:'#fff',textShadow:'0 3px 14px rgba(0,35,90,0.65)',animation:'introWelcome 0.9s ease-out 0.3s both',pointerEvents:'none'}},'Welcome to');
-  var title=React.createElement('div',{style:{position:'absolute',left:0,right:0,top:'23%',textAlign:'center',fontFamily:'var(--font-title)',fontSize:'clamp(64px,14vw,132px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#fff',lineHeight:1,textShadow:'0 0 34px rgba(56,189,248,0.8),0 5px 0 rgba(0,40,100,0.45)',animation:'introTitle 0.9s ease-out 3s both',pointerEvents:'none'}},'Soccer Slime');
-  return React.createElement('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,cursor:'pointer',overflow:'hidden',background:'#10213c'},onClick:skip},React.createElement('canvas',{ref:cvRef,style:{width:'100%',height:'100%',display:'block'}}),welcome,title,skipHint);
+  // The title drops in letter by letter and lands with a flash and a screen shake, then keeps a slow glow.
+  var word='Soccer Slime'.split('');
+  var title=React.createElement('div',{'aria-label':'Soccer Slime',style:{position:'absolute',left:0,right:0,top:'23%',textAlign:'center',fontFamily:'var(--font-title)',fontSize:'clamp(56px,13vw,132px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#fff',lineHeight:1,whiteSpace:'nowrap',animation:'introGlow 1.6s ease-in-out 3.9s infinite',textShadow:'0 0 34px rgba(56,189,248,0.8),0 5px 0 rgba(0,40,100,0.45)',pointerEvents:'none'}},
+    word.map(function(ch,i){return React.createElement('span',{key:i,'aria-hidden':'true',style:{display:'inline-block',width:ch===' '?'0.35em':undefined,'--r':((i%2?1:-1)*(12+i*3))+'deg',animation:'introLetter 0.55s cubic-bezier(.2,.8,.3,1.2) '+(2.9+i*0.035)+'s both'}},ch===' '?'\u00a0':ch);}));
+  var bar=function(top){return React.createElement('div',{style:{position:'absolute',left:0,right:0,height:'9vh',background:'#000',top:top?0:undefined,bottom:top?undefined:0,transformOrigin:top?'top':'bottom',animation:'introBars 0.7s ease-out 0.2s both',pointerEvents:'none'}});};
+  var flash=React.createElement('div',{style:{position:'absolute',inset:0,background:'radial-gradient(circle at 50% 32%,#fff,rgba(186,230,253,0.6) 45%,rgba(56,189,248,0) 75%)',opacity:0,animation:'introFlash 0.7s ease-out 3.42s both',pointerEvents:'none'}});
+  var vignette=React.createElement('div',{style:{position:'absolute',inset:0,background:'radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,0.45) 100%)',pointerEvents:'none'}});
+  return React.createElement('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:9999,cursor:'pointer',overflow:'hidden',background:'#10213c',animation:'introOut 0.55s ease-in 8.45s both'},onClick:skip},
+    React.createElement('div',{style:{position:'absolute',inset:0,animation:'introShake 0.5s ease-out 3.45s both'}},React.createElement('canvas',{ref:cvRef,style:{width:'100%',height:'100%',display:'block'}}),vignette,welcome,title),
+    flash,bar(true),bar(false),skipHint);
 }
 
 // Little slime dot in a player's own colour/skin, for leaderboard and friends rows.
@@ -3367,6 +3409,8 @@ function App(){
   useEffect(function(){INVITE_UI.set(incomingInvite,acceptInvite,declineInvite);});
   // Tell the update pop-up when a match is being played, so it waits until the match is over.
   useEffect(function(){GAME_UI.setInGame(screen==='game'&&!winner);});
+  // Phones / home-screen app: pin the page during a match so the field can't scroll or rubber-band.
+  useEffect(function(){var on=touchUI&&screen==='game';document.documentElement.classList.toggle('lock-scroll',on);if(on)window.scrollTo(0,0);},[touchUI,screen]);
   function resetImpossibleAI(){
   qTableRef.current={};
   qHistRef.current=[];
