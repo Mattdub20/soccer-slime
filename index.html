@@ -94,7 +94,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.8.2';
+var GAME_VERSION='v24.8.3';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3906,21 +3906,16 @@ function App(){
                   if(tj===Infinity)continue;
                   if(Math.abs(cx-ai.x)/runSpd+(h>48?Math.max(0,tj-2):0)<=q.time+1){best={x:cx,t:q.time,h:h,tj:tj};break;}
                 }
-                if(best&&!behind&&(onOurs||threat||best.t<70)){
+                var incoming=aiLeft?b.vx<-0.5:b.vx>0.5;
+                if(best&&!behind&&onOurs&&(threat||incoming)){
                   newT=best.x;spd2=runSpd;
                   var ground=ai.y>=GH-GRND-1;
                   doJump=false;
                   if(ground&&best.h>48&&Math.abs(ai.x-best.x)<46&&best.t-best.tj<=1.5)doJump=true;
                   if(!ground&&!ai.hasDoubleJumped&&!ai.isSpinning&&best.h>SR+100&&ai.vy>-2&&best.t<=14&&Math.abs(ai.x-best.x)<50){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}
-                }else if(!behind&&!ai.isSpinning){
-                  // press: get on our goal side of the ball and drive it forward
-                  newT=Math.max(SR,Math.min(GW-SR,b.x+gsd*22));spd2=runSpd;
-                  var grd2=ai.y>=GH-GRND-1,bh3=GH-GRND-b.y,dx3=(b.x-ai.x)*-gsd;
-                  if(grd2&&dx3>0&&dx3<95&&bh3<30&&ai.dashFrames===0&&ai.dashCooldown===0){ai.dashFrames=DASH_F;ai.dashDir=-gsd;ai.groundDash=true;ai.dashCooldown=3;}
-                  if(grd2&&Math.abs(b.x-ai.x)<55&&bh3>45&&bh3<130&&b.vy>-1)doJump=true;
                 }
               })();
-              newT=isImp?Math.max(SR,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+50:GW-SR,newT));if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*Math.min(Math.abs(dd2)/28,1):0;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
+              newT=Math.max(SR,Math.min(aiLeft?GW/2+50:GW-SR,newT));if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
           var slimes=[ls,rs];
           for(var sli=0;sli<slimes.length;sli++){
