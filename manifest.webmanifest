@@ -1,0 +1,10 @@
+{
+  "name": "Soccer Slime",
+  "short_name": "Soccer Slime",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050c23",
+  "theme_color": "#050c23"
+}
