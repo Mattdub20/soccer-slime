@@ -73,7 +73,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.7.3';
+var GAME_VERSION='v24.7.4';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -2745,7 +2745,7 @@ function App(){
   var TURN_HOST='global.relay.metered.ca';
   var TURN_USERNAME='698083b06e212345d6374c11';
   var TURN_CREDENTIAL='CWNj0cLNf/ukM/kn';
-  var PEER_CONNECT_TIMEOUT_MS=15000;
+  var PEER_CONNECT_TIMEOUT_MS=25000; // relay routes on school/work Wi-Fi can take a while to settle
   function peerOptions(){
     var ice=[{urls:['stun:stun.l.google.com:19302','stun:stun.cloudflare.com:3478','stun:stun.relay.metered.ca:80']}];
     if(TURN_HOST&&TURN_USERNAME&&TURN_CREDENTIAL){
@@ -2802,9 +2802,18 @@ function App(){
         room.remotePresence=Object.assign(room.remotePresence||{},presencePatch);
         if(msg.p.r===null||msg.p.r===undefined&&msg.p.st===null)room.remotePresence=null;
       });
+      // Report connection progress (ICE state) and, once open, whether the link is direct or through the relay.
+      var iceWatch=setInterval(function(){
+        var pc=conn.peerConnection;if(!pc||room.closed){if(room.closed)clearInterval(iceWatch);return;}
+        clearInterval(iceWatch);
+        function report(){if(room._onIce)room._onIce(pc.iceConnectionState);}
+        pc.addEventListener('iceconnectionstatechange',report);report();
+      },100);
       conn.on('open',function(){
         room.remotePresence=room.remotePresence||{};
         room.sendLocalPresence();
+        var pc=conn.peerConnection;
+        if(pc&&pc.getStats)pc.getStats().then(function(st){var route='direct';st.forEach(function(r){if(r.type==='candidate-pair'&&r.state==='succeeded'&&r.nominated){var lc=st.get(r.localCandidateId),rc=st.get(r.remoteCandidateId);if((lc&&lc.candidateType==='relay')||(rc&&rc.candidateType==='relay'))route='relay';}});room.route=route;if(room._onRoute)room._onRoute(route);}).catch(function(){});
         if(room._onOpen)room._onOpen();
       });
       conn.on('close',function(){
@@ -2968,6 +2977,16 @@ function App(){
       var nmv=onlinePlayerName();try{window.localStorage.setItem('slime_myname',nmv);}catch(e){}
       room.presence(role==='h'?{r:'h',st:'lobby',mid:0,n:nmv||'Host',a:account.avatar}:{r:'g',st:'lobby',n:nmv||'Guest',a:account.avatar});
       room._onOpen=connected;
+      // Step-by-step status so it's clear where a connection gets stuck.
+      function stepStatus(text){if(!finished&&onTokRef.current===tok)setOnl(function(o){return o.peerOn?o:Object.assign({},o,{status:text});});}
+      room._onIce=function(state){
+        if(state==='checking')stepStatus(role==='h'?'A player is joining… finding a route between your devices':'Room found! Finding a route between your devices…');
+        else if(state==='failed'){
+          if(role==='h')stepStatus('A player tried to join but your networks couldn’t connect. Waiting… (a phone hotspot usually fixes this)');
+          else fail('Found the room, but your networks couldn’t connect to each other, even through the relay. Try a phone hotspot on one laptop.');
+        }
+      };
+      room._onRoute=function(route){try{console.info('[Soccer Slime] online connection: '+route);}catch(e){}};
       room._onClose=function(){
         if(!finished&&onTokRef.current===tok){
           if(pmRef.current==='online'&&!goRef.current){
@@ -2984,6 +3003,7 @@ function App(){
           connected();
         }else{
           startConnTimer(blockedMsg);
+          stepStatus('Looking for the room…');
           var conn=peer.connect(makePeerId(code),{label:'soccer-slime',serialization:'json',reliable:false});
           room.attach(conn);
         }
