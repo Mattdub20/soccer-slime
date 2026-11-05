@@ -94,7 +94,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.8.3';
+var GAME_VERSION='v24.8.4';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3190,7 +3190,7 @@ function App(){
     persistAchievementProgress({goals:100,wins:50,matches:100,hatTricks:10,cleanSheets:10,impossibleWins:10,onlineWins:10,comebacks:1,longRallies:1,bigWins:1,winStreak:0,bestWinStreak:5,dailyDone:10,bestDailyStreak:7,developerUnlocked:true});
   }
   // Who has which celebration / trail / victory pose this match (only things the owner has unlocked).
-  var remoteCosRef=useRef(null),lastTouchRef=useRef(null),impMemRef=useRef({land:null,prevOurs:null}),practGoalRef=useRef(null);
+  var remoteCosRef=useRef(null),lastTouchRef=useRef(null),impMemRef=useRef({land:null,prevOurs:null,retreat:0}),practGoalRef=useRef(null);
   function getGameCosmetics(mode){
     var none={celebration:'none',trail:'none',pose:'none'},mine={};
     COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&unlockedCosmetics(achievementProgress,k).indexOf(id)>=0?id:'none';});
@@ -3664,7 +3664,7 @@ function App(){
       else netPresence({rm:null});}
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
     practGoalRef.current=null;statsRef.current={lG:0,rG:0,lStr:0,rStr:0,lMax:0,rMax:0,last:null,fastestShot:0,longestGoal:0,saves:0,longestRally:0,rallyFrames:0,saveCooldown:0,shotStartX:GW/2};
-    matchAchievementsRecordedRef.current=false;setAchToasts([]);dailyJustDoneRef.current=false;lastTouchRef.current=null;impMemRef.current={land:null,prevOurs:null};gsRef.current.left._poseT=0;gsRef.current.right._poseT=0;achStartRef.current=prac||mode==='training'?null:unlockedAchievementIds(achievementProgressRef.current);trainingChallengeRef.current=mode==='training'?trainingChallengeRef.current:null;
+    matchAchievementsRecordedRef.current=false;setAchToasts([]);dailyJustDoneRef.current=false;lastTouchRef.current=null;impMemRef.current={land:null,prevOurs:null,retreat:0};gsRef.current.left._poseT=0;gsRef.current.right._poseT=0;achStartRef.current=prac||mode==='training'?null:unlockedAchievementIds(achievementProgressRef.current);trainingChallengeRef.current=mode==='training'?trainingChallengeRef.current:null;
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
     colRef.current=c;pmRef.current=mode;practRef.current=prac;unlimJumpRef.current=false;setUnlimJump(false);
     clearTimeout(postRpRef.current);frozenRef.current=false;pausedRef.current=false;goRef.current=false;flashRef.current=false;goalFlashRef.current=false;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;otRef.current=false;otReadyRef.current=false;
@@ -3890,6 +3890,19 @@ function App(){
               if(isImp)(function(){
                 // Impossible: plan an interception from the full predicted path instead of reacting late.
                 var mem=impMemRef.current,gsd=aiLeft?-1:1;
+                // Ball up against the wall above our own goal: hit it from the field side so it rebounds off the wall
+                // and away, then back off so it can't drop in off us. Repeat until it's cleared.
+                var wallX=aiLeft?0:GW,fromWall=Math.abs(b.x-wallX),barY=GH-GRND-GOALH,fieldX=function(d){return wallX-gsd*d;};
+                if(mem.retreat>0){mem.retreat--;if(fromWall<GOALW+90){newT=fieldX(GOALW+SR+70);spd2=SPD*1.15;doJump=false;return;}}
+                if(fromWall<GOALW+70&&b.y<barY-BR*0.5){
+                  var h2=GH-GRND-b.y,dx2=Math.abs(ai.x-b.x),grd3=ai.y>=GH-GRND-1;
+                  newT=Math.max(GOALW-SR*0.4,Math.min(GW-GOALW+SR*0.4,fieldX(fromWall+26)));spd2=SPD*1.15;doJump=false;
+                  if(grd3&&dx2<70&&h2>40&&h2<SR+150&&b.vy>-4)doJump=true;
+                  if(!grd3&&!ai.hasDoubleJumped&&dx2<55&&h2-(GH-GRND-ai.y)>SR+25&&ai.vy>-2){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}
+                  // touched it this frame: get out of the way
+                  if(Math.hypot(b.x-ai.x,b.y-ai.y)<SR+BR+6)mem.retreat=34;
+                  return;
+                }
                 function ours(x){return aiLeft?x<GW/2+40:x>GW/2-40;}
                 // frames for the slime's top to rise `rise` px after jumping (Infinity if out of reach)
                 function tReach(rise){if(rise<=0)return 0;var disc=JUMP*JUMP-2*GRAV*rise;return disc<0?Infinity:(-JUMP-Math.sqrt(disc))/GRAV;}
