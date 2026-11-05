@@ -73,7 +73,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.6.9';
+var GAME_VERSION='v24.7.0';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -156,9 +156,38 @@ function loadOnlineStickerSlots(){
 var DC={left:{body:'#1a6bcc',accent:'#0a3d7a'},right:{body:'#e8192c',accent:'#8b0000'}};
 var AI_ROBOT_SKIN={id:'robot',name:'AI Robot',color:'#9ca3af',accent:'#38bdf8',detail:'#e2e8f0',pattern:'robot'};
 var GAME_SETTINGS_KEY='soccer_slime_settings',GAME_AUDIO_VOLUME=1;
+// ─── Keybinds ─────────────────────────────────────────────────────────────
+// The game logic always uses these "canonical" keys; custom bindings are translated to them on key press.
+var DEFAULT_KEYBINDS={p1:{left:'a',right:'d',jump:'w',dash:'s'},p2:{left:'arrowleft',right:'arrowright',jump:'arrowup',dash:'arrowdown'}};
+var KEY_ACTIONS=['left','right','jump','dash'];
+var RESERVED_KEYS=['escape','p','tab','enter','/','1','2','3','4','5'];
+function cleanKeybinds(v){
+  var out={p1:{},p2:{}},used={};
+  ['p1','p2'].forEach(function(p){KEY_ACTIONS.forEach(function(a){
+    var k=v&&v[p]&&typeof v[p][a]==='string'?v[p][a].toLowerCase():'';
+    if(!k||k.length>20||RESERVED_KEYS.indexOf(k)>=0||used[k])k=DEFAULT_KEYBINDS[p][a];
+    if(used[k]){k='';} // default clashes with a custom key elsewhere: leave unbound rather than doubled
+    out[p][a]=k;if(k)used[k]=1;
+  });});
+  return out;
+}
+var KEYMAP={};
+// physical key -> canonical key ('' = this key does nothing because its default action was moved elsewhere)
+function applyKeybinds(kb){
+  var map={};
+  ['p1','p2'].forEach(function(p){KEY_ACTIONS.forEach(function(a){map[DEFAULT_KEYBINDS[p][a]]='';});});
+  ['p1','p2'].forEach(function(p){KEY_ACTIONS.forEach(function(a){if(kb[p][a])map[kb[p][a]]=DEFAULT_KEYBINDS[p][a];});});
+  KEYMAP=map;
+}
+function keyLabel(k){
+  if(!k)return'—';
+  var names={' ':'Space',arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓',shift:'Shift',control:'Ctrl',alt:'Alt',meta:'Cmd',backspace:'Bksp',capslock:'Caps'};
+  return names[k]||(k.length===1?k.toUpperCase():k.charAt(0).toUpperCase()+k.slice(1));
+}
 function cleanGameSettings(value){
   value=value&&typeof value==='object'?value:{};
   return{
+    keybinds:cleanKeybinds(value.keybinds),
     defaultSide:value.defaultSide==='left'?'left':'right',
     soundEnabled:typeof value.soundEnabled==='boolean'?value.soundEnabled:true,
     perfMode:['auto','on','off'].indexOf(value.perfMode)>=0?value.perfMode:'auto',
@@ -2348,52 +2377,88 @@ function SettingsScreen(props){
     }
     e.preventDefault();e.stopPropagation();
     if(active&&active.type==='checkbox'&&(direction==='left'||direction==='right')){active.click();return;}
-    var closeButton=panelRef.current.querySelector('button[aria-label="Close settings"]');
-    var sideButtons=Array.prototype.slice.call(panelRef.current.querySelectorAll('button[aria-pressed]'));
-    var checkbox=panelRef.current.querySelector('input[type="checkbox"]');
-    var sliders=Array.prototype.slice.call(panelRef.current.querySelectorAll('input[type="range"]'));
-    var resetAIButton=panelRef.current.querySelector('button[data-reset-impossible-ai]');
-    var rows=[[closeButton],sideButtons,checkbox?[checkbox]:[],sliders.length?[sliders[0]]:[],sliders.length>1?[sliders[1]]:[],resetAIButton?[resetAIButton]:[]].filter(function(row){return row.length;});
+    // Every control is tagged with data-nav-row, so each setting is its own row for up/down.
+    var byRow={};
+    Array.prototype.forEach.call(panelRef.current.querySelectorAll('[data-nav-row]'),function(el){var r=Number(el.getAttribute('data-nav-row'));(byRow[r]=byRow[r]||[]).push(el);});
+    var rows=Object.keys(byRow).map(Number).sort(function(a,b){return a-b;}).map(function(r){return byRow[r];});
     var rowIndex=-1,columnIndex=0;
     for(var ri=0;ri<rows.length;ri++){var ci=rows[ri].indexOf(active);if(ci!==-1){rowIndex=ri;columnIndex=ci;break;}}
-    if(rowIndex===-1){rows[1][0].focus();return;}
+    if(rowIndex===-1){(rows[1]||rows[0])[0].focus();return;}
     if(direction==='left'||direction==='right'){
       var row=rows[rowIndex],columnStep=direction==='left'?-1:1;
       if(row.length>1)row[(columnIndex+columnStep+row.length)%row.length].focus();
       return;
     }
     var rowStep=direction==='up'?-1:1,targetRow=(rowIndex+rowStep+rows.length)%rows.length,target=rows[targetRow];
-    target[Math.min(columnIndex,target.length-1)].focus();
+    var dest=target[Math.min(columnIndex,target.length-1)];dest.focus();
+    if(dest.scrollIntoView)dest.scrollIntoView({block:'nearest'});
   }
-  var panel={width:'min(440px,92vw)',boxSizing:'border-box',padding:24,borderRadius:22,background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.2)',boxShadow:'0 20px 60px rgba(0,0,0,0.55)',display:'flex',flexDirection:'column',gap:18};
-  function sideButton(side,label){var active=settings.defaultSide===side;return React.createElement('button',{type:'button',onClick:function(){props.onChange({defaultSide:side});},'aria-pressed':active,style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},label);}
-  function slider(id,label,value,min,max,step,display,change){return React.createElement('label',{key:id,htmlFor:id,style:{display:'grid',gridTemplateColumns:'minmax(120px,1fr) 2fr 48px',alignItems:'center',gap:10,fontSize:13,fontWeight:800}},label,React.createElement('input',{id:id,type:'range',min:min,max:max,step:step,value:value,onChange:function(e){change(Number(e.target.value));}}),React.createElement('span',{style:{textAlign:'right',fontVariantNumeric:'tabular-nums'}},display));}
+  // Key rebinding: click a key, then press the new key (Esc cancels). Binding a key that's already used swaps them.
+  var s_cap=useState(null),capture=s_cap[0],setCapture=s_cap[1];
+  var s_kmsg=useState(''),keyMsg=s_kmsg[0],setKeyMsg=s_kmsg[1];
+  useEffect(function(){
+    if(!capture)return;
+    function onKey(e){
+      e.preventDefault();e.stopImmediatePropagation();
+      var k=e.key.toLowerCase();
+      if(k==='escape'){setCapture(null);setKeyMsg('');return;}
+      if(RESERVED_KEYS.indexOf(k)>=0){setKeyMsg(keyLabel(k)+' is used for menus, pausing or stickers. Pick another key.');return;}
+      var kb=JSON.parse(JSON.stringify(settings.keybinds)),old=kb[capture.p][capture.a];
+      ['p1','p2'].forEach(function(p){KEY_ACTIONS.forEach(function(a){if(kb[p][a]===k&&!(p===capture.p&&a===capture.a))kb[p][a]=old;});});
+      kb[capture.p][capture.a]=k;
+      props.onChange({keybinds:kb});setCapture(null);setKeyMsg('');
+    }
+    window.addEventListener('keydown',onKey,true);
+    return function(){window.removeEventListener('keydown',onKey,true);};
+  },[capture,settings.keybinds]);
+  function keybindRow(p,label,row){
+    return React.createElement('div',{key:p,style:{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}},
+      React.createElement('span',{style:{fontSize:12,fontWeight:900,minWidth:28,color:p==='p1'?'#60a5fa':'#f87171'}},label),
+      KEY_ACTIONS.map(function(a){
+        var listening=capture&&capture.p===p&&capture.a===a;
+        return React.createElement('button',{key:a,type:'button','data-nav-row':row,'aria-label':label+' '+a+': '+keyLabel(settings.keybinds[p][a])+'. Press Enter to change.',onClick:function(){setKeyMsg('');setCapture({p:p,a:a});},style:{flex:'1 1 70px',display:'flex',flexDirection:'column',alignItems:'center',gap:1,padding:'5px 6px',borderRadius:10,border:listening?'2px solid #fbbf24':'1px solid rgba(255,255,255,0.25)',background:listening?'rgba(251,191,36,0.18)':'rgba(255,255,255,0.08)',color:'#fff',cursor:'pointer'}},
+          React.createElement('span',{style:{fontSize:9,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)',fontWeight:800}},a),
+          React.createElement('span',{style:{fontSize:15,fontWeight:900}},listening?'Press a key…':keyLabel(settings.keybinds[p][a])));
+      }));
+  }
+  var panel={width:'min(440px,92vw)',maxHeight:'calc(100dvh - 32px)',overflowY:'auto',boxSizing:'border-box',padding:24,borderRadius:22,background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.2)',boxShadow:'0 20px 60px rgba(0,0,0,0.55)',display:'flex',flexDirection:'column',gap:18};
+  function sideButton(side,label){var active=settings.defaultSide===side;return React.createElement('button',{type:'button','data-nav-row':1,onClick:function(){props.onChange({defaultSide:side});},'aria-pressed':active,style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},label);}
+  function slider(id,label,value,min,max,step,display,change,row){return React.createElement('label',{key:id,htmlFor:id,style:{display:'grid',gridTemplateColumns:'minmax(120px,1fr) 2fr 48px',alignItems:'center',gap:10,fontSize:13,fontWeight:800}},label,React.createElement('input',{id:id,'data-nav-row':row,type:'range',min:min,max:max,step:step,value:value,onChange:function(e){change(Number(e.target.value));}}),React.createElement('span',{style:{textAlign:'right',fontVariantNumeric:'tabular-nums'}},display));}
   return React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'settings-title',onKeyDownCapture:handlePanelKeyDown,style:{position:'fixed',inset:0,zIndex:10000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,boxSizing:'border-box',background:'rgba(1,6,20,0.72)',backdropFilter:'blur(8px)'}},
     React.createElement('div',{ref:panelRef,style:panel},
       React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12}},
         React.createElement('h1',{id:'settings-title',style:{flex:1,fontFamily:'var(--font-display)',fontSize:30,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.55)'}},'Settings'),
-        React.createElement('button',{type:'button',onClick:props.onClose,'aria-label':'Close settings',style:{width:40,height:40,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontSize:22,fontWeight:900,cursor:'pointer'}},'×')),
+        React.createElement('button',{type:'button','data-nav-row':0,onClick:props.onClose,'aria-label':'Close settings',style:{width:40,height:40,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontSize:22,fontWeight:900,cursor:'pointer'}},'×')),
       React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
         React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Default side'),
         React.createElement('div',{style:{display:'flex',gap:8}},sideButton('left','Left'),sideButton('right','Right'))),
       React.createElement('label',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,fontSize:14,fontWeight:900}},
         'Sound effects',
-        React.createElement('input',{type:'checkbox',checked:settings.soundEnabled,onChange:function(e){props.onChange({soundEnabled:e.target.checked});},'aria-label':'Sound effects'})),
-      slider('settings-sfx-volume','Sound volume',settings.sfxVolume,0,1,0.05,Math.round(settings.sfxVolume*100)+'%',function(value){props.onChange({sfxVolume:value});}),
+        React.createElement('input',{type:'checkbox','data-nav-row':2,checked:settings.soundEnabled,onChange:function(e){props.onChange({soundEnabled:e.target.checked});},'aria-label':'Sound effects'})),
+      slider('settings-sfx-volume','Sound volume',settings.sfxVolume,0,1,0.05,Math.round(settings.sfxVolume*100)+'%',function(value){props.onChange({sfxVolume:value});},3),
       React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
   React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Performance mode'),
   React.createElement('div',{style:{display:'flex',gap:8}},
     [['auto','Auto'],['on','On'],['off','Off']].map(function(o){
       var active=settings.perfMode===o[0];
-      return React.createElement('button',{key:o[0],type:'button','aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
+      return React.createElement('button',{key:o[0],type:'button','data-nav-row':4,'aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
     }))),
-    slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});}),
+    slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});},5),
+      React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
+        React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}},
+          React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Controls'),
+          React.createElement('button',{type:'button','data-nav-row':8,onClick:function(){setCapture(null);setKeyMsg('');props.onChange({keybinds:JSON.parse(JSON.stringify(DEFAULT_KEYBINDS))});},style:{padding:'5px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer'}},'Reset to default')),
+        React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)'}},capture?'Press the new key · Esc to cancel':'Select a key to change it. P1 is also you in single player when on the left side.'),
+        keybindRow('p1','P1',6),
+        keybindRow('p2','P2',7),
+        keyMsg&&React.createElement('div',{role:'alert',style:{fontSize:12,color:'#fecaca'}},keyMsg)),
       props.saveError&&React.createElement('div',{role:'alert',style:{fontSize:12,lineHeight:1.4,color:'#fecaca'}},props.saveError),
           React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
         React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#fca5a5'}},'Impossible AI'),
         React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)',lineHeight:1.4}},'Reset the Impossible AI learning back to its default state.'),
         React.createElement('button',{
           type:'button',
+          'data-nav-row':9,
           'data-reset-impossible-ai':true,
           onPointerDown:startResetHold,
           onPointerUp:stopResetHold,
@@ -2849,7 +2914,7 @@ function App(){
 
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
-  GAME_AUDIO_VOLUME=gameSettings.sfxVolume;
+  GAME_AUDIO_VOLUME=gameSettings.sfxVolume;applyKeybinds(gameSettings.keybinds);
   updatePerf(gameSettings.perfMode);
   var s_settingsErr=useState(''),settingsSaveError=s_settingsErr[0],setSettingsSaveError=s_settingsErr[1];
   var s_showSettings=useState(false),showSettings=s_showSettings[0],setShowSettings=s_showSettings[1];
@@ -3498,20 +3563,27 @@ function App(){
         return;
       }
       e.preventDefault();
+      var raw=key,bound=Object.prototype.hasOwnProperty.call(KEYMAP,raw);
+      if(bound)key=KEYMAP[raw]||'__unbound';
       if(onRoleRef.current&&NETMAP[key])key=NETMAP[key];
       var wasDown=kRef.current[key];kRef.current[key]=true;jrRef.current[key]=false;
       if(onRoleRef.current==='guest'&&!wasDown){if(key==='w')netCtrRef.current.jc++;if(key==='s')netCtrRef.current.dc++;}
       if(replayActiveRef.current&&goalFlashDoneRef.current){var scorer=replayScorerRef.current,rmode=pmRef.current,canSkip=false;if(rmode==='multi'){if(scorer==='left'&&key==='w')canSkip=true;if(scorer==='right'&&key==='arrowup')canSkip=true;}else if(rmode==='single'&&(key==='arrowup'||key==='w'))canSkip=true;if(canSkip){endReplay();return;}}
       if(key==='escape'){if(screen==='guide'||screen==='practice_select'){setScreen('menu');return;}if(screen==='game'){if(goRef.current||practRef.current||pausedRef.current){exitToMenu();return;}togglePause();}}
-      if((key==='p'||key===' ')&&screen==='game'&&!goRef.current&&!practRef.current)togglePause();
-      if(key==='j'&&screen==='game'&&practRef.current)toggleUnlimJump();
+      // Pause / unlimited-jump shortcuts use the physical key, unless that key is bound to a control.
+      if((raw==='p'||(raw===' '&&!KEYMAP[' ']))&&screen==='game'&&!goRef.current&&!practRef.current)togglePause();
+      if(raw==='j'&&!KEYMAP.j&&screen==='game'&&practRef.current)toggleUnlimJump();
     }
-    function up(e){if(screen!=='game'||e.target.tagName==='INPUT')return;e.preventDefault();var key=e.key.toLowerCase();if(onRoleRef.current&&NETMAP[key])key=NETMAP[key];kRef.current[key]=false;jrRef.current[key]=true;if(onRoleRef.current==='guest'&&key==='s')netCtrRef.current.rc++;}
+    function up(e){if(screen!=='game'||e.target.tagName==='INPUT')return;e.preventDefault();var key=e.key.toLowerCase();if(Object.prototype.hasOwnProperty.call(KEYMAP,key))key=KEYMAP[key]||'__unbound';if(onRoleRef.current&&NETMAP[key])key=NETMAP[key];kRef.current[key]=false;jrRef.current[key]=true;if(onRoleRef.current==='guest'&&key==='s')netCtrRef.current.rc++;}
     function releaseAll(){Object.keys(kRef.current).forEach(function(key){kRef.current[key]=false;jrRef.current[key]=true;});}
-    function onVisibility(){if(document.visibilityState==='hidden')releaseAll();}
+    // Alt-tab / switching tabs: let go of every key, and pause matches vs the AI or local multiplayer
+    // (online can't pause, and practice/training don't need to).
+    function autoPause(){if(screen==='game'&&(pmRef.current==='single'||pmRef.current==='multi')&&!goRef.current&&!pausedRef.current&&!onRoleRef.current)togglePause();}
+    function onBlur(){releaseAll();autoPause();}
+    function onVisibility(){if(document.visibilityState==='hidden'){releaseAll();autoPause();}}
     window.addEventListener('keydown',dn);window.addEventListener('keyup',up);
-    window.addEventListener('blur',releaseAll);document.addEventListener('visibilitychange',onVisibility);
-    return function(){window.removeEventListener('keydown',dn);window.removeEventListener('keyup',up);window.removeEventListener('blur',releaseAll);document.removeEventListener('visibilitychange',onVisibility);releaseAll();};
+    window.addEventListener('blur',onBlur);document.addEventListener('visibilitychange',onVisibility);
+    return function(){window.removeEventListener('keydown',dn);window.removeEventListener('keyup',up);window.removeEventListener('blur',onBlur);document.removeEventListener('visibilitychange',onVisibility);releaseAll();};
   },[screen,stickerSlots,myName]);
 
   useEffect(function(){
@@ -4249,8 +4321,8 @@ function App(){
         ),
         React.createElement('div',{className:isOnG?'':'kbd-hints',style:{marginTop:14,display:'flex',flexDirection:'column',alignItems:'center',gap:6,textAlign:'center',fontSize:12,color:'rgba(255,255,255,0.95)',background:isDay?'rgba(20,80,145,0.8)':'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:16,padding:'9px 18px',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)',boxShadow:'0 8px 24px rgba(0,0,0,0.25)',maxWidth:'100%'}},
           React.createElement('div',{className:'kbd-hints'},
-            lLeft&&React.createElement('span',{style:{marginRight:rRight?14:0}},keys(['A','D']),'move ',keys(['W']),'jump ',keys(['S']),'dash'),
-            rRight&&React.createElement('span',null,keys(['←','→']),'move ',keys(['↑']),'jump ',keys(['↓']),'dash')),
+            lLeft&&React.createElement('span',{style:{marginRight:rRight?14:0}},keys([keyLabel(gameSettings.keybinds.p1.left),keyLabel(gameSettings.keybinds.p1.right)]),'move ',keys([keyLabel(gameSettings.keybinds.p1.jump)]),'jump ',keys([keyLabel(gameSettings.keybinds.p1.dash)]),'dash'),
+            rRight&&React.createElement('span',null,keys([keyLabel(gameSettings.keybinds.p2.left),keyLabel(gameSettings.keybinds.p2.right)]),'move ',keys([keyLabel(gameSettings.keybinds.p2.jump)]),'jump ',keys([keyLabel(gameSettings.keybinds.p2.dash)]),'dash')),
           isOnG&&React.createElement('div',{style:{opacity:0.85}},(onRoleRef.current==='host'?'You are the blue slime':'You are the red slime')+' · arrow keys work too · 1–5 stickers'),
           isImpG&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(239,68,68,0.2)',border:'1px solid rgba(248,113,113,0.45)',color:'#fecaca',fontWeight:800,fontSize:11,letterSpacing:'0.06em',textTransform:'uppercase'}},'Impossible AI · has studied '+memCount+' of your goals'),
           gmode==='training'&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(245,158,11,0.2)',border:'1px solid rgba(252,211,77,0.35)',color:'#fde68a',fontWeight:800,fontSize:11}},trainingChallengeRef.current==='dash'?'Dash control · '+trainingScore+' '+(trainingScore===1?'hit':'hits')+' · '+trainingTries+'/10 tries':(trainingChallengeRef.current==='aim'?'Aiming':trainingChallengeRef.current==='jump'?'Jump timing':'Goalkeeping')+' · '+trainingScore+' '+(trainingChallengeRef.current==='aim'?(trainingScore===1?'goal':'goals'):trainingChallengeRef.current==='save'?(trainingScore===1?'save':'saves'):(trainingScore===1?'hit':'hits'))+' · '+fmt(tl)+' left')),
