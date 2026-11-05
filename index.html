@@ -73,7 +73,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.7.4';
+var GAME_VERSION='v24.7.5';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -2770,6 +2770,9 @@ function App(){
     room.sendLocalPresence=function(){
       if(room.conn&&room.conn.open){try{room.conn.send({t:'presence',p:room.localPresence});}catch(e){}}
     };
+    // Game data uses an unreliable channel, so a single "who I am" message can get lost (more often through
+    // the relay on school/work Wi-Fi). Re-send our full presence every second so the other side always catches up.
+    room._presenceBeat=setInterval(function(){if(room.closed){clearInterval(room._presenceBeat);return;}room.sendLocalPresence();},1000);
     room.sendChat=function(message){
       if(room.closed||!room.conn||!room.conn.open)return false;
       try{room.conn.send({t:'chat',p:message});return true;}catch(e){return false;}
@@ -2830,6 +2833,7 @@ function App(){
       });
     };
     room.leave=function(){
+      clearInterval(room._presenceBeat);
       room.closed=true;room.remotePresence=null;
       if(room.conn){try{room.conn.close();}catch(e){}room.conn=null;}
       try{peer.destroy();}catch(e){}
