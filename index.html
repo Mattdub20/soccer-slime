@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.8.7';
+var GAME_VERSION='v24.8.8';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -2896,7 +2896,7 @@ function App(){
     };
     room.attach=function(conn){
       if(room.closed)return;
-      if(room.conn&&room.conn!==conn&&room.conn.open){try{conn.close();}catch(e){}return;}
+      if(room.conn&&room.conn!==conn){var oldConn=room.conn;room.conn=null;room.remotePresence=null;try{oldConn.close();}catch(e){}}
       room.conn=conn;
       conn.on('data',function(msg){
         if(!msg||!msg.p)return;
@@ -3098,7 +3098,7 @@ function App(){
       };
       roomRef.current={room:room};onRoleRef.current=role==='h'?'host':'guest';netMidRef.current=0;
       var nmv=onlinePlayerName();try{window.localStorage.setItem('slime_myname',nmv);}catch(e){}
-      room.presence(role==='h'?{r:'h',st:'lobby',mid:0,n:nmv||'Host',a:account.avatar}:{r:'g',st:'lobby',n:nmv||'Guest',a:account.avatar});
+      room.presence(role==='h'?{r:'h',st:'lobby',mid:0,n:nmv||'Host',a:account.avatar,v:GAME_VERSION,seen:0}:{r:'g',st:'lobby',n:nmv||'Guest',a:account.avatar,v:GAME_VERSION});
       room._onOpen=connected;
       // Step-by-step status so it's clear where a connection gets stuck.
       function stepStatus(text){if(!finished&&onTokRef.current===tok)setOnl(function(o){return o.peerOn?o:Object.assign({},o,{status:text});});}
@@ -3835,8 +3835,14 @@ function App(){
     if(screen!=='online')return;
     var id=setInterval(function(){
       if(!roomRef.current)return;
-      var role=onRoleRef.current,other=netFind(role==='host'?'g':'h'),on=!!other;
-      setOnl(function(o){return o.peerOn===on?o:Object.assign({},o,{peerOn:on});});
+      var role=onRoleRef.current,other=netFind(role==='host'?'g':'h'),on=!!other,rm2=roomRef.current.room,nowW=performance.now();
+      if(role==='host'&&rm2&&(rm2.localPresence||{}).seen!==(on?1:0))rm2.presence({seen:on?1:0});
+      var linkOpen=!!(rm2&&rm2.conn&&rm2.conn.open);
+      if(!linkOpen||(role==='host'?on:(other&&other.seen)))rm2._oneWaySince=0;else if(!rm2._oneWaySince)rm2._oneWaySince=nowW;
+      var warn='';
+      if(other&&other.v&&other.v!==GAME_VERSION)warn='Version mismatch: you have '+GAME_VERSION+', your friend has '+other.v+'. Both of you refresh the page (Ctrl+F5) and try again.';
+      else if(rm2&&rm2._oneWaySince&&nowW-rm2._oneWaySince>5000)warn=role==='host'?'Your friend reached this room but their messages aren’t getting through. Ask them to refresh and join again.':'The host can’t hear you yet. If this doesn’t clear in a few seconds, both refresh and try again (a browser privacy setting or ad blocker can also cause this).';
+      setOnl(function(o){return o.peerOn===on&&(o.warn||'')===warn?o:Object.assign({},o,{peerOn:on,warn:warn});});
       if(role==='guest'&&other&&other.st==='play'&&other.mid!==netMidRef.current){netMidRef.current=other.mid;startGame(other.dur||'2min','online',DC,{left:cleanName(other.n)||'Host',right:onlinePlayerName()||'You'},'right','regular',null,null,{scoreLimit:other.sl||0,overtime:other.ot!==false});}
     },250);
     return function(){clearInterval(id);};
@@ -4400,6 +4406,7 @@ function App(){
       oBody.push(React.createElement('div',{key:'l',style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Room code'));
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:56,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.peerOn?'Your friend is in! Pick a length and start.':(onl.status==='Connected'?'Waiting for your friend to join…':onl.status)));
+      if(onl.warn)oBody.push(React.createElement('div',{key:'w',role:'alert',style:{fontSize:12,color:'#fde68a',maxWidth:320,textAlign:'center',lineHeight:1.4,margin:'4px auto 0'}},onl.warn));
       if(onl.peerOn){
         oBody.push(React.createElement('div',{key:'d',style:{display:'flex',gap:8}},['1min','2min','4min'].map(function(dv){var navId='online_dur'+dv.replace('min','');return React.createElement('button',{key:dv,onClick:function(){setOnl(function(o){return Object.assign({},o,{dur:dv});});},style:Object.assign(hudChip(false,{padding:'6px 14px',fontSize:12,background:onl.dur===dv?btnPrimary:'rgba(255,255,255,0.12)'}),focusSty(navId))},dv.replace('min',' min'));})));
         oBody.push(React.createElement('div',{key:'opts',style:{width:'100%',display:'flex',flexDirection:'column',alignItems:'center',gap:7,padding:'9px 0',borderTop:'1px solid rgba(255,255,255,0.12)',borderBottom:'1px solid rgba(255,255,255,0.12)'}},
@@ -4413,6 +4420,7 @@ function App(){
     }else{
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:44,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.status!=='Connected'?onl.status:(onl.peerOn?'Connected! Waiting for the host to start the match…':'Connected. Looking for the host…')));
+      if(onl.warn)oBody.push(React.createElement('div',{key:'w',role:'alert',style:{fontSize:12,color:'#fde68a',maxWidth:320,textAlign:'center',lineHeight:1.4,margin:'4px auto 0'}},onl.warn));
     }
     if(onl.err)oBody.push(React.createElement('div',{key:'e',style:{color:'#fecaca',fontSize:12,textAlign:'center',maxWidth:300,lineHeight:1.45,background:'rgba(239,68,68,0.18)',border:'1px solid rgba(248,113,113,0.4)',borderRadius:12,padding:'8px 12px'}},onl.err));
     var backId=oV==='choose'?'online_back':oV==='stickers'?'sticker_cancel':'online_cancel';
