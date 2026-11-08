@@ -13,7 +13,7 @@ button{font-family:inherit}
 @keyframes screenIn{from{opacity:0}to{opacity:1}}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes introTitle{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
-[data-results] button:focus-visible,[data-results] button:focus{outline:3px solid #fbbf24;outline-offset:3px}
+[data-tutdone] button:focus,[data-results] button:focus-visible,[data-results] button:focus{outline:3px solid #fbbf24;outline-offset:3px}
 html.lock-scroll,html.lock-scroll body{overflow:hidden!important;overscroll-behavior:none;height:100%;position:fixed;inset:0;width:100%}
 @keyframes introLetter{0%{opacity:0;transform:translateY(-140%) rotate(var(--r)) scale(1.6)}60%{opacity:1;transform:translateY(8%) rotate(0) scale(.94)}80%{transform:translateY(-4%) scale(1.03)}100%{opacity:1;transform:none}}
 @keyframes introFlash{0%{opacity:0}12%{opacity:.85}100%{opacity:0}}
@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.8.9';
+var GAME_VERSION='v24.9.2';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -2872,11 +2872,13 @@ function App(){
   // Some browsers never flag a PeerJS connection as "open" even though its data channel works (messages arrive fine).
 // So check the channel itself, and send through it directly when PeerJS thinks it's still closed.
 function connIsOpen(c){return !!c&&(c.open||(c.dataChannel&&c.dataChannel.readyState==='open'));}
+var NET_DIAG={sent:0,recv:0,fail:0,err:''};
 function connSend(c,msg){
-  if(!c)return false;
-  try{if(c.open){c.send(msg);return true;}var dc=c.dataChannel;if(dc&&dc.readyState==='open'){dc.send(JSON.stringify(msg));return true;}}catch(e){}
-  return false;
+  if(!c){NET_DIAG.fail++;return false;}
+  try{if(c.open){c.send(msg);NET_DIAG.sent++;return true;}var dc=c.dataChannel;if(dc&&dc.readyState==='open'){dc.send(JSON.stringify(msg));NET_DIAG.sent++;return true;}}catch(e){NET_DIAG.err=String(e&&e.message||e).slice(0,60);}
+  NET_DIAG.fail++;return false;
 }
+function netDiagText(room){var c=room&&room.conn,dc=c&&c.dataChannel,pc=c&&c.peerConnection;return 'diag · '+GAME_VERSION+' · peer '+(c?(c.open?'open':'shut'):'none')+' · chan '+(dc?dc.readyState:'none')+' · ice '+(pc?pc.iceConnectionState:'-')+' · sent '+NET_DIAG.sent+' · got '+NET_DIAG.recv+' · fail '+NET_DIAG.fail+(NET_DIAG.err?' · '+NET_DIAG.err:'')+(room&&room.route?' · '+room.route:'');}
 function makePeerRoom(peer,role,code){
     var room={peer:peer,role:role,code:code,conn:null,remotePresence:null,localPresence:{},closed:false};
     room.peers=function(){
@@ -2907,6 +2909,7 @@ function makePeerRoom(peer,role,code){
       if(room.conn&&room.conn!==conn){var oldConn=room.conn;room.conn=null;room.remotePresence=null;try{oldConn.close();}catch(e){}}
       room.conn=conn;
       conn.on('data',function(msg){
+        NET_DIAG.recv++;
         if(!msg||!msg.p)return;
         if(msg.t==='chat'){
           var chatText=typeof msg.p.m==='string'?msg.p.m.trim().slice(0,200):'';
@@ -3612,7 +3615,7 @@ function makePeerRoom(peer,role,code){
       acts.online_code1=function(){if(joinInputRefs[1].current)joinInputRefs[1].current.focus();};
       acts.online_code2=function(){if(joinInputRefs[2].current)joinInputRefs[2].current.focus();};
       acts.online_code3=function(){if(joinInputRefs[3].current)joinInputRefs[3].current.focus();};
-      acts.online_submit=function(){if((onl.joinCode||'').length===4)openRoom('g',onl.joinCode);};
+      acts.online_submit=function(){if(/^[A-Z0-9]{4}$/.test(onl.joinCode||''))openRoom('g',onl.joinCode);};
       acts.online_dur1=function(){setOnl(function(o){return Object.assign({},o,{dur:'1min'});});};
       acts.online_dur2=function(){setOnl(function(o){return Object.assign({},o,{dur:'2min'});});};
       acts.online_dur4=function(){setOnl(function(o){return Object.assign({},o,{dur:'4min'});});};
@@ -3718,7 +3721,7 @@ function makePeerRoom(peer,role,code){
   function scoreGoal(goalSide){
     if(replayActiveRef.current||goalFlashRef.current||frozenRef.current)return;
     if(practRef.current&&tutRef.current&&TUT_STEPS[tutRef.current.step]&&TUT_STEPS[tutRef.current.step].id==='goal'&&goalSide!==sideRef.current)tutAdvance();
-    if(practRef.current){var pb=gsRef.current.ball,pst=statsRef.current;practGoalRef.current={kmh:Math.round(Math.sqrt(pb.vx*pb.vx+pb.vy*pb.vy)*KMH_PER_SPEED),m:Math.round(Math.abs((goalSide==='left'?0:GW)-(pst.shotStartX===undefined?GW/2:pst.shotStartX))*METRES_PER_UNIT),at:performance.now()};var pclip=replayBufRef.current.slice();if(pclip.length>20){practClipRef.current={frames:pclip,goal:{f:pclip.length-1,side:goalSide==='left'?'right':'left',own:false},kmh:practGoalRef.current.kmh,m:practGoalRef.current.m};setPractClip('ready');}resetPosRef.current(false);return;}
+    if(practRef.current){var pb=gsRef.current.ball,pst=statsRef.current;practGoalRef.current={kmh:Math.round(Math.sqrt(pb.vx*pb.vx+pb.vy*pb.vy)*KMH_PER_SPEED),m:Math.round(Math.abs((goalSide==='left'?0:GW)-(pst.shotStartX===undefined?GW/2:pst.shotStartX))*METRES_PER_UNIT),at:performance.now()};var hsd=sideRef.current,pclip=replayBufRef.current.map(function(f){var o={left:f.left,right:f.right,ball:f.ball};o[hsd==='left'?'right':'left']=Object.assign({},f[hsd==='left'?'right':'left'],{x:-999,y:-999});return o;});if(pclip.length>20){practClipRef.current={frames:pclip,goal:{f:pclip.length-1,side:goalSide==='left'?'right':'left',own:false},kmh:practGoalRef.current.kmh,m:practGoalRef.current.m};setPractClip('ready');}resetPosRef.current(false);return;}
     if(goRef.current)return;
     if(pmRef.current==='training'&&trainingChallengeRef.current!=='aim'){completeTrainingAttempt(false);return;}
     var scoring=goalSide==='left'?'right':'left',st=statsRef.current;
@@ -3834,7 +3837,10 @@ function makePeerRoom(peer,role,code){
     return rpSave(saveMeta(kind,{left:matchNames.left,right:matchNames.right,score:kind==='match'&&endStats?[endStats.lG,endStats.rG]:null,title:kind==='goal'?'Goal · '+who:(matchNames.left+' vs '+matchNames.right)}),fr,gl);
   }
   function savePracticeGoal(){var c=practClipRef.current;if(!c||practClip!=='ready')return;setPractClip('saving');rpSave(saveMeta('practice',{title:'Practice goal · '+c.kmh+' km/h, '+c.m+' m',left:lastNm.current&&lastNm.current.left,right:lastNm.current&&lastNm.current.right}),c.frames,[c.goal]).then(function(){setPractClip('saved');},function(){setPractClip('ready');});}
-  function playSavedReplay(id){return rpGet(id).then(function(rec){if(!rec)throw new Error('missing');var m=rec.meta||{};setViewReplay({frames:rpUnpack(rec.data),goals:rec.goals||[],colors:m.colors||DC,names:{left:m.left||'Left',right:m.right||'Right'},theme:m.theme||themeMode,skins:m.skins?{left:achievementSkinDetails(m.skins.left),right:achievementSkinDetails(m.skins.right)}:null,title:m.title||'Replay'});});}
+  function playSavedReplay(id){return rpGet(id).then(function(rec){if(!rec)throw new Error('missing');var m=rec.meta||{},frs=rpUnpack(rec.data);
+    // practice clips saved before the fix still include the idle opponent: hide whichever slime stayed further from the ball
+    if(m.kind==='practice'&&frs.length){var dl=0,dr=0;frs.forEach(function(f){if(f.left.x<-500||f.right.x<-500)return;dl+=Math.abs(f.left.x-f.ball.x);dr+=Math.abs(f.right.x-f.ball.x);});if(dl||dr){var hide=dl>dr?'left':'right';frs.forEach(function(f){f[hide].x=-999;f[hide].y=-999;});}}
+    setViewReplay({frames:frs,goals:rec.goals||[],colors:m.colors||DC,names:{left:m.left||'Left',right:m.right||'Right'},theme:m.theme||themeMode,skins:m.skins?{left:achievementSkinDetails(m.skins.left),right:achievementSkinDetails(m.skins.right)}:null,title:m.title||'Replay'});});}
   function exitToMenu(){tutRef.current=null;setTut(null);clearTimeout(postRpRef.current);onlineCleanup();setNetMsg('');winRef.current=null;readyRef.current=null;setRunning(false);setWinner(null);setGmode(null);setIsPractice(false);practRef.current=false;setGoalFlash(false);goalFlashRef.current=false;frozenRef.current=false;setPaused(false);pausedRef.current=false;setOt(false);otRef.current=false;otReadyRef.current=false;goRef.current=false;flashRef.current=false;replayActiveRef.current=false;setReplayActive(false);replayBufRef.current=[];replayFrRef.current=[];matchRecRef.current=[];matchRecActiveRef.current=false;setMatchFrames([]);setShowMatchReplay(false);particlesRef.current=[];ballTrailRef.current=[];setScreen('menu');setPendDur('1min');}
   function restartGame(){startGame(lastGM.current,lastPM.current,lastCol.current,lastNm.current,lastSide.current,practModeRef.current,p1IdRef.current,p2IdRef.current,lastGameOptionsRef.current);}
   function toggleUnlimJump(){if(!practRef.current)return;setUnlimJump(function(p){unlimJumpRef.current=!p;return !p;});}
@@ -3854,7 +3860,7 @@ function makePeerRoom(peer,role,code){
       var warn='';
       if(other&&other.v&&other.v!==GAME_VERSION)warn='Version mismatch: you have '+GAME_VERSION+', your friend has '+other.v+'. Both of you refresh the page (Ctrl+F5) and try again.';
       else if(rm2&&rm2._oneWaySince&&nowW-rm2._oneWaySince>5000)warn=role==='host'?'Your friend reached this room but their messages aren’t getting through. Ask them to refresh and join again.':'The host can’t hear you yet. If this doesn’t clear in a few seconds, both refresh and try again (a browser privacy setting or ad blocker can also cause this).';
-      setOnl(function(o){return o.peerOn===on&&(o.warn||'')===warn?o:Object.assign({},o,{peerOn:on,warn:warn});});
+      var dg=netDiagText(rm2);setOnl(function(o){return o.peerOn===on&&(o.warn||'')===warn&&o.diag===dg?o:Object.assign({},o,{peerOn:on,warn:warn,diag:dg});});
       if(role==='guest'&&other&&other.st==='play'&&other.mid!==netMidRef.current){netMidRef.current=other.mid;startGame(other.dur||'2min','online',DC,{left:cleanName(other.n)||'Host',right:onlinePlayerName()||'You'},'right','regular',null,null,{scoreLimit:other.sl||0,overtime:other.ot!==false});}
     },250);
     return function(){clearInterval(id);};
@@ -4021,7 +4027,7 @@ function makePeerRoom(peer,role,code){
             liveStats.rallyFrames++;liveStats.fastestShot=Math.max(liveStats.fastestShot||0,ballSpeed);
             if(liveStats.saveCooldown>0)liveStats.saveCooldown--;
           }
-          if(practRef.current){if(kk['r']&&!kk['_rp'])resetPosRef.current(false);kk['_rp']=kk['r'];}
+          if(practRef.current){if(kk['r']&&!kk['_rp']){resetPosRef.current(false);practGoalRef.current=null;}kk['_rp']=kk['r'];}
           if(!gameOver){
             if(mode==='training'&&trainingChallengeRef.current==='aim'){
               var keeperLeft=hSide==='right',keeper=keeperLeft?ls:rs,keeperX=keeperLeft?GOALW+SR:GW-GOALW-SR;
@@ -4230,6 +4236,20 @@ function makePeerRoom(peer,role,code){
   var wrapStyle={zoom:uiZ,position:'relative',zIndex:1,display:'flex',flexDirection:'column',alignItems:'center',maxWidth:'100%'};
   function bgLayer(){return React.createElement(ThemeBg,{theme:themeMode});}
 
+  // Tutorial finished panel: same keyboard controls as the results screen.
+  useEffect(function(){
+    if(!(tut&&tut.done))return;
+    function btns(){var r=document.querySelector('[data-tutdone]');return r?Array.prototype.slice.call(r.querySelectorAll('button')):[];}
+    var t=setTimeout(function(){var b=btns();if(b[0])b[0].focus();},100);
+    function onKey(e){
+      var raw=e.key.toLowerCase(),b=btns();if(!b.length)return;var i=b.indexOf(document.activeElement);
+      if(raw==='arrowleft'||raw==='a'||raw==='arrowup'||raw==='w'){e.preventDefault();e.stopPropagation();b[(i<=0?b.length:i)-1].focus();}
+      else if(raw==='arrowright'||raw==='d'||raw==='arrowdown'||raw==='s'){e.preventDefault();e.stopPropagation();b[(i+1)%b.length].focus();}
+      else if(raw==='enter'||raw===' '){e.preventDefault();e.stopPropagation();(i>=0?b[i]:b[0]).click();}
+    }
+    window.addEventListener('keydown',onKey,true);
+    return function(){clearTimeout(t);window.removeEventListener('keydown',onKey,true);};
+  },[tut&&tut.done]);
   // Results screen: arrows / WASD move between the buttons, Enter / Space presses the highlighted one.
   useEffect(function(){
     if(!(screen==='game'&&winner&&endStats)||showMatchReplay)return;
@@ -4366,58 +4386,58 @@ function makePeerRoom(peer,role,code){
       oBody.push(React.createElement('button',{key:'done',onClick:finishOnlineStickerPicker,style:Object.assign(pill(btnPrimary,{width:220,flexShrink:0}),focusSty('sticker_done'))},'Done'));
     }else if(oV==='join'){
       oBody.push(React.createElement('div',{key:'t',style:oTxt},'Type the room code from your friend'));
+      // The code is kept as 4 fixed slots (blank = space) so clearing one box never shifts the others.
+      var slots=(onl.joinCode||'').split('').concat(['','','','']).slice(0,4).map(function(c){return c===' '?'':c;}),codeFull=/^[A-Z0-9]{4}$/.test(onl.joinCode||'');
+      function parseSlots(c){return (c||'').split('').concat(['','','','']).slice(0,4).map(function(x){return x===' '?'':x;});}
+      // always edit the latest code (fast typing can fire several changes before a re-render)
+      function editSlots(fn){setOnl(function(o){var a=parseSlots(o.joinCode);fn(a);return Object.assign({},o,{joinCode:a.map(function(c){return c||' ';}).join('').replace(/\s+$/,''),err:''});});}
+      function focusSlot(n){var el=joinInputRefs[n].current;if(el){el.focus();el.select();}setFocusIdx(n);setTimeout(function(){var e2=joinInputRefs[n].current;if(e2&&document.activeElement!==e2){e2.focus();e2.select();}},0);}
       oBody.push(React.createElement('div',{key:'codeinputs',style:{display:'flex',gap:10,justifyContent:'center',alignItems:'center'}},[0,1,2,3].map(function(idx){
-        var ch=(onl.joinCode||'').charAt(idx);
+        var ch=slots[idx];
         return React.createElement('input',{
           key:'code_'+idx,
           ref:joinInputRefs[idx],
           value:ch,
           autoFocus:idx===0,
-          maxLength:1,
+          maxLength:2,
           inputMode:'text',
           autoCapitalize:'characters',
           spellCheck:false,
           'aria-label':'Room code character '+(idx+1),
-          onFocus:function(){setFocusIdx(idx);},
+          onFocus:function(e){setFocusIdx(idx);e.target.select();},
           onChange:function(e){
             var raw=String(e.target.value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-            if(!raw)return;
-            var v=raw.charAt(raw.length-1),cur=(onl.joinCode||'').split('');
-            while(cur.length<4)cur.push('');
-            cur[idx]=v;
-            var code=cur.join('').slice(0,4);
-            setOnl(function(o){return Object.assign({},o,{joinCode:code,err:''});});
-            if(idx<3){setFocusIdx(idx+1);setTimeout(function(){var el=joinInputRefs[idx+1].current;if(el){el.focus();el.select();}},0);}
+            if(!raw){editSlots(function(a){a[idx]='';});return;}
+            // typed into a box that already had a letter: keep it and carry the new one to the next box
+            if(raw.length>=2&&idx<3){var keep=raw.charAt(0),nx=raw.charAt(raw.length-1);editSlots(function(a){a[idx]=keep;a[idx+1]=nx;});focusSlot(Math.min(3,idx+2));return;}
+            var v=raw.charAt(raw.length-1);editSlots(function(a){a[idx]=v;});
+            if(idx<3)focusSlot(idx+1);
           },
           onKeyDown:function(e){
             if(e.key!=='ArrowUp'&&e.key!=='ArrowDown'&&e.key!=='Escape')e.stopPropagation();
-            if(e.key==='Enter'){if((onl.joinCode||'').length===4)openRoom('g',onl.joinCode);return;}
-            if(e.key==='Backspace'&&!ch&&idx>0){
-              var cur=(onl.joinCode||'').split('');while(cur.length<4)cur.push('');cur[idx-1]='';
-              var code=cur.join('').replace(/\s+$/g,'');
-              setOnl(function(o){return Object.assign({},o,{joinCode:code,err:''});});
-              setFocusIdx(idx-1);setTimeout(function(){var el=joinInputRefs[idx-1].current;if(el){el.focus();el.select();}},0);
-            }else if(e.key==='ArrowLeft'&&idx>0){setFocusIdx(idx-1);var l=joinInputRefs[idx-1].current;if(l)l.focus();}
-            else if(e.key==='ArrowRight'&&idx<3){setFocusIdx(idx+1);var r=joinInputRefs[idx+1].current;if(r)r.focus();}
+            if(e.key==='Enter'){if(codeFull)openRoom('g',onl.joinCode);return;}
+            if(e.key==='Backspace'||e.key==='Delete'){
+              e.preventDefault();
+              if(e.target.value){editSlots(function(a){a[idx]='';});}
+              else if(e.key==='Backspace'&&idx>0){editSlots(function(a){a[idx-1]='';});focusSlot(idx-1);}
+            }else if(e.key==='ArrowLeft'&&idx>0){focusSlot(idx-1);}
+            else if(e.key==='ArrowRight'&&idx<3){focusSlot(idx+1);}
           },
           onPaste:function(e){
             e.preventDefault();
             var raw=(e.clipboardData||window.clipboardData).getData('text').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);
             if(!raw)return;
-            var cur=(onl.joinCode||'').split('');while(cur.length<4)cur.push('');
-            for(var pi=0;pi<raw.length&&idx+pi<4;pi++)cur[idx+pi]=raw.charAt(pi);
-            var code=cur.join('').slice(0,4);
-            setOnl(function(o){return Object.assign({},o,{joinCode:code,err:''});});
-            var ni=Math.min(3,idx+raw.length);setFocusIdx(ni);setTimeout(function(){var el=joinInputRefs[ni].current;if(el){el.focus();el.select();}},0);
+            editSlots(function(a){for(var pi=0;pi<raw.length&&idx+pi<4;pi++)a[idx+pi]=raw.charAt(pi);});focusSlot(Math.min(3,idx+raw.length));
           },
           style:Object.assign({fontFamily:DISP,fontSize:34,fontWeight:900,textAlign:'center',width:52,height:60,padding:'0',borderRadius:14,border:'2px solid rgba(255,255,255,0.3)',background:'rgba(0,0,0,0.35)',color:'#fff',outline:'none',boxSizing:'border-box'},focusSty('online_code'+idx))
         });
       })));
-      oBody.push(React.createElement('button',{key:'go',onClick:function(){if((onl.joinCode||'').length===4)openRoom('g',onl.joinCode);},style:Object.assign(pill(btnPrimary,{width:240,opacity:(onl.joinCode||'').length===4?1:0.5}),focusSty('online_submit'))},'Join'));
+      oBody.push(React.createElement('button',{key:'go',onClick:function(){if(codeFull)openRoom('g',onl.joinCode);},style:Object.assign(pill(btnPrimary,{width:240,opacity:codeFull?1:0.5}),focusSty('online_submit'))},'Join'));
     }else if(oV==='host'){
       oBody.push(React.createElement('div',{key:'l',style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Room code'));
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:56,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.peerOn?'Your friend is in! Pick a length and start.':(onl.status==='Connected'?'Waiting for your friend to join…':onl.status)));
+      if(onl.diag)oBody.push(React.createElement('div',{key:'dg',style:{fontSize:10,color:'rgba(255,255,255,0.4)',maxWidth:340,textAlign:'center',margin:'6px auto 0',fontFamily:'monospace',wordBreak:'break-word'}},onl.diag));
       if(onl.warn)oBody.push(React.createElement('div',{key:'w',role:'alert',style:{fontSize:12,color:'#fde68a',maxWidth:320,textAlign:'center',lineHeight:1.4,margin:'4px auto 0'}},onl.warn));
       if(onl.peerOn){
         oBody.push(React.createElement('div',{key:'d',style:{display:'flex',gap:8}},['1min','2min','4min'].map(function(dv){var navId='online_dur'+dv.replace('min','');return React.createElement('button',{key:dv,onClick:function(){setOnl(function(o){return Object.assign({},o,{dur:dv});});},style:Object.assign(hudChip(false,{padding:'6px 14px',fontSize:12,background:onl.dur===dv?btnPrimary:'rgba(255,255,255,0.12)'}),focusSty(navId))},dv.replace('min',' min'));})));
@@ -4432,6 +4452,7 @@ function makePeerRoom(peer,role,code){
     }else{
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:44,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.status!=='Connected'?onl.status:(onl.peerOn?'Connected! Waiting for the host to start the match…':'Connected. Looking for the host…')));
+      if(onl.diag)oBody.push(React.createElement('div',{key:'dg',style:{fontSize:10,color:'rgba(255,255,255,0.4)',maxWidth:340,textAlign:'center',margin:'6px auto 0',fontFamily:'monospace',wordBreak:'break-word'}},onl.diag));
       if(onl.warn)oBody.push(React.createElement('div',{key:'w',role:'alert',style:{fontSize:12,color:'#fde68a',maxWidth:320,textAlign:'center',lineHeight:1.4,margin:'4px auto 0'}},onl.warn));
     }
     if(onl.err)oBody.push(React.createElement('div',{key:'e',style:{color:'#fecaca',fontSize:12,textAlign:'center',maxWidth:300,lineHeight:1.45,background:'rgba(239,68,68,0.18)',border:'1px solid rgba(248,113,113,0.4)',borderRadius:12,padding:'8px 12px'}},onl.err));
@@ -4720,7 +4741,7 @@ function makePeerRoom(peer,role,code){
       var K=touchUI?{l:'◀',r:'▶',j:'JUMP',d:'DASH'}:{l:keyLabel(kb.left),r:keyLabel(kb.right),j:keyLabel(kb.jump),d:keyLabel(kb.dash)};
       var st=TUT_STEPS[tut.step];
       var box={position:'fixed',left:'50%',top:touchUI?'calc(env(safe-area-inset-top,0px) + 8px)':undefined,bottom:touchUI?undefined:'calc(env(safe-area-inset-bottom,0px) + 12px)',transform:'translateX(-50%)',zIndex:70,width:touchUI?'min(380px,62vw)':'min(440px,92vw)',boxSizing:'border-box',padding:touchUI?'8px 12px':'12px 16px',borderRadius:16,background:'rgba(5,12,35,0.93)',border:'1px solid rgba(251,191,36,0.55)',boxShadow:'0 12px 36px rgba(0,0,0,0.5)',textAlign:'center',color:'#fff'};
-      if(tut.done)return React.createElement('div',{role:'dialog','aria-label':'Tutorial complete',style:Object.assign({},box,{top:'50%',bottom:'auto',transform:'translate(-50%,-50%)',padding:'22px 22px 18px',width:'min(380px,92vw)'})},
+      if(tut.done)return React.createElement('div',{role:'dialog','data-tutdone':true,'aria-label':'Tutorial complete',style:Object.assign({},box,{top:'50%',bottom:'auto',transform:'translate(-50%,-50%)',padding:'22px 22px 18px',width:'min(380px,92vw)'})},
         React.createElement('div',{style:{fontSize:34}},'🏆'),
         React.createElement('div',{style:{fontFamily:DISP,fontSize:26,margin:'4px 0 6px'}},'Tutorial complete!'),
         React.createElement('div',{style:{fontSize:13,color:'rgba(255,255,255,0.78)',marginBottom:14,lineHeight:1.45}},'You know every move. Try them against the AI, or keep practising here.'),
@@ -4745,7 +4766,7 @@ function makePeerRoom(peer,role,code){
       function tb(label,onClick,active,danger){var icon=landscape&&ICONS[label];return React.createElement('button',{key:label,type:'button','aria-label':label,title:label,onClick:onClick,'aria-pressed':active===undefined?undefined:!!active,style:{minWidth:bs,height:bs,padding:icon?0:'0 14px',width:icon?bs:undefined,borderRadius:bs/2,border:'1px solid '+(danger?'rgba(248,113,113,0.6)':'rgba(255,255,255,0.4)'),background:danger?'rgba(239,68,68,0.3)':active?btnPrimary:'rgba(5,12,35,0.7)',color:danger?'#fecaca':'#fff',fontFamily:DISP,fontSize:14,letterSpacing:'0.03em',boxShadow:'0 4px 12px rgba(0,0,0,0.35)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)'}},icon||label);}
       var btns=isPractice
         ?[tb('Switch side',function(){var ns=sideRef.current==='right'?'left':'right';setSide(ns);sideRef.current=ns;achievementSideRef.current=ns;setActiveSide(ns);resetPosRef.current(false);}),
-          tb('Reset',function(){resetPosRef.current(false);})]
+          tb('Reset',function(){resetPosRef.current(false);practGoalRef.current=null;})]
           .concat([['regular','Regular'],['air','Air'],['ground','Ground']].map(function(item){return tb(item[1],function(){setPractMode(item[0]);practModeRef.current=item[0];resetPosRef.current(false);},practMode===item[0]);}))
           .concat(practClip?[tb(practClip==='saved'?'Saved ✓':'Save goal',savePracticeGoal,practClip==='saved')]:[])
           .concat([tb('∞ Jump',toggleUnlimJump,unlimJump),tb('Exit',exitToMenu,undefined,true)])
