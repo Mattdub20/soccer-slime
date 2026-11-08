@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.8.8';
+var GAME_VERSION='v24.8.9';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -2869,7 +2869,15 @@ function App(){
     }
     return {debug:1,secure:true,config:{iceServers:ice,sdpSemantics:'unified-plan'}};
   }
-  function makePeerRoom(peer,role,code){
+  // Some browsers never flag a PeerJS connection as "open" even though its data channel works (messages arrive fine).
+// So check the channel itself, and send through it directly when PeerJS thinks it's still closed.
+function connIsOpen(c){return !!c&&(c.open||(c.dataChannel&&c.dataChannel.readyState==='open'));}
+function connSend(c,msg){
+  if(!c)return false;
+  try{if(c.open){c.send(msg);return true;}var dc=c.dataChannel;if(dc&&dc.readyState==='open'){dc.send(JSON.stringify(msg));return true;}}catch(e){}
+  return false;
+}
+function makePeerRoom(peer,role,code){
     var room={peer:peer,role:role,code:code,conn:null,remotePresence:null,localPresence:{},closed:false};
     room.peers=function(){
       return room.closed||!room.remotePresence?[]:[{isMe:false,presence:room.remotePresence}];
@@ -2878,21 +2886,21 @@ function App(){
       if(room.closed)return;
       if(patch&&typeof patch==='object')Object.assign(room.localPresence,patch);
       var msg={t:'presence',p:patch||{}};
-      if(room.conn&&room.conn.open){try{room.conn.send(msg);}catch(e){}}
+      connSend(room.conn,msg);
     };
     room.sendLocalPresence=function(){
-      if(room.conn&&room.conn.open){try{room.conn.send({t:'presence',p:room.localPresence});}catch(e){}}
+      connSend(room.conn,{t:'presence',p:room.localPresence});
     };
     // Game data uses an unreliable channel, so a single "who I am" message can get lost (more often through
     // the relay on school/work Wi-Fi). Re-send our full presence every second so the other side always catches up.
     room._presenceBeat=setInterval(function(){if(room.closed){clearInterval(room._presenceBeat);return;}room.sendLocalPresence();},1000);
     room.sendChat=function(message){
-      if(room.closed||!room.conn||!room.conn.open)return false;
-      try{room.conn.send({t:'chat',p:message});return true;}catch(e){return false;}
+      if(room.closed)return false;
+      return connSend(room.conn,{t:'chat',p:message});
     };
     room.sendReplayChunk=function(chunk){
-      if(room.closed||!room.conn||!room.conn.open)return false;
-      try{room.conn.send({t:'replay',p:chunk});return true;}catch(e){return false;}
+      if(room.closed)return false;
+      return connSend(room.conn,{t:'replay',p:chunk});
     };
     room.attach=function(conn){
       if(room.closed)return;
@@ -2925,13 +2933,17 @@ function App(){
         function report(){if(room._onIce)room._onIce(pc.iceConnectionState);}
         pc.addEventListener('iceconnectionstatechange',report);report();
       },100);
-      conn.on('open',function(){
+      var openedOnce=false;
+      var dcWatch=setInterval(function(){if(room.closed||openedOnce){clearInterval(dcWatch);return;}var dc=conn.dataChannel;if(dc&&dc.readyState==='open'){clearInterval(dcWatch);if(!openedOnce)onOpen();}},250);
+      conn.on('open',function(){onOpen();});
+      function onOpen(){
+        if(openedOnce)return;openedOnce=true;
         room.remotePresence=room.remotePresence||{};
         room.sendLocalPresence();
         var pc=conn.peerConnection;
         if(pc&&pc.getStats)pc.getStats().then(function(st){var route='direct';st.forEach(function(r){if(r.type==='candidate-pair'&&r.state==='succeeded'&&r.nominated){var lc=st.get(r.localCandidateId),rc=st.get(r.remoteCandidateId);if((lc&&lc.candidateType==='relay')||(rc&&rc.candidateType==='relay'))route='relay';}});room.route=route;if(room._onRoute)room._onRoute(route);}).catch(function(){});
         if(room._onOpen)room._onOpen();
-      });
+      }
       conn.on('close',function(){
         if(room.conn===conn){
           room.conn=null;room.remotePresence=null;
@@ -3837,7 +3849,7 @@ function App(){
       if(!roomRef.current)return;
       var role=onRoleRef.current,other=netFind(role==='host'?'g':'h'),on=!!other,rm2=roomRef.current.room,nowW=performance.now();
       if(role==='host'&&rm2&&(rm2.localPresence||{}).seen!==(on?1:0))rm2.presence({seen:on?1:0});
-      var linkOpen=!!(rm2&&rm2.conn&&rm2.conn.open);
+      var linkOpen=!!(rm2&&connIsOpen(rm2.conn));
       if(!linkOpen||(role==='host'?on:(other&&other.seen)))rm2._oneWaySince=0;else if(!rm2._oneWaySince)rm2._oneWaySince=nowW;
       var warn='';
       if(other&&other.v&&other.v!==GAME_VERSION)warn='Version mismatch: you have '+GAME_VERSION+', your friend has '+other.v+'. Both of you refresh the page (Ctrl+F5) and try again.';
