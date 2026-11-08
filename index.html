@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.8.5: NEW UPDATE COMING SUNDAY';
+var GAME_VERSION='v24.8.7';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -1994,7 +1994,7 @@ function rpDelete(id,keepIndex){if(!keepIndex)rpSetIndex(rpIndex().filter(functi
 function rpResumeFrames(frames,goals){return goals.map(function(g){for(var i=g.f+2;i<frames.length&&i<g.f+900;i++){var a=frames[i-1].ball,b=frames[i].ball;if(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)>100)return i;}return -1;});}
 function MatchReplayScreen(props){
   var frames=props.frames,colors=props.colors,names=props.names,onBack=props.onBack,theme=props.theme||'night',skins=props.skins||null;
-  var cvRef=useRef(null),posRef=useRef(0),playingRef=useRef(true),speedRef=useRef(1),dragRef=useRef(false);
+  var endedRef=useRef(false),cvRef=useRef(null),posRef=useRef(0),playingRef=useRef(true),speedRef=useRef(1),dragRef=useRef(false);
   var s_t=useState(0),shownPos=s_t[0],setShownPos=s_t[1];
   var s_p=useState(true),playing=s_p[0],setPlaying=s_p[1];
   var s_s=useState(1),speed=s_s[0],setSpeed=s_s[1];
@@ -2049,9 +2049,9 @@ function MatchReplayScreen(props){
       if(!alive)return;
       var dt=prev?Math.min(100,now-prev):16.7;prev=now;
       if(playingRef.current&&!dragRef.current){
-        posRef.current=Math.min(last,posRef.current+dt/(1000/REPLAY_FPS)*speedRef.current);
-        // jump over the pause between a goal and the restart
-        for(var gi=0;gi<evRef.current.length;gi++){var gf=evRef.current[gi].f,rs=resumeRef.current[gi];if(rs>0&&posRef.current>gf+75&&posRef.current<rs){posRef.current=rs;break;}}
+        var before=posRef.current;posRef.current=Math.min(last,posRef.current+dt/(1000/REPLAY_FPS)*speedRef.current);
+        // jump over the pause between a goal and the restart, only when playback runs into it (not when you drag into it)
+        for(var gi=0;gi<evRef.current.length;gi++){var gf=evRef.current[gi].f,rs=resumeRef.current[gi];if(rs>0&&before<=gf+75&&posRef.current>gf+75&&posRef.current<rs){posRef.current=rs;break;}}
         if(posRef.current>=last){playingRef.current=false;setPlaying(false);}
       }
       var cv=cvRef.current;
@@ -2073,7 +2073,7 @@ function MatchReplayScreen(props){
     return function(){alive=false;cancelAnimationFrame(raf);};
   },[frames,colors,theme]);
   function fmt(sv){sv=Math.floor(sv);var m=Math.floor(sv/60),sec=sv%60;return(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;}
-  function scrubTo(e){var r=e.currentTarget.getBoundingClientRect();setPos((e.clientX-r.left)/r.width*last);}
+  function scrubTo(e){var r=e.currentTarget.getBoundingClientRect(),w=Math.max(1,r.width-20);setPos(Math.max(0,Math.min(1,(e.clientX-r.left-10)/w))*last);}
   var btn=function(active){return{padding:'7px 14px',minHeight:34,background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,'+(active?'0.6':'0.2')+')',borderRadius:50,color:'#fff',fontWeight:800,cursor:'pointer',fontSize:12};};
   // Draw at the size the replay is actually shown (it fills the screen), so it stays sharp when big.
   var shownW=Math.min(window.innerWidth*0.96,Math.max(Math.min(window.innerWidth*0.96,320),(window.innerHeight-230)*2));
@@ -2088,9 +2088,9 @@ function MatchReplayScreen(props){
     React.createElement('canvas',{ref:cvRef,width:Math.round(GW*dpr),height:Math.round(GH*dpr),onClick:function(){setPlay(!playingRef.current);},style:{display:'block',width:'100%',aspectRatio:GW+'/'+GH,cursor:'pointer',border:'1px solid rgba(255,255,255,0.08)',borderTop:'none',boxSizing:'border-box',background:'#000'}}),
     // Timeline: drag to scrub; gold ticks mark goals.
     React.createElement('div',{role:'slider','aria-label':'Replay position','aria-valuemin':0,'aria-valuemax':Math.round(last/REPLAY_FPS),'aria-valuenow':Math.round(shownPos/REPLAY_FPS),tabIndex:0,
-      onPointerDown:function(e){dragRef.current=true;try{e.currentTarget.setPointerCapture(e.pointerId);}catch(err){}scrubTo(e);},
+      onPointerDown:function(e){endedRef.current=!playingRef.current&&posRef.current>=last-1;dragRef.current=true;try{e.currentTarget.setPointerCapture(e.pointerId);}catch(err){}scrubTo(e);},
       onPointerMove:function(e){if(dragRef.current)scrubTo(e);},
-      onPointerUp:function(){dragRef.current=false;},onPointerCancel:function(){dragRef.current=false;},
+      onPointerUp:function(){dragRef.current=false;if(!playingRef.current&&posRef.current<last-1&&endedRef.current)setPlay(true);endedRef.current=false;},onPointerCancel:function(){dragRef.current=false;},
       style:{position:'relative',width:'100%',height:28,background:'rgba(5,12,35,0.92)',cursor:'pointer',touchAction:'none'}},
       React.createElement('div',{style:{position:'absolute',left:10,right:10,top:11,height:6,borderRadius:3,background:'rgba(255,255,255,0.15)'}},
         React.createElement('div',{style:{width:(last?shownPos/last*100:0)+'%',height:'100%',borderRadius:3,background:'#38bdf8'}}),
