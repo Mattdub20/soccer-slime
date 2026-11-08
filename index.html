@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.9.2';
+var GAME_VERSION='v24.9.3';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -214,7 +214,10 @@ function cleanGameSettings(value){
     soundEnabled:typeof value.soundEnabled==='boolean'?value.soundEnabled:true,
     perfMode:['auto','on','off'].indexOf(value.perfMode)>=0?value.perfMode:'auto',
     sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
-    uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,value.uiScale)):1
+    uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,value.uiScale)):1,
+    // chances (0–1) of the rare hard-hit gags; defaults are 0.0001% and 0.00001%
+    rareFire:typeof value.rareFire==='number'&&isFinite(value.rareFire)?Math.max(0,Math.min(1,value.rareFire)):0.000001,
+    rareBoom:typeof value.rareBoom==='number'&&isFinite(value.rareBoom)?Math.max(0,Math.min(1,value.rareBoom)):0.0000001
   };
 }
 function loadGameSettings(){
@@ -482,7 +485,7 @@ function tsMillis(v){return v&&v.toMillis?v.toMillis():typeof v==='number'?v:0;}
 function lastOnlineText(ts){var t=tsMillis(ts);if(!t)return 'Offline';var m=Math.floor((Date.now()-t)/60000);if(m<1)return 'Last online just now';if(m<60)return 'Last online '+m+'m ago';var h=Math.floor(m/60);if(h<24)return 'Last online '+h+'h ago';var d=Math.floor(h/24);return 'Last online '+(d===1?'yesterday':d<30?d+' days ago':'over a month ago');}
 function cloudIsOnline(p){return !!p&&Date.now()-tsMillis(p.lastSeen)<ONLINE_WINDOW_MS;}
 function cloudPublicProfile(){
-  var a=loadAchievementProgress(),acct=loadAccountProfile(),p={username:cloudUsernameOf(CLOUD.user),name:acct.name||'',skin:acct.avatar.skin||'none',color:acct.avatar.kind==='slime'?acct.avatar.color:'#e8192c',lastSeen:firebase.firestore.FieldValue.serverTimestamp()};
+  var a=loadAchievementProgress(),acct=loadAccountProfile(),p={username:cloudUsernameOf(CLOUD.user),name:acct.name||'',skin:(acct.avatar.pfpSkin&&acct.avatar.pfpSkin!=='same'?acct.avatar.pfpSkin:acct.avatar.skin)||'none',color:acct.avatar.kind==='slime'?acct.avatar.color:'#e8192c',lastSeen:firebase.firestore.FieldValue.serverTimestamp()};
   LEADERBOARD_FIELDS.forEach(function(f){p[f[0]]=a[f[0]]||0;});
   return p;
 }
@@ -2247,7 +2250,8 @@ function cleanAccountAvatar(value){
   var theme=value&&['day','night','japan'].indexOf(value.theme)>=0?value.theme:'night';
   var frame=value&&value.frame==='none'?'none':achievementFrameDetails(value&&value.frame)?value.frame:'none';
   var skin=value&&value.skin==='none'?'none':achievementSkinDetails(value&&value.skin)?value.skin:'none';
-  var extra={};COSMETIC_KINDS.forEach(function(k){extra[k]=value&&cosmeticDetails(k,value[k])?value[k]:'none';});
+  var pfpSkin=value&&value.pfpSkin==='none'?'none':value&&achievementSkinDetails(value.pfpSkin)?value.pfpSkin:'same';
+  var extra={pfpSkin:pfpSkin};COSMETIC_KINDS.forEach(function(k){extra[k]=value&&cosmeticDetails(k,value[k])?value[k]:'none';});
   if(value&&value.kind==='photo'&&typeof value.image==='string'&&value.image.indexOf('data:image/jpeg;base64,')===0&&value.image.length<=180000)return Object.assign({kind:'photo',image:value.image,theme:theme,frame:frame,skin:skin},extra);
   return Object.assign({kind:'slime',color:value?normHex(value.color):'#e8192c',theme:theme,frame:frame,skin:skin},extra);
 }
@@ -2260,7 +2264,7 @@ function loadAccountProfile(){
 }
 function ProfileAvatar(props){
   var profile=cleanAccountAvatar(props.profile),size=props.size||44,canvasRef=useRef(null);
-  var frame=achievementFrameDetails(profile.frame),skin=achievementSkinDetails(profile.skin);
+  var pSkinId=profile.pfpSkin&&profile.pfpSkin!=='same'?profile.pfpSkin:profile.skin,frame=achievementFrameDetails(profile.frame),skin=achievementSkinDetails(pSkinId);
   useEffect(function(){
     if(profile.kind!=='slime'||!canvasRef.current)return;
     var canvas=canvasRef.current,ctx=canvas.getContext('2d'),scale=2;
@@ -2274,7 +2278,7 @@ function ProfileAvatar(props){
     ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(size*0.18,size*0.82,size*0.16,size*0.18);ctx.fillRect(size*0.66,size*0.82,size*0.16,size*0.18);
     miniSlime(ctx,size/2,size*0.79,size*0.4,profile.color,accent,true,false,skin);
     ctx.restore();
-  },[profile.kind,profile.color,profile.skin,size]);
+  },[profile.kind,profile.color,pSkinId,size]);
   return React.createElement('div',{role:'img','aria-label':(profile.kind==='photo'?'Player avatar photo':'Player slime avatar')+(frame?' with '+frame.name+' frame':''),style:{position:'relative',width:size,height:size,flex:'0 0 auto',borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',background:THEME_BG[profile.theme],border:(frame?3:2)+'px solid '+(frame?frame.color:'rgba(255,255,255,0.82)'),boxShadow:frame?'0 0 11px '+frame.color+',0 2px 9px rgba(0,0,0,0.35)':'0 2px 9px rgba(0,0,0,0.35)',boxSizing:'border-box'}},
     profile.kind==='photo'?React.createElement('img',{src:profile.image,alt:'',style:{width:'100%',height:'100%',objectFit:'cover',display:'block'}}):
       React.createElement('canvas',{ref:canvasRef,'aria-hidden':'true',style:{display:'block',width:'100%',height:'100%'}}));
@@ -2514,6 +2518,15 @@ function AccountScreen(props){
               React.createElement(ProfileAvatar,{profile:{kind:'slime',color:avatar.color||'#e8192c',theme:avatar.theme||'night',frame:'none',skin:skin.id},size:30}),skin.name);
           })),
         unlockedSkins.length===0&&React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.64)',textAlign:'center',marginTop:6}},'Earn long-term achievements to unlock in-game slime designs.')),
+      avatar.kind!=='photo'&&React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)'}},
+        React.createElement('div',{style:{fontSize:12,fontWeight:800,marginBottom:8}},'Profile picture skin'),
+        React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.64)',textAlign:'center',marginBottom:8}},'Show a different skin on your profile picture than the one you play with.'),
+        React.createElement('div',{style:{display:'flex',justifyContent:'center',gap:8,flexWrap:'wrap'}},
+          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(skin){return unlockedSkins.indexOf(skin.id)>=0;})).map(function(skin){
+            var selected=(avatar.pfpSkin||'same')===skin.id,shown=skin.id==='same'?(avatar.skin||'none'):skin.id;
+            return React.createElement('button',{key:'pfp-'+skin.id,type:'button',onClick:function(){updateAvatar({pfpSkin:skin.id});},'aria-pressed':selected,style:{display:'flex',alignItems:'center',gap:6,padding:'6px 9px',borderRadius:20,border:selected?'2px solid #fff':'1px solid rgba(255,255,255,0.24)',background:selected?'rgba(56,189,248,0.25)':'rgba(255,255,255,0.08)',color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer'}},
+              React.createElement(ProfileAvatar,{profile:{kind:'slime',color:avatar.color||'#e8192c',theme:avatar.theme||'night',frame:'none',skin:shown},size:30}),skin.name);
+          }))),
       React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',gap:10}},
         React.createElement('div',{style:{fontSize:12,fontWeight:800}},'Celebrations, trails & poses'),
         COSMETIC_KINDS.map(function(kind){
@@ -2653,6 +2666,20 @@ function SettingsScreen(props){
       return React.createElement('button',{key:o[0],type:'button','data-nav-row':4,'aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
     }))),
     slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});},5),
+    // Rare events: type any chance from 0% to 100% (applies to really hard hits)
+    React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
+      React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Rare events'),
+      React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)'}},'Chance per really hard hit. Type anything from 0 to 100%.'),
+      [['rareFire','🔥 Spontaneous combustion',6,0.0001],['rareBoom','💥 Sound barrier goal',7,0.00001]].map(function(r){
+        var pct=+(settings[r[0]]*100).toPrecision(6);
+        return React.createElement('label',{key:r[0],style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,fontSize:13,fontWeight:800}},r[1],
+          React.createElement('span',{style:{display:'flex',alignItems:'center',gap:6}},
+            React.createElement('input',{type:'number','data-nav-row':r[2],min:0,max:100,step:'any',defaultValue:pct,key:r[0]+pct,'aria-label':r[1]+' chance in percent',
+              onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')e.target.blur();},
+              onBlur:function(e){var v=parseFloat(e.target.value);if(!isFinite(v))v=r[3];v=Math.max(0,Math.min(100,v));var o={};o[r[0]]=v/100;props.onChange(o);},
+              style:{width:110,padding:'6px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:13,textAlign:'right'}}),'%',
+            React.createElement('button',{type:'button',title:'Back to default','aria-label':'Reset '+r[1]+' chance',onClick:function(){var o={};o[r[0]]=r[3]/100;props.onChange(o);},style:{padding:'4px 8px',borderRadius:50,border:'1px solid rgba(255,255,255,0.25)',background:'transparent',color:'rgba(255,255,255,0.7)',fontSize:11,cursor:'pointer'}},'↺')));
+      })),
       React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
         React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}},
           React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Controls'),
@@ -2872,6 +2899,7 @@ function App(){
   // Some browsers never flag a PeerJS connection as "open" even though its data channel works (messages arrive fine).
 // So check the channel itself, and send through it directly when PeerJS thinks it's still closed.
 function connIsOpen(c){return !!c&&(c.open||(c.dataChannel&&c.dataChannel.readyState==='open'));}
+var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
 function connSend(c,msg){
   if(!c){NET_DIAG.fail++;return false;}
@@ -3176,6 +3204,7 @@ function makePeerRoom(peer,role,code){
 
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
+  RARE_P.fire=gameSettings.rareFire;RARE_P.boom=gameSettings.rareBoom;
   GAME_AUDIO_VOLUME=gameSettings.sfxVolume;applyKeybinds(gameSettings.keybinds);
   updatePerf(gameSettings.perfMode);
   var s_settingsErr=useState(''),settingsSaveError=s_settingsErr[0],setSettingsSaveError=s_settingsErr[1];
@@ -4116,6 +4145,13 @@ function makePeerRoom(peer,role,code){
                   if(mem.land!=null)home2=home2*0.6+mem.land*0.4;
                   newT=newT*0.35+home2*0.65;spd2=runSpd;
                 }
+                // Dashes, like Hard but timed off the predicted contact.
+                var tw=aiLeft?1:-1,dxB=(b.x-ai.x)*tw,dyB=ai.y-b.y,inAir=ai.y<GH-GRND-2,danger=onOurs&&incoming&&!best;
+                // Air spin dash: in the air with the ball just ahead on the attacking side -> tilt, then fire forward into it.
+                if(inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&dxB>8&&dxB<125&&dyB>-30&&dyB<115){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}
+                if(ai.spinPhase===1&&((dxB>-12&&dxB<70&&Math.abs(dyB)<85)||dxB>170||dxB<-40)){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}
+                // Ground dash: low ball just ahead on the attacking side -> burst through it.
+                if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&GH-GRND-b.y<45&&dxB>18&&dxB<105&&Math.abs(b.vx)<9){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}
               })();
               newT=isImp&&!aiLeft?Math.max(GW/2-50,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+50:GW-SR,newT));if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
@@ -4158,12 +4194,12 @@ function makePeerRoom(peer,role,code){
           var bsp=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy),prevB=gsRef.current._prevBsp||0;gsRef.current._prevBsp=bsp;
           if(!gameOver&&!replayActiveRef.current&&lastTouchRef.current&&(RARE_TEST?bsp-prevB>1:bsp>MAXBS*0.7&&bsp-prevB>MAXBS*0.25)){
             var rr=Math.random(),hitter=lastTouchRef.current==='left'?ls:rs;
-            if(rr<1e-7||RARE_TEST==='boom'){RARE_TEST='';
+            if(rr<RARE_P.boom||RARE_TEST==='boom'){RARE_TEST='';
               for(var sbi=0;sbi<60;sbi++){var sba=sbi/60*Math.PI*2;particlesRef.current.push(mkP(ball.x,ball.y,Math.cos(sba)*9,Math.sin(sba)*9,'rgba(255,255,255,0.9)',30,4));}
               shakeRef.current=Math.max(shakeRef.current,22);rareMsgRef.current={text:'SOUND BARRIER BROKEN',t:150,col:'#7dd3fc'};if(soundEnabledRef.current){playGameSound('kick');playGameSound('goal');}
               if(mode!=='practice'&&mode!=='training'){ball.x=lastTouchRef.current==='left'?GW-BR:BR;ball.y=GH-GRND-30;scoreGoalRef.current(lastTouchRef.current==='left'?'right':'left');}
               else{ball.vx=Math.sign(ball.vx||1)*MAXBS*1.6;}
-            }else if(rr<1.1e-6||RARE_TEST==='fire'){RARE_TEST='';
+            }else if(rr<RARE_P.boom+RARE_P.fire||RARE_TEST==='fire'){RARE_TEST='';
               hitter._burnT=260;rareMsgRef.current={text:'SPONTANEOUS COMBUSTION',t:170,col:'#fb923c'};shakeRef.current=Math.max(shakeRef.current,10);
               for(var fbi=0;fbi<70;fbi++)particlesRef.current.push(mkP(hitter.x+(Math.random()-0.5)*SR*2,hitter.y-Math.random()*SR,(Math.random()-0.5)*6,-2-Math.random()*6,['#fbbf24','#f97316','#ef4444','#fde68a'][fbi%4],30+Math.random()*30,3+Math.random()*4));
               if(soundEnabledRef.current)playGameSound('dash');
