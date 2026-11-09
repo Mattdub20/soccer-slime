@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.9.3';
+var GAME_VERSION='v24.9.5';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -2550,6 +2550,16 @@ function AccountScreen(props){
         React.createElement('button',{onClick:save,style:{padding:'11px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.6)',background:'linear-gradient(135deg,#059669,#047857)',color:'#fff',fontWeight:900,fontSize:14,letterSpacing:'0.05em',cursor:'pointer',boxShadow:'0 5px 18px rgba(5,150,105,0.38)'}},'Save account'),
         React.createElement('button',{onClick:props.onBack,style:{padding:'10px 22px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Cancel'))));
 }
+// Percent box that saves on every keystroke (so closing Settings straight after typing still keeps the value).
+function RareChanceInput(props){
+  var s_t=useState(String(props.pct)),text=s_t[0],setText=s_t[1];
+  useEffect(function(){if(parseFloat(text)!==props.pct)setText(String(props.pct));},[props.pct]);
+  return React.createElement('input',{type:'number','data-nav-row':props.row,min:0,max:100,step:'any',value:text,'aria-label':props.label+' chance in percent',
+    onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')e.target.blur();},
+    onChange:function(e){var t=e.target.value;setText(t);var v=parseFloat(t);if(isFinite(v))props.onSave(Math.max(0,Math.min(100,v)));},
+    onBlur:function(){var v=parseFloat(text);if(!isFinite(v)||v<0||v>100)setText(String(props.pct));},
+    style:props.style});
+}
 function SettingsScreen(props){
   var panelRef=useRef(null),settings=props.settings;
   var resetHoldRef=useRef(null),resetStartedRef=useRef(0),resetDoneRef=useRef(false);
@@ -2674,9 +2684,7 @@ function SettingsScreen(props){
         var pct=+(settings[r[0]]*100).toPrecision(6);
         return React.createElement('label',{key:r[0],style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,fontSize:13,fontWeight:800}},r[1],
           React.createElement('span',{style:{display:'flex',alignItems:'center',gap:6}},
-            React.createElement('input',{type:'number','data-nav-row':r[2],min:0,max:100,step:'any',defaultValue:pct,key:r[0]+pct,'aria-label':r[1]+' chance in percent',
-              onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')e.target.blur();},
-              onBlur:function(e){var v=parseFloat(e.target.value);if(!isFinite(v))v=r[3];v=Math.max(0,Math.min(100,v));var o={};o[r[0]]=v/100;props.onChange(o);},
+            React.createElement(RareChanceInput,{pct:pct,row:r[2],label:r[1],onSave:function(v){var o={};o[r[0]]=v/100;props.onChange(o);},
               style:{width:110,padding:'6px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:13,textAlign:'right'}}),'%',
             React.createElement('button',{type:'button',title:'Back to default','aria-label':'Reset '+r[1]+' chance',onClick:function(){var o={};o[r[0]]=r[3]/100;props.onChange(o);},style:{padding:'4px 8px',borderRadius:50,border:'1px solid rgba(255,255,255,0.25)',background:'transparent',color:'rgba(255,255,255,0.7)',fontSize:11,cursor:'pointer'}},'↺')));
       })),
@@ -4203,6 +4211,8 @@ function makePeerRoom(peer,role,code){
               hitter._burnT=260;rareMsgRef.current={text:'SPONTANEOUS COMBUSTION',t:170,col:'#fb923c'};shakeRef.current=Math.max(shakeRef.current,10);
               for(var fbi=0;fbi<70;fbi++)particlesRef.current.push(mkP(hitter.x+(Math.random()-0.5)*SR*2,hitter.y-Math.random()*SR,(Math.random()-0.5)*6,-2-Math.random()*6,['#fbbf24','#f97316','#ef4444','#fde68a'][fbi%4],30+Math.random()*30,3+Math.random()*4));
               if(soundEnabledRef.current)playGameSound('dash');
+              // a slime that bursts into flames forfeits the match on the spot
+              if(mode!=='practice'&&mode!=='training'){rareMsgRef.current={text:'SPONTANEOUS COMBUSTION · FORFEIT',t:240,col:'#fb923c'};triggerWin(lastTouchRef.current==='left'?'right':'left');}
             }
           }
           [ls,rs].forEach(function(bs){if(bs._burnT>0){bs._burnT--;if(bs._burnT%3===0)particlesRef.current.push(mkP(bs.x+(Math.random()-0.5)*SR*1.4,bs.y-SR*0.6,(Math.random()-0.5)*1.5,-1.5-Math.random()*2,bs._burnT>120?(Math.random()<0.5?'#f97316':'#fbbf24'):'rgba(90,90,90,0.6)',35,4+Math.random()*3));}});
