@@ -95,7 +95,9 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v25.0.1';
+var RARE_P={fire:0.000001,boom:0.0000001};
+var NET_DIAG={sent:0,recv:0,fail:0,err:''};
+var GAME_VERSION='v25.0.3';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -216,6 +218,7 @@ function cleanGameSettings(value){
     sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
     uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,value.uiScale)):1,
     // chances (0–1) of the rare hard-hit gags; defaults are 0.0001% and 0.00001%
+    defaultDiff:['easy','hard','impossible'].indexOf(value.defaultDiff)>=0?value.defaultDiff:'easy',
     rareFire:typeof value.rareFire==='number'&&isFinite(value.rareFire)?Math.max(0,Math.min(1,value.rareFire)):0.000001,
     rareBoom:typeof value.rareBoom==='number'&&isFinite(value.rareBoom)?Math.max(0,Math.min(1,value.rareBoom)):0.0000001
   };
@@ -2762,6 +2765,11 @@ function SettingsScreen(props){
       var active=settings.perfMode===o[0];
       return React.createElement('button',{key:o[0],type:'button','data-nav-row':4,'aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
     }))),
+    React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
+      React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Default AI difficulty'),
+      React.createElement('div',{style:{display:'flex',gap:8}},
+        [['easy','Easy'],['hard','Hard'],['impossible','Impossible']].map(function(o){var active=settings.defaultDiff===o[0];
+          return React.createElement('button',{key:o[0],type:'button','data-nav-row':4.5,'aria-pressed':active,onClick:function(){props.onChange({defaultDiff:o[0]});},style:{padding:'9px 16px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'}},o[1]);}))),
     slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});},5),
     // Rare events: type any chance from 0% to 100% (applies to really hard hits)
     React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
@@ -2849,7 +2857,7 @@ function App(){
   var goalFlashRef=useRef(false),goalFlashFrRef=useRef(0);
   var otRef=useRef(false),otReadyRef=useRef(false);
   var flashRef=useRef(false);
-  var sideRef=useRef('right'),diffRef=useRef('easy');
+  var sideRef=useRef('right'),diffRef=useRef(loadGameSettings().defaultDiff);
   var unlimRef=useRef(true);
   var unlimJumpRef=useRef(false);
   var stratRef=useRef('balanced'),stratTimRef=useRef(0);
@@ -2994,44 +3002,54 @@ function App(){
   // Some browsers never flag a PeerJS connection as "open" even though its data channel works (messages arrive fine).
 // So check the channel itself, and send through it directly when PeerJS thinks it's still closed.
 function connIsOpen(c){return !!c&&(c.open||(c.dataChannel&&c.dataChannel.readyState==='open'));}
-var RARE_P={fire:0.000001,boom:0.0000001};
-var NET_DIAG={sent:0,recv:0,fail:0,err:''};
 function connSend(c,msg){
   if(!c){NET_DIAG.fail++;return false;}
   try{if(c.open){c.send(msg);NET_DIAG.sent++;return true;}var dc=c.dataChannel;if(dc&&dc.readyState==='open'){dc.send(JSON.stringify(msg));NET_DIAG.sent++;return true;}}catch(e){NET_DIAG.err=String(e&&e.message||e).slice(0,60);}
   NET_DIAG.fail++;return false;
 }
-function netDiagText(room){var c=room&&room.conn,dc=c&&c.dataChannel,pc=c&&c.peerConnection;return 'diag · '+GAME_VERSION+' · peer '+(c?(c.open?'open':'shut'):'none')+' · chan '+(dc?dc.readyState:'none')+' · ice '+(pc?pc.iceConnectionState:'-')+' · sent '+NET_DIAG.sent+' · got '+NET_DIAG.recv+' · fail '+NET_DIAG.fail+(NET_DIAG.err?' · '+NET_DIAG.err:'')+(room&&room.route?' · '+room.route:'');}
+function netDiagText(room){var c=room&&room.conn,dc=c&&c.dataChannel,pc=c&&c.peerConnection;return 'diag · '+GAME_VERSION+' · peer '+(c?(c.open?'open':'shut'):'none')+' · chan '+(dc?dc.readyState:'none')+' · ctl '+(room&&room.ctl&&room.ctl.dataChannel?room.ctl.dataChannel.readyState:'none')+' · ice '+(pc?pc.iceConnectionState:'-')+' · sent '+NET_DIAG.sent+' · got '+NET_DIAG.recv+' · fail '+NET_DIAG.fail+(NET_DIAG.err?' · '+NET_DIAG.err:'')+(room&&room.route?' · '+room.route:'');}
 function makePeerRoom(peer,role,code){
     var room={peer:peer,role:role,code:code,conn:null,remotePresence:null,localPresence:{},closed:false};
     room.peers=function(){
       return room.closed||!room.remotePresence?[]:[{isMe:false,presence:room.remotePresence}];
     };
+    // Two channels: a fast "unreliable" one for live gameplay (positions and inputs, where only the newest matters)
+    // and a reliable one for everything that must arrive: lobby info, profiles, chat and replays.
+    room.ctl=null;
+    function sendCtl(msg){return connIsOpen(room.ctl)?connSend(room.ctl,msg):connSend(room.conn,msg);}
     room.presence=function(patch){
       if(room.closed)return;
       if(patch&&typeof patch==='object')Object.assign(room.localPresence,patch);
-      var msg={t:'presence',p:patch||{}};
-      connSend(room.conn,msg);
+      var msg={t:'presence',p:patch||{}},keys=Object.keys(patch||{}),fast=keys.length>0&&keys.every(function(k){return k==='p'||k==='i';});
+      if(fast)connSend(room.conn,msg);else sendCtl(msg);
     };
     room.sendLocalPresence=function(){
-      connSend(room.conn,{t:'presence',p:room.localPresence});
+      var lp={};for(var k in room.localPresence)if(k!=='p'&&k!=='i')lp[k]=room.localPresence[k];
+      sendCtl({t:'presence',p:lp});
+    };
+    room.attachCtl=function(conn){
+      if(room.closed)return;
+      if(room.ctl&&room.ctl!==conn){try{room.ctl.close();}catch(e){}}
+      room.ctl=conn;
+      conn.on('data',function(m){if(room._handle)room._handle(m);else (room._q=room._q||[]).push(m);});
+      conn.on('open',function(){room.sendLocalPresence();});
     };
     // Game data uses an unreliable channel, so a single "who I am" message can get lost (more often through
     // the relay on school/work Wi-Fi). Re-send our full presence every second so the other side always catches up.
     room._presenceBeat=setInterval(function(){if(room.closed){clearInterval(room._presenceBeat);return;}room.sendLocalPresence();},1000);
     room.sendChat=function(message){
       if(room.closed)return false;
-      return connSend(room.conn,{t:'chat',p:message});
+      return sendCtl({t:'chat',p:message});
     };
     room.sendReplayChunk=function(chunk){
       if(room.closed)return false;
-      return connSend(room.conn,{t:'replay',p:chunk});
+      return sendCtl({t:'replay',p:chunk});
     };
     room.attach=function(conn){
       if(room.closed)return;
       if(room.conn&&room.conn!==conn){var oldConn=room.conn;room.conn=null;room.remotePresence=null;try{oldConn.close();}catch(e){}}
       room.conn=conn;
-      conn.on('data',function(msg){
+      conn.on('data',room._handle=function(msg){
         NET_DIAG.recv++;
         if(!msg||!msg.p)return;
         if(msg.t==='chat'){
@@ -3052,6 +3070,7 @@ function makePeerRoom(peer,role,code){
         room.remotePresence=Object.assign(room.remotePresence||{},presencePatch);
         if(msg.p.r===null||msg.p.r===undefined&&msg.p.st===null)room.remotePresence=null;
       });
+      if(room._q){var q=room._q;room._q=null;q.forEach(function(m){room._handle(m);});}
       // Report connection progress (ICE state) and, once open, whether the link is direct or through the relay.
       var iceWatch=setInterval(function(){
         var pc=conn.peerConnection;if(!pc||room.closed){if(room.closed)clearInterval(iceWatch);return;}
@@ -3087,6 +3106,7 @@ function makePeerRoom(peer,role,code){
       clearInterval(room._presenceBeat);
       room.closed=true;room.remotePresence=null;
       if(room.conn){try{room.conn.close();}catch(e){}room.conn=null;}
+      if(room.ctl){try{room.ctl.close();}catch(e){}room.ctl=null;}
       try{peer.destroy();}catch(e){}
     };
     return room;
@@ -3266,10 +3286,12 @@ function makePeerRoom(peer,role,code){
           startConnTimer(blockedMsg);
           stepStatus('Looking for the room…');
           var conn=peer.connect(makePeerId(code),{label:'soccer-slime',serialization:'json',reliable:false});
+          try{room.attachCtl(peer.connect(makePeerId(code),{label:'soccer-slime-ctl',serialization:'json',reliable:true}));}catch(e){}
           room.attach(conn);
         }
       });
       peer.on('connection',function(conn){
+        if(conn&&conn.label==='soccer-slime-ctl'){if(role==='h'&&!finished&&onTokRef.current===tok)room.attachCtl(conn);return;}
         if(role!=='h'||finished||onTokRef.current!==tok)return;
         room.attach(conn);
       });
@@ -3346,7 +3368,7 @@ function makePeerRoom(peer,role,code){
   var s_col=useState(DC),colors=s_col[0],setColors=s_col[1];
   var s_nm=useState({left:'P1',right:'P2'}),names=s_nm[0],setNames=s_nm[1];
   var s_pau=useState(false),paused=s_pau[0],setPaused=s_pau[1];
-  var s_df=useState('easy'),diff=s_df[0],setDiff=s_df[1];
+  var s_df=useState(function(){return loadGameSettings().defaultDiff;}),diff=s_df[0],setDiff=s_df[1];
   var s_sd=useState(gameSettings.defaultSide),side=s_sd[0],setSide=s_sd[1];
   var s_as=useState('right'),activeSide=s_as[0],setActiveSide=s_as[1];
   var s_es=useState(null),endStats=s_es[0],setEndStats=s_es[1];
@@ -3551,6 +3573,7 @@ function makePeerRoom(peer,role,code){
   function updateGameSettings(patch){
     var next=cleanGameSettings(Object.assign({},gameSettings,patch));
     setGameSettings(next);GAME_AUDIO_VOLUME=next.sfxVolume;
+    if(Object.prototype.hasOwnProperty.call(patch,'defaultDiff')){setDiff(next.defaultDiff);diffRef.current=next.defaultDiff;}
     if(Object.prototype.hasOwnProperty.call(patch,'defaultSide')){setSide(next.defaultSide);sideRef.current=next.defaultSide;}
     if(Object.prototype.hasOwnProperty.call(patch,'soundEnabled')){setSoundEnabled(next.soundEnabled);soundEnabledRef.current=next.soundEnabled;}
     try{window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(next));setSettingsSaveError('');cloudQueueSave();}
@@ -4300,7 +4323,16 @@ function makePeerRoom(peer,role,code){
                 // Ground dash: low ball just ahead on the attacking side -> burst through it.
                 if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&GH-GRND-b.y<45&&dxB>18&&dxB<105&&Math.abs(b.vx)<9){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}
               })();
-              newT=isImp&&!aiLeft?Math.max(GW/2-50,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+50:GW-SR,newT));if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
+              var deadBall=isImp&&(aiLeft?b.x>GW/2:b.x<GW/2)&&Math.abs(b.vx)<3&&Math.abs(b.vy)<4&&(GH-GRND-b.y)<70,reach=deadBall?GW:50;
+              if(deadBall){
+                // The ball has stopped in their half (e.g. parked in front of their goal): go and take it.
+                // Stand just on our side of it so the touch goes towards their goal, and hop over them if they're in the way.
+                newT=b.x-(aiLeft?1:-1)*(SR+BR-6);spd2=SPD*1.2;
+                if(Math.abs(ai.x-hum.x)<SR*2+12&&(hum.x-ai.x)*(b.x-ai.x)>0&&ai.y>=GH-GRND-1)doJump=true;
+              }
+              newT=isImp&&!aiLeft?Math.max(GW/2-reach,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+reach:GW-SR,newT));
+              // Never float around in an air-dash tilt: fire it at the ball after half a second at most.
+              if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
           var slimes=[ls,rs];
           for(var sli=0;sli<slimes.length;sli++){
