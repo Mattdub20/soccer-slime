@@ -97,7 +97,7 @@ var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // and offer a reload when a newer one is published.
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.0.3';
+var GAME_VERSION='v25.0.5';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3964,7 +3964,7 @@ function makePeerRoom(peer,role,code){
     if(mode==='online'){var nowp=performance.now();netSeqRef.current=0;netBufRef.current=[];netClockRef.current={off:null,jit:10};netLostRef.current=false;netRxRef.current=nowp;netLastInRef.current=nowp;netLastSendRef.current=0;netInRef.current={m:0,jc:0,dc:0,rc:0};netOutSigRef.current='';netGfRef.current=0;netLastMetaRef.current={sc:'',tl:-1,ot:false};setNetMsg('');setChatMessages([]);setChatError('');setChatOpen(false);setRematchRequested(false);setOpponentRematchRequested(false);
       if(onRoleRef.current==='host'){netMidRef.current++;var gpp=netFind('g');netPrevRef.current=(gpp&&gpp.i)?{jc:gpp.i[1]|0,dc:gpp.i[2]|0,rc:gpp.i[3]|0,pu:0,pd:0}:{jc:0,dc:0,rc:0,pu:0,pd:0};netPresence({st:'play',mid:netMidRef.current,dur:duration,sl:scoreLimitRef.current,ot:overtimeEnabledRef.current,p:null,rm:null});}
       else netPresence({rm:null});}
-    Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
+    gsRef.current._combust=false;gsRef.current._sonic=null;Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
     practGoalRef.current=null;statsRef.current={lG:0,rG:0,lStr:0,rStr:0,lMax:0,rMax:0,last:null,fastestShot:0,longestGoal:0,saves:0,longestRally:0,rallyFrames:0,saveCooldown:0,shotStartX:GW/2};
     matchAchievementsRecordedRef.current=false;setAchToasts([]);dailyJustDoneRef.current=false;lastTouchRef.current=null;impMemRef.current={land:null,prevOurs:null,retreat:0};gsRef.current.left._poseT=0;gsRef.current.left._poseX=gsRef.current.right._poseX=gsRef.current.left._spinT=gsRef.current.right._spinT=null;gsRef.current.left._poseRot=gsRef.current.right._poseRot=0;gsRef.current.right._poseT=0;achStartRef.current=prac||mode==='training'?null:unlockedAchievementIds(achievementProgressRef.current);trainingChallengeRef.current=mode==='training'?trainingChallengeRef.current:null;
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
@@ -4208,7 +4208,7 @@ function makePeerRoom(peer,role,code){
             liveStats.rallyFrames++;liveStats.fastestShot=Math.max(liveStats.fastestShot||0,ballSpeed);
             if(liveStats.saveCooldown>0)liveStats.saveCooldown--;
           }
-          if(practRef.current){if(kk['r']&&!kk['_rp']){resetPosRef.current(false);practGoalRef.current=null;}kk['_rp']=kk['r'];}
+          if(practRef.current){if(kk['r']&&!kk['_rp']){resetPosRef.current(false);practGoalRef.current=null;replayBufRef.current=[];}kk['_rp']=kk['r'];}
           if(!gameOver){
             if(mode==='training'&&trainingChallengeRef.current==='aim'){
               var keeperLeft=hSide==='right',keeper=keeperLeft?ls:rs,keeperX=keeperLeft?GOALW+SR:GW-GOALW-SR;
@@ -4995,7 +4995,7 @@ function makePeerRoom(peer,role,code){
       function tb(label,onClick,active,danger){var icon=landscape&&ICONS[label];return React.createElement('button',{key:label,type:'button','aria-label':label,title:label,onClick:onClick,'aria-pressed':active===undefined?undefined:!!active,style:{minWidth:bs,height:bs,padding:icon?0:'0 14px',width:icon?bs:undefined,borderRadius:bs/2,border:'1px solid '+(danger?'rgba(248,113,113,0.6)':'rgba(255,255,255,0.4)'),background:danger?'rgba(239,68,68,0.3)':active?btnPrimary:'rgba(5,12,35,0.7)',color:danger?'#fecaca':'#fff',fontFamily:DISP,fontSize:14,letterSpacing:'0.03em',boxShadow:'0 4px 12px rgba(0,0,0,0.35)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)'}},icon||label);}
       var btns=isPractice
         ?[tb('Switch side',function(){var ns=sideRef.current==='right'?'left':'right';setSide(ns);sideRef.current=ns;achievementSideRef.current=ns;setActiveSide(ns);resetPosRef.current(false);}),
-          tb('Reset',function(){resetPosRef.current(false);practGoalRef.current=null;})]
+          tb('Reset',function(){resetPosRef.current(false);practGoalRef.current=null;replayBufRef.current=[];})]
           .concat([['regular','Regular'],['air','Air'],['ground','Ground']].map(function(item){return tb(item[1],function(){setPractMode(item[0]);practModeRef.current=item[0];resetPosRef.current(false);},practMode===item[0]);}))
           .concat(practClip?[tb(practClip==='saved'?'Saved ✓':'Save goal',savePracticeGoal,practClip==='saved')]:[])
           .concat([tb('∞ Jump',toggleUnlimJump,unlimJump),tb('Exit',exitToMenu,undefined,true)])
@@ -5104,17 +5104,19 @@ function UpdateBanner(){
   var s_g=useState(GAME_UI.inGame),inGame=s_g[0],setInGame=s_g[1];
   var s_d=useState(''),dismissed=s_d[0],setDismissed=s_d[1];
   useEffect(function(){
-    GAME_UI.listeners.push(setInGame);
     var alive=true,last=0;
+    // check soon after leaving a match, too (the banner is hidden while you play)
+    function onGameUi(v){setInGame(v);if(!v)setTimeout(function(){last=0;check();},800);}
+    GAME_UI.listeners.push(onGameUi);
     function check(){
-      if(Date.now()-last<60000)return;last=Date.now();
+      if(Date.now()-last<20000)return;last=Date.now();
       fetchLiveVersion().then(function(v){if(alive&&v&&isNewerVersion(v,GAME_VERSION))setNewVersion(v);});
     }
-    var t=setInterval(check,5*60000);
+    var t=setInterval(check,60000);
     function onVisible(){if(document.visibilityState==='visible')check();}
-    document.addEventListener('visibilitychange',onVisible);
-    setTimeout(check,15000);
-    return function(){alive=false;clearInterval(t);document.removeEventListener('visibilitychange',onVisible);GAME_UI.listeners=GAME_UI.listeners.filter(function(f){return f!==setInGame;});};
+    document.addEventListener('visibilitychange',onVisible);window.addEventListener('focus',onVisible);
+    setTimeout(check,5000);
+    return function(){alive=false;clearInterval(t);document.removeEventListener('visibilitychange',onVisible);window.removeEventListener('focus',onVisible);GAME_UI.listeners=GAME_UI.listeners.filter(function(f){return f!==onGameUi;});};
   },[]);
   if(!newVersion||inGame||dismissed===newVersion)return null;
   return React.createElement('div',{role:'status','aria-live':'polite',className:'rise',style:{position:'fixed',left:'calc(env(safe-area-inset-left,0px) + 12px)',bottom:'calc(env(safe-area-inset-bottom,0px) + 12px)',zIndex:85,maxWidth:'min(360px,calc(100vw - 24px))',boxSizing:'border-box',padding:'10px 12px',borderRadius:14,background:'rgba(5,12,35,0.96)',border:'1px solid #4ade80',boxShadow:'0 10px 30px rgba(0,0,0,0.5),0 0 16px rgba(74,222,128,0.35)',display:'flex',alignItems:'center',gap:10,color:'#fff',fontFamily:'var(--font-body)'}},
