@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v24.9.5';
+var GAME_VERSION='v24.9.7';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -267,7 +267,7 @@ var SF=['x','y','vx','vy','spinAngle','isSpinning','spinDipY','spinPhase','spinT
 
 var HARD={aggressive:{hl:0.58,ao:-40,sm:1.3,jn:15,jx:115,hx:0.40,ib:1.4,dr:50,cd:4,jf:0.7,ad:true,er:true,def:false,w:3,dj:false},ultra_press:{hl:0.70,ao:-50,sm:1.4,jn:10,jx:120,hx:0.48,ib:1.5,dr:65,cd:3,jf:0.8,ad:true,er:true,def:false,w:3,dj:true},balanced:{hl:0.45,ao:-28,sm:1.15,jn:20,jx:110,hx:0.35,ib:1.2,dr:55,cd:5,jf:0.5,ad:false,er:false,def:false,w:2,dj:false},defensive:{hl:0.30,ao:-18,sm:1.1,jn:20,jx:105,hx:0.28,ib:1.2,dr:50,cd:5,jf:0.4,ad:false,er:false,def:true,w:1,dj:false},deep_block:{hl:0.25,ao:-12,sm:1.05,jn:25,jx:100,hx:0.22,ib:1.15,dr:45,cd:6,jf:0.35,ad:false,er:false,def:true,w:1,dj:false},opportunistic:{hl:0.60,ao:-20,sm:1.1,jn:18,jx:105,hx:0.42,ib:1.2,dr:45,cd:6,jf:0.5,ad:false,er:false,def:false,w:2,dj:false},wide_hunt:{hl:0.50,ao:-55,sm:1.2,jn:12,jx:118,hx:0.38,ib:1.3,dr:60,cd:5,jf:0.6,ad:true,er:true,def:false,w:3,dj:true},counter:{hl:0.35,ao:-30,sm:1.25,jn:22,jx:108,hx:0.30,ib:1.35,dr:52,cd:4,jf:0.6,ad:true,er:false,def:false,w:2,dj:false},blitz:{hl:0.75,ao:-60,sm:1.5,jn:5,jx:125,hx:0.50,ib:1.6,dr:80,cd:2,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},acrobat:{hl:0.52,ao:-38,sm:1.2,jn:8,jx:120,hx:0.40,ib:1.25,dr:55,cd:4,jf:0.95,ad:true,er:false,def:false,w:2,dj:true},berserker:{hl:0.80,ao:-65,sm:1.6,jn:5,jx:130,hx:0.55,ib:1.7,dr:90,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true},kamikaze:{hl:0.90,ao:-70,sm:1.7,jn:5,jx:130,hx:0.60,ib:1.8,dr:100,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true},scrambler:{hl:0.50,ao:-35,sm:1.3,jn:5,jx:120,hx:0.36,ib:1.3,dr:70,cd:3,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},sniper:{hl:0.44,ao:-48,sm:1.15,jn:20,jx:108,hx:0.33,ib:1.3,dr:45,cd:6,jf:0.5,ad:true,er:false,def:false,w:2,dj:false},high_line:{hl:0.55,ao:-45,sm:1.2,jn:15,jx:112,hx:0.44,ib:1.3,dr:58,cd:4,jf:0.65,ad:true,er:true,def:false,w:3,dj:false},poacher:{hl:0.65,ao:-15,sm:1.05,jn:8,jx:90,hx:0.45,ib:1.1,dr:30,cd:9,jf:0.4,ad:false,er:true,def:false,w:2,dj:false},shadow:{hl:0.42,ao:-25,sm:1.08,jn:15,jx:105,hx:0.30,ib:1.15,dr:42,cd:7,jf:0.4,ad:false,er:false,def:true,w:1,dj:false},wall_bouncer:{hl:0.48,ao:-32,sm:1.1,jn:10,jx:115,hx:0.35,ib:1.2,dr:50,cd:5,jf:0.6,ad:true,er:false,def:false,w:2,dj:false},lurker:{hl:0.40,ao:-10,sm:1.0,jn:25,jx:85,hx:0.25,ib:1.1,dr:25,cd:8,jf:0.2,ad:false,er:false,def:true,w:1,dj:false},patient:{hl:0.38,ao:-22,sm:1.05,jn:25,jx:100,hx:0.32,ib:1.2,dr:38,cd:7,jf:0.35,ad:false,er:false,def:true,w:1,dj:false}};
 var EASY={easy_basic:{hl:0.45,ao:-20,sm:0.85,jn:30,jx:90,hx:0.30,ib:0.9,dr:30,cd:12,jf:0.2,ad:false,er:false,def:false,w:1,dj:false},easy_rush:{hl:0.60,ao:-35,sm:0.9,jn:25,jx:95,hx:0.38,ib:1.0,dr:35,cd:10,jf:0.3,ad:false,er:true,def:false,w:1,dj:false},easy_def:{hl:0.28,ao:-10,sm:0.8,jn:35,jx:80,hx:0.22,ib:0.85,dr:20,cd:14,jf:0.15,ad:false,er:false,def:true,w:1,dj:false}};
-var IMPOSSIBLE={imp_press:{hl:0.78,ao:-52,sm:1.55,jn:8,jx:128,hx:0.50,ib:1.65,dr:70,cd:2,jf:0.85,ad:true,er:true,def:false,w:3,dj:true},imp_wall:{hl:0.32,ao:-15,sm:1.35,jn:18,jx:112,hx:0.26,ib:1.5,dr:55,cd:3,jf:0.5,ad:true,er:false,def:true,w:2,dj:true},imp_strike:{hl:0.62,ao:-42,sm:1.5,jn:6,jx:122,hx:0.46,ib:1.55,dr:75,cd:2,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},imp_anchor:{hl:0.40,ao:-22,sm:1.3,jn:22,jx:108,hx:0.30,ib:1.45,dr:50,cd:4,jf:0.45,ad:true,er:false,def:true,w:2,dj:true},imp_blitz:{hl:0.85,ao:-62,sm:1.65,jn:5,jx:130,hx:0.55,ib:1.75,dr:90,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true}};
+var IMPOSSIBLE={imp_press:{hl:0.78,ao:-52,sm:1.55,jn:8,jx:128,hx:0.50,ib:1.65,dr:70,cd:2,jf:0.85,ad:true,er:true,def:false,w:3,dj:true},imp_wall:{hl:0.5,ao:-30,sm:1.45,jn:12,jx:118,hx:0.36,ib:1.55,dr:65,cd:3,jf:0.7,ad:true,er:false,def:false,w:2,dj:true},imp_strike:{hl:0.62,ao:-42,sm:1.5,jn:6,jx:122,hx:0.46,ib:1.55,dr:75,cd:2,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},imp_anchor:{hl:0.55,ao:-36,sm:1.45,jn:12,jx:118,hx:0.4,ib:1.5,dr:65,cd:3,jf:0.7,ad:true,er:false,def:false,w:2,dj:true},imp_blitz:{hl:0.85,ao:-62,sm:1.65,jn:5,jx:130,hx:0.55,ib:1.75,dr:90,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true}};
 var ALL_S=Object.assign({},HARD,EASY,IMPOSSIBLE);
 function mkPool(o){var p=[],keys=Object.keys(o);for(var ki=0;ki<keys.length;ki++){var k=keys[ki];for(var wi=0;wi<o[k].w;wi++)p.push(k);}return p;}
 var HP=mkPool(HARD),EP=mkPool(EASY),IP=mkPool(IMPOSSIBLE);
@@ -1857,6 +1857,7 @@ function GuideScreen(props){
   return React.createElement('div',{style:{maxWidth:500,width:'100%',height:'100%',minHeight:0,margin:'0 auto',padding:'4px 0',boxSizing:'border-box',display:'flex',flexDirection:'column',alignItems:'center',overflow:'hidden'}},
     React.createElement('h2',{style:{flex:'0 0 auto',fontFamily:'var(--font-display)',color:'#fff',fontSize:34,fontWeight:700,margin:'0 0 8px',textShadow:'0 0 20px rgba(56,189,248,0.6)',letterSpacing:'0.04em',textAlign:'center'}},'How to Play'),
     React.createElement('div',{style:{flex:'1 1 0',minHeight:0,overflowY:'auto',overscrollBehavior:'contain',display:'flex',flexDirection:'column',gap:10,padding:'0 6px',width:'100%',boxSizing:'border-box'}},
+      props.onTour&&React.createElement('button',{type:'button',onClick:props.onTour,style:{alignSelf:'center',padding:'7px 16px',borderRadius:50,border:'1px solid rgba(56,189,248,0.6)',background:'rgba(56,189,248,0.14)',color:'#bae6fd',fontSize:12,fontWeight:900,cursor:'pointer'}},'Menu tour'),
       React.createElement(GuideControlsDemo,{key:'demo-'+demoRun,theme:props.theme,keybinds:props.keybinds,touch:props.touch,onReplay:props.onTutorial||function(){setDemoRun(function(n){return n+1;});}}),
       (props.touch?S.filter(function(x){return x.t!=='P1 Controls'&&x.t!=='P2 Controls'&&x.t!=='Extra keys';}).map(function(x){return x.t==='Practice'?Object.assign({},x,{b:'No opponent, no timer. Use the ↺ button to reset and ∞ to toggle unlimited jump.'}):x.t==='Replay'?Object.assign({},x,{b:'After each goal in multiplayer. The scorer can skip it with jump.'}):x;}):S).map(function(s,i){return React.createElement('div',{key:i,style:{background:'rgba(5,12,35,0.75)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:12,padding:12}},React.createElement('div',{style:{color:'#fbbf24',fontWeight:700,fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:4}},s.t),React.createElement('div',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,lineHeight:1.55,marginBottom:10}},s.b),React.createElement(GuideScreenshot,{kind:s.shot,theme:props.theme,label:s.t+' gameplay visualization'}));})
     ),
@@ -2550,6 +2551,58 @@ function AccountScreen(props){
         React.createElement('button',{onClick:save,style:{padding:'11px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.6)',background:'linear-gradient(135deg,#059669,#047857)',color:'#fff',fontWeight:900,fontSize:14,letterSpacing:'0.05em',cursor:'pointer',boxShadow:'0 5px 18px rgba(5,150,105,0.38)'}},'Save account'),
         React.createElement('button',{onClick:props.onBack,style:{padding:'10px 22px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Cancel'))));
 }
+// First-visit walkthrough of the main menu: a spotlight on each part with a short explanation.
+var MENU_TOUR=[
+  {t:null,title:'Welcome to Soccer Slime!',body:'Here\u2019s a quick look around. Use Next (or \u2192 / Enter), Back (\u2190), or Skip (Esc) at any time.'},
+  {t:'single',title:'Player vs AI',body:'Play against the computer. Pick Easy, Hard or Impossible, plus match length, score limit and overtime.'},
+  {t:'multi',title:'Multiplayer',body:'Two players on one keyboard (or two controllers). Pick saved players to track wins and head-to-head records.'},
+  {t:'practice',title:'Practice',body:'No opponent, no timer. Try shots, dashes and jumps, and save your best practice goals.'},
+  {t:'daily',title:'Daily challenge',body:'A new goal every day. Finish it to build a streak and unlock rewards.'},
+  {t:'online',title:'Play Online',body:'Make a room and send your friend the 4-letter code, or type theirs to join.'},
+  {t:'guide',title:'How to Play',body:'Every control and rule, with an animated demo. You can replay the hands-on tutorial and this tour from here.'},
+  {t:'playerdata',title:'Stats & Social',body:'Your players, head-to-head records, achievements, the leaderboard, friends and saved replays.'},
+  {t:'accounts',title:'Your Account',body:'Set your name, colour, skin, frame and celebrations. Sign in to save your progress to the cloud.'},
+  {t:'settings',title:'Settings',body:'Change keybinds, sound, performance mode, interface size and the rare-event chances.'},
+  {t:'theme',title:'Theme',body:'Switch the arena between Day, Night and Sakura.'},
+  {t:null,title:'You\u2019re all set!',body:'Have fun, and good luck against Impossible.'}
+];
+function MenuTour(props){
+  var s_i=useState(0),i=s_i[0],setI=s_i[1],s_r=useState(null),rect=s_r[0],setRect=s_r[1];
+  var steps=MENU_TOUR.filter(function(st){return !st.t||document.querySelector('[data-tour="'+st.t+'"]');});
+  var st=steps[Math.min(i,steps.length-1)];
+  useEffect(function(){
+    function measure(){var el=st.t&&document.querySelector('[data-tour="'+st.t+'"]');if(!el){setRect(null);return;}if(el.scrollIntoView)el.scrollIntoView({block:'nearest'});var r=el.getBoundingClientRect();setRect({x:r.left,y:r.top,w:r.width,h:r.height});}
+    measure();var t=setTimeout(measure,120);window.addEventListener('resize',measure);
+    return function(){clearTimeout(t);window.removeEventListener('resize',measure);};
+  },[i]);
+  function next(){if(i>=steps.length-1)props.onDone();else setI(i+1);}
+  function back(){if(i>0)setI(i-1);}
+  useEffect(function(){
+    function key(e){var k=e.key;
+      if(k==='ArrowRight'||k==='Enter'||k===' '||k==='d'||k==='D'){e.preventDefault();e.stopPropagation();next();}
+      else if(k==='ArrowLeft'||k==='a'||k==='A'){e.preventDefault();e.stopPropagation();back();}
+      else if(k==='Escape'){e.preventDefault();e.stopPropagation();props.onDone();}
+      else if(k==='ArrowUp'||k==='ArrowDown'||k==='w'||k==='s'||k==='Tab'){e.preventDefault();e.stopPropagation();}}
+    window.addEventListener('keydown',key,true);return function(){window.removeEventListener('keydown',key,true);};
+  },[i,steps.length]);
+  var pad=8,vw=window.innerWidth,vh=window.innerHeight,boxW=Math.min(330,vw-24);
+  var hole=rect?{left:rect.x-pad,top:rect.y-pad,width:rect.w+pad*2,height:rect.h+pad*2}:null;
+  var below=hole&&hole.top+hole.height+190<vh,boxTop=hole?(below?hole.top+hole.height+14:Math.max(12,hole.top-14-170)):vh/2-90;
+  var boxLeft=hole?Math.max(12,Math.min(vw-boxW-12,hole.left+hole.width/2-boxW/2)):(vw-boxW)/2;
+  var btn=function(primary){return{padding:'8px 16px',borderRadius:50,border:primary?'none':'1px solid rgba(255,255,255,0.3)',background:primary?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'};};
+  return React.createElement('div',{role:'dialog','aria-modal':'true','aria-label':'Menu tour',style:{position:'fixed',inset:0,zIndex:90}},
+    hole?React.createElement('div',{style:{position:'fixed',left:hole.left,top:hole.top,width:hole.width,height:hole.height,borderRadius:18,boxShadow:'0 0 0 9999px rgba(2,6,20,0.72),0 0 0 3px #fbbf24,0 0 24px rgba(251,191,36,0.6)',transition:'all 0.25s ease',pointerEvents:'none'}})
+        :React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(2,6,20,0.72)'}}),
+    React.createElement('div',{className:'rise',key:i,style:{position:'fixed',left:boxLeft,top:boxTop,width:boxW,boxSizing:'border-box',padding:'14px 16px 12px',borderRadius:16,background:'rgba(5,12,35,0.97)',border:'1px solid rgba(251,191,36,0.6)',boxShadow:'0 16px 40px rgba(0,0,0,0.55)',color:'#fff'}},
+      React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:'#fde68a'}},'Tour \u00b7 '+(i+1)+' / '+steps.length),
+      React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:20,margin:'3px 0 4px'}},st.title),
+      React.createElement('div',{style:{fontSize:13,lineHeight:1.45,color:'rgba(255,255,255,0.85)'}},st.body),
+      React.createElement('div',{style:{display:'flex',gap:8,marginTop:12,alignItems:'center'}},
+        React.createElement('button',{type:'button',onClick:props.onDone,style:Object.assign(btn(false),{background:'transparent',border:'none',color:'rgba(255,255,255,0.6)',padding:'8px 4px'})},'Skip'),
+        React.createElement('div',{style:{flex:1}}),
+        i>0&&React.createElement('button',{type:'button',onClick:back,style:btn(false)},'Back'),
+        React.createElement('button',{type:'button',onClick:next,style:btn(true)},i>=steps.length-1?'Done':'Next'))));
+}
 // Percent box that saves on every keystroke (so closing Settings straight after typing still keeps the value).
 function RareChanceInput(props){
   var s_t=useState(String(props.pct)),text=s_t[0],setText=s_t[1];
@@ -3056,7 +3109,7 @@ function makePeerRoom(peer,role,code){
       var lm=netLastMetaRef.current,scs=p.s[0]+'-'+p.s[1];
       if(lm.sc!==scs){var previousScores=lm.sc?lm.sc.split('-').map(Number):[0,0];lm.sc=scs;setSc({left:p.s[0],right:p.s[1]});statsRef.current.lG=p.s[0];statsRef.current.rG=p.s[1];statsRef.current.lBehind=Math.max(statsRef.current.lBehind||0,p.s[1]-p.s[0]);statsRef.current.rBehind=Math.max(statsRef.current.rBehind||0,p.s[0]-p.s[1]);if(onRoleRef.current==='guest'&&p.s[1]>previousScores[1])for(var goalIndex=previousScores[1];goalIndex<p.s[1];goalIndex++)recordAchievementGoal('right');}
       if(lm.tl!==p.t){lm.tl=p.t;tlRef.current=p.t;setTl(p.t);}
-      netOrRef.current=p.o||0;var otv=!!p.o;if(lm.ot!==otv){lm.ot=otv;otRef.current=otv;setOt(otv);}
+      netOrRef.current=p.o||0;setOtLive(p.o===2);var otv=!!p.o;if(lm.ot!==otv){lm.ot=otv;otRef.current=otv;setOt(otv);}
       if(p.g&&!goalFlashRef.current)shakeRef.current=Math.max(shakeRef.current,10);
 
       netRfRef.current=(p.rf===undefined?-999:p.rf);if(netRfRef.current>=30&&netRfPrevRef.current<30)shakeRef.current=Math.max(shakeRef.current,6);netRfPrevRef.current=netRfRef.current;goalFlashRef.current=!!p.g;flashRef.current=!!p.g;netGfRef.current=p.g?p.gf:0;netGlRef.current=p.gl||[0,0];
@@ -3240,6 +3293,7 @@ function makePeerRoom(peer,role,code){
     return function(){clearTimeout(timer);};
   },[winner]);
   var s_ot=useState(false),ot=s_ot[0],setOt=s_ot[1];
+  var s_otl=useState(false),otLive=s_otl[0],setOtLive=s_otl[1]; // overtime has really started (ball has landed at 0:00)
   var s_lcd=useState(0),lCD=s_lcd[0],setLCD=s_lcd[1];
   var s_rcd=useState(0),rCD=s_rcd[0],setRCD=s_rcd[1];
   var s_ulj=useState(false),unlimJump=s_ulj[0],setUnlimJump=s_ulj[1];
@@ -3264,6 +3318,13 @@ function makePeerRoom(peer,role,code){
   var matchGoalsRef=useRef([]),s_mg=useState([]),matchGoals=s_mg[0],setMatchGoals=s_mg[1];
   var s_vr=useState(null),viewReplay=s_vr[0],setViewReplay=s_vr[1];
   var s_fs=useState(''),fullSaved=s_fs[0],setFullSaved=s_fs[1];
+  var s_tour=useState(false),tour=s_tour[0],setTour=s_tour[1];
+  function finishTour(){try{window.localStorage.setItem('slime_tour_seen','1');}catch(e){}setTour(false);}
+  useEffect(function(){
+    if(screen!=='menu'||!introDone||tutPrompt||tour||showSettings||showPD)return;
+    var seen=false;try{seen=!!window.localStorage.getItem('slime_tour_seen');}catch(e){seen=true;}
+    if(seen)return;var t=setTimeout(function(){setTour(true);},700);return function(){clearTimeout(t);};
+  },[screen,introDone,tutPrompt,tour,showSettings,showPD]);
   var s_np=useState({P1:'',P2:'',err:''}),newPl=s_np[0],setNewPl=s_np[1];
   var tutRef=useRef(null),s_tut=useState(null),tut=s_tut[0],setTut=s_tut[1];
   var practClipRef=useRef(null),s_pc=useState(''),practClip=s_pc[0],setPractClip=s_pc[1];
@@ -3711,6 +3772,8 @@ function makePeerRoom(peer,role,code){
   },[screen,introDone,focusIdx,pendDur,customMinutes,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots,showPD,showSettings,scoreLimit,overtimeEnabled,themeMode]);
 
   function resetPos(defMove){
+    gsRef.current._combust=false;
+    impMemRef.current.kickoff=Math.random()<0.6;
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
     var pm=practRef.current?practModeRef.current:'regular',hSide=sideRef.current;
     if(pmRef.current==='training'){
@@ -3737,7 +3800,7 @@ function makePeerRoom(peer,role,code){
     frozenRef.current=true;goalFlashRef.current=true;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;flashRef.current=true;setGoalFlash(true);
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
     var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,scoring==='left'?colRef.current.left.body:colRef.current.right.body);skinFx(particlesRef.current,gp0,getGameSlimeSkins(pmRef.current)[scoring]);emitCelebration(particlesRef.current,getGameCosmetics(pmRef.current)[scoring].celebration);
-    var frames=replayBufRef.current.slice();replayBufRef.current=[];replayScorerRef.current=scoring;otReadyRef.current=false;
+    var frames=replayBufRef.current.slice();replayBufRef.current=[];replayScorerRef.current=scoring;otReadyRef.current=false;setOtLive(false);
     if(pmRef.current==='online'&&onRoleRef.current==='host'&&frames.length){
       var packed=frames.map(packReplayFrame),chunks=[];
       for(var fi=0;fi<packed.length;fi+=REPLAY_CHUNK_FRAMES)chunks.push(packed.slice(fi,fi+REPLAY_CHUNK_FRAMES));
@@ -3756,6 +3819,7 @@ function makePeerRoom(peer,role,code){
     humanBufRef.current=[];
   }
   function scoreGoal(goalSide){
+    if(gsRef.current._combust)return;
     if(replayActiveRef.current||goalFlashRef.current||frozenRef.current)return;
     if(practRef.current&&tutRef.current&&TUT_STEPS[tutRef.current.step]&&TUT_STEPS[tutRef.current.step].id==='goal'&&goalSide!==sideRef.current)tutAdvance();
     if(practRef.current){var pb=gsRef.current.ball,pst=statsRef.current;practGoalRef.current={kmh:Math.round(Math.sqrt(pb.vx*pb.vx+pb.vy*pb.vy)*KMH_PER_SPEED),m:Math.round(Math.abs((goalSide==='left'?0:GW)-(pst.shotStartX===undefined?GW/2:pst.shotStartX))*METRES_PER_UNIT),at:performance.now()};var hsd=sideRef.current,pclip=replayBufRef.current.map(function(f){var o={left:f.left,right:f.right,ball:f.ball};o[hsd==='left'?'right':'left']=Object.assign({},f[hsd==='left'?'right':'left'],{x:-999,y:-999});return o;});if(pclip.length>20){practClipRef.current={frames:pclip,goal:{f:pclip.length-1,side:goalSide==='left'?'right':'left',own:false},kmh:practGoalRef.current.kmh,m:practGoalRef.current.m};setPractClip('ready');}resetPosRef.current(false);return;}
@@ -3785,7 +3849,7 @@ function makePeerRoom(peer,role,code){
       // A goal after the clock hits 0 ends the match, but the winner is whoever
       // leads on the scoreboard, not just whoever scored. A buzzer-beater that
       // ties the game sends it to sudden death instead.
-      if(st.lG===st.rG){doGoalFlashThenReset(goalSide,scoring,isSingle);otReadyRef.current=true;return;}
+      if(st.lG===st.rG){doGoalFlashThenReset(goalSide,scoring,isSingle);otReadyRef.current=true;setOtLive(true);return;}
       var otWinner=st.lG>st.rG?'left':'right';
       if(isSingle)triggerWin(otWinner);else{pendingWinRef.current=otWinner;doGoalFlashThenReset(goalSide,scoring,isSingle);}
       return;
@@ -3800,7 +3864,7 @@ function makePeerRoom(peer,role,code){
     if(gmode==='training'){finishTraining();return;}
     var stats=statsRef.current;
     if(!overtimeEnabledRef.current){triggerWin(stats.lG===stats.rG?'draw':stats.lG>stats.rG?'left':'right');return;}
-    setOt(true);otRef.current=true;otReadyRef.current=false;
+    setOt(true);otRef.current=true;otReadyRef.current=false;setOtLive(false);
   },[tl]);
 
   function startGame(duration,mode,cols,nms,pside,pmode,pid1,pid2,options){
@@ -3825,7 +3889,7 @@ function makePeerRoom(peer,role,code){
     matchAchievementsRecordedRef.current=false;setAchToasts([]);dailyJustDoneRef.current=false;lastTouchRef.current=null;impMemRef.current={land:null,prevOurs:null,retreat:0};gsRef.current.left._poseT=0;gsRef.current.left._poseX=gsRef.current.right._poseX=gsRef.current.left._spinT=gsRef.current.right._spinT=null;gsRef.current.left._poseRot=gsRef.current.right._poseRot=0;gsRef.current.right._poseT=0;achStartRef.current=prac||mode==='training'?null:unlockedAchievementIds(achievementProgressRef.current);trainingChallengeRef.current=mode==='training'?trainingChallengeRef.current:null;
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
     colRef.current=c;pmRef.current=mode;practRef.current=prac;unlimJumpRef.current=false;setUnlimJump(false);
-    clearTimeout(postRpRef.current);frozenRef.current=false;pausedRef.current=false;goRef.current=false;flashRef.current=false;goalFlashRef.current=false;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;otRef.current=false;otReadyRef.current=false;
+    clearTimeout(postRpRef.current);frozenRef.current=false;pausedRef.current=false;goRef.current=false;flashRef.current=false;goalFlashRef.current=false;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;otRef.current=false;otReadyRef.current=false;setOtLive(false);
     replayBufRef.current=[];replayActiveRef.current=false;replayFrRef.current=[];replayIdxRef.current=0;replayTxRef.current=null;replayRxRef.current=null;netReplayRef.current=false;pendingWinRef.current=null;
     matchRecRef.current=[];matchGoalsRef.current=[];setFullSaved('');practClipRef.current=null;setPractClip('');matchRecActiveRef.current=!prac&&mode!=='online'&&mode!=='training';particlesRef.current=[];ballTrailRef.current=[];practModeRef.current=pm2;
     qHistRef.current=[];qGoalsRef.current=0;humanBufRef.current=[];shakeRef.current=0;aiAlertRef.current=0;
@@ -3878,7 +3942,7 @@ function makePeerRoom(peer,role,code){
     // practice clips saved before the fix still include the idle opponent: hide whichever slime stayed further from the ball
     if(m.kind==='practice'&&frs.length){var dl=0,dr=0;frs.forEach(function(f){if(f.left.x<-500||f.right.x<-500)return;dl+=Math.abs(f.left.x-f.ball.x);dr+=Math.abs(f.right.x-f.ball.x);});if(dl||dr){var hide=dl>dr?'left':'right';frs.forEach(function(f){f[hide].x=-999;f[hide].y=-999;});}}
     setViewReplay({frames:frs,goals:rec.goals||[],colors:m.colors||DC,names:{left:m.left||'Left',right:m.right||'Right'},theme:m.theme||themeMode,skins:m.skins?{left:achievementSkinDetails(m.skins.left),right:achievementSkinDetails(m.skins.right)}:null,title:m.title||'Replay'});});}
-  function exitToMenu(){tutRef.current=null;setTut(null);clearTimeout(postRpRef.current);onlineCleanup();setNetMsg('');winRef.current=null;readyRef.current=null;setRunning(false);setWinner(null);setGmode(null);setIsPractice(false);practRef.current=false;setGoalFlash(false);goalFlashRef.current=false;frozenRef.current=false;setPaused(false);pausedRef.current=false;setOt(false);otRef.current=false;otReadyRef.current=false;goRef.current=false;flashRef.current=false;replayActiveRef.current=false;setReplayActive(false);replayBufRef.current=[];replayFrRef.current=[];matchRecRef.current=[];matchRecActiveRef.current=false;setMatchFrames([]);setShowMatchReplay(false);particlesRef.current=[];ballTrailRef.current=[];setScreen('menu');setPendDur('1min');}
+  function exitToMenu(){gsRef.current._combust=false;tutRef.current=null;setTut(null);clearTimeout(postRpRef.current);onlineCleanup();setNetMsg('');winRef.current=null;readyRef.current=null;setRunning(false);setWinner(null);setGmode(null);setIsPractice(false);practRef.current=false;setGoalFlash(false);goalFlashRef.current=false;frozenRef.current=false;setPaused(false);pausedRef.current=false;setOt(false);otRef.current=false;otReadyRef.current=false;setOtLive(false);goRef.current=false;flashRef.current=false;replayActiveRef.current=false;setReplayActive(false);replayBufRef.current=[];replayFrRef.current=[];matchRecRef.current=[];matchRecActiveRef.current=false;setMatchFrames([]);setShowMatchReplay(false);particlesRef.current=[];ballTrailRef.current=[];setScreen('menu');setPendDur('1min');}
   function restartGame(){startGame(lastGM.current,lastPM.current,lastCol.current,lastNm.current,lastSide.current,practModeRef.current,p1IdRef.current,p2IdRef.current,lastGameOptionsRef.current);}
   function toggleUnlimJump(){if(!practRef.current)return;setUnlimJump(function(p){unlimJumpRef.current=!p;return !p;});}
   function togglePause(){if(goRef.current||onRoleRef.current)return;var np=!pausedRef.current;pausedRef.current=np;if(!goalFlashRef.current&&!replayActiveRef.current)frozenRef.current=np;setPaused(np);}
@@ -4020,7 +4084,7 @@ function makePeerRoom(peer,role,code){
             if(replayActiveRef.current){var grt=replayFrRef.current.length,grp=grt?replayIdxRef.current/grt:0;gctx.fillStyle='rgba(0,0,0,0.55)';gctx.fillRect(0,0,GW,32);gctx.save();gctx.font='16px "Lilita One",sans-serif';gctx.textAlign='left';gctx.textBaseline='middle';gctx.fillStyle='#fbbf24';gctx.shadowColor='#fbbf24';gctx.shadowBlur=8;gctx.fillText('INSTANT REPLAY',10,16);gctx.restore();gctx.fillStyle='rgba(255,255,255,0.15)';gctx.fillRect(0,28,GW,4);gctx.fillStyle='#38bdf8';gctx.fillRect(0,28,GW*grp,4);}
             if(!replayActiveRef.current&&netRfRef.current>-999&&netRfRef.current<62&&!goRef.current)drawReady(gctx,netRfRef.current,statsRef.current.lG,statsRef.current.rG,cols);
             var gtl=tlRef.current;if(!replayActiveRef.current&&((gtl>0&&gtl<=10)||(gtl===0&&netOrRef.current!==2))&&!goRef.current){gctx.save();gctx.font='88px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='middle';gctx.fillStyle='rgba(255,255,255,0.95)';gctx.shadowColor='rgba(0,0,0,0.6)';gctx.shadowBlur=12;gctx.fillText(String(gtl),GW/2,GH/2-80);gctx.restore();}
-            if(!replayActiveRef.current&&otRef.current&&!goRef.current){gctx.save();gctx.font='22px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,100,100,0.9)';gctx.shadowColor='#ff4444';gctx.shadowBlur=10;gctx.fillText('OVERTIME',GW/2,8);gctx.restore();}
+            if(!replayActiveRef.current&&otRef.current&&netOrRef.current===2&&!goRef.current){gctx.save();gctx.font='22px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,100,100,0.9)';gctx.shadowColor='#ff4444';gctx.shadowBlur=10;gctx.fillText('OVERTIME',GW/2,8);gctx.restore();}
             gctx.restore();}
           guestSendInput(controllerKeys);
           return;
@@ -4084,10 +4148,12 @@ function makePeerRoom(peer,role,code){
               if(smart&&!behind&&bh>40&&(aiLeft?(b.x<GW*0.6&&b.vx<1.2):(b.x>GW*0.4&&b.vx>-1.2))){for(var pra=3;pra<preds.length;pra++){var pq=preds[pra],ph2=GH-GRND-pq.y;if(pq.y>preds[pra-1].y&&ph2<170&&ph2>35&&(aiLeft?pq.x<GW*0.62:pq.x>GW*0.38)&&Math.abs(ai.x-pq.x)/(SPD*s2.ib)<=pq.time+5){aer={x:pq.x,t:pq.time,h:ph2};break;}}}
               if(behind){newT=b.x+(aiLeft?-10:10);spd2=SPD*s2.ib*1.15;if(bh>15&&bh<s2.jx&&ai.y>=GH-GRND-1&&Math.random()<s2.jf*0.7)doJump=true;if(!ai.isSpinning&&ai.y>=GH-GRND-1&&ai.dashFrames===0&&ai.dashCooldown===0){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}}
               else if(aer){var gsd=aiLeft?-1:1;newT=Math.max(SR,Math.min(GW-SR,aer.x+gsd*16));spd2=SPD*s2.ib*1.12;var grd=ai.y>=GH-GRND-1,nrb=Math.abs(ai.x-aer.x)<75;if(grd&&nrb&&aer.t>=2&&aer.t<=(aer.h>105?28:19))doJump=true;if(!grd&&nrb&&!ai.hasDoubleJumped&&!ai.isSpinning&&aer.h>112&&ai.vy>-3&&aer.t<=16){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}
-              else if(threat||s2.def||alerted){var bx2=b.x;for(var prj=0;prj<preds.length;prj++){var ttrj=Math.abs(ai.x-preds[prj].x)/SPD;if(ttrj<=preds[prj].time+3){bx2=preds[prj].x;break;}}var shade=smart?Math.max(0.1,Math.min(alerted?0.4:0.3,Math.abs(bx2-ownGx)/GW*0.5)):0,cutX=smart?bx2+(ownGx-bx2)*shade:bx2+(aiLeft?-5:5);newT=aiLeft?Math.max(cutX,ownGx+SR):Math.min(cutX,ownGx-SR);spd2=SPD*s2.ib;if(aDist<100&&bh<120&&ai.y>=GH-GRND-1&&Math.random()<s2.jf)doJump=true;if(ai.stuckCounter>15){doJump=true;newT=aiLeft?b.x+20:b.x-20;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}else if(aiLeft?(b.x>GW*s2.hl):(b.x<GW*(1-s2.hl))){newT=b.x+s2.ao*(aiLeft?1:-1)+(Math.random()<0.3?(Math.random()*28-14):0);if(aDist<130){if(hPatA&&ai.y>=GH-GRND-1&&bh>10&&Math.random()<hPatA.jf*0.6)doJump=true;if(hPatA&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y>=GH-GRND-1&&aDist<s2.dr*1.2&&Math.random()<Math.min(0.5,hPatA.df*3)){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(bh>s2.jn&&bh<s2.jx&&ai.y>=GH-GRND-1&&Math.random()<s2.jf){var ttr2=aDist/SPD,bhy=b.y+b.vy*ttr2+0.5*GRAV*ttr2*ttr2;if(bhy>GH-GRND-s2.jx&&bhy<GH-GRND-8)doJump=true;}if(ai.stuckCounter>18){doJump=true;newT=b.x+s2.ao*(aiLeft?1:-1)-10;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(s2.ad&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y<GH-GRND-15&&aDist<90&&ai.spinPhase===0){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}if(s2.ad&&ai.spinPhase===1&&aDist<70){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}}}else{newT=GW*s2.hx+(Math.random()<0.08?(Math.random()*40-20):0);if(smart)newT+=(b.x-newT)*0.16;for(var prk=0;prk<preds.length;prk++){if(preds[prk].y<GH-GRND-35&&Math.abs(preds[prk].x-newT)<140){var ttr3=Math.abs(ai.x-preds[prk].x)/SPD;if(ttr3<preds[prk].time+6&&preds[prk].time<50&&Math.random()<s2.jf){newT=preds[prk].x+(aiLeft?-18:18);if(preds[prk].time<30&&ai.y>=GH-GRND-1)doJump=true;break;}}}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr*0.7&&bon&&ai.y>=GH-GRND-1&&Math.random()<0.3){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}
+              else if(threat||s2.def||(alerted&&!isImp)){var bx2=b.x;for(var prj=0;prj<preds.length;prj++){var ttrj=Math.abs(ai.x-preds[prj].x)/SPD;if(ttrj<=preds[prj].time+3){bx2=preds[prj].x;break;}}var shade=smart?Math.max(0.1,Math.min(alerted?0.4:0.3,Math.abs(bx2-ownGx)/GW*0.5)):0,cutX=smart?bx2+(ownGx-bx2)*shade:bx2+(aiLeft?-5:5);newT=aiLeft?Math.max(cutX,ownGx+SR):Math.min(cutX,ownGx-SR);spd2=SPD*s2.ib;if(aDist<100&&bh<120&&ai.y>=GH-GRND-1&&Math.random()<s2.jf)doJump=true;if(ai.stuckCounter>15){doJump=true;newT=aiLeft?b.x+20:b.x-20;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}else if(aiLeft?(b.x>GW*s2.hl):(b.x<GW*(1-s2.hl))){newT=b.x+s2.ao*(aiLeft?1:-1)+(Math.random()<0.3?(Math.random()*28-14):0);if(aDist<130){if(hPatA&&ai.y>=GH-GRND-1&&bh>10&&Math.random()<hPatA.jf*0.6)doJump=true;if(hPatA&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y>=GH-GRND-1&&aDist<s2.dr*1.2&&Math.random()<Math.min(0.5,hPatA.df*3)){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(bh>s2.jn&&bh<s2.jx&&ai.y>=GH-GRND-1&&Math.random()<s2.jf){var ttr2=aDist/SPD,bhy=b.y+b.vy*ttr2+0.5*GRAV*ttr2*ttr2;if(bhy>GH-GRND-s2.jx&&bhy<GH-GRND-8)doJump=true;}if(ai.stuckCounter>18){doJump=true;newT=b.x+s2.ao*(aiLeft?1:-1)-10;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(s2.ad&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y<GH-GRND-15&&aDist<90&&ai.spinPhase===0){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}if(s2.ad&&ai.spinPhase===1&&aDist<70){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}}}else{newT=GW*s2.hx+(Math.random()<0.08?(Math.random()*40-20):0);if(smart)newT+=(b.x-newT)*0.16;for(var prk=0;prk<preds.length;prk++){if(preds[prk].y<GH-GRND-35&&Math.abs(preds[prk].x-newT)<140){var ttr3=Math.abs(ai.x-preds[prk].x)/SPD;if(ttr3<preds[prk].time+6&&preds[prk].time<50&&Math.random()<s2.jf){newT=preds[prk].x+(aiLeft?-18:18);if(preds[prk].time<30&&ai.y>=GH-GRND-1)doJump=true;break;}}}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr*0.7&&bon&&ai.y>=GH-GRND-1&&Math.random()<0.3){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}
               if(isImp)(function(){
                 // Impossible: plan an interception from the full predicted path instead of reacting late.
                 var mem=impMemRef.current,gsd=aiLeft?-1:1;
+                // Kickoff: on most points, burst straight at the ball so the opponent can't steal it with a first dash.
+                if(mem.kickoff&&!frozenRef.current){var gk0=ai.y>=GH-GRND-1;if(Math.abs(b.x-GW/2)<60&&gk0&&ai.dashCooldown===0&&!ai.isSpinning){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;mem.kickoff=false;newT=b.x;spd2=SPD*1.2;}else if(Math.abs(b.x-GW/2)>=60)mem.kickoff=false;}
                 // How does this opponent attack? Track the ball's height as it crosses halfway towards us (lobs vs drives).
                 if(mem.prevBx!=null&&(aiLeft?(b.x<GW/2&&mem.prevBx>=GW/2&&b.vx<0):(b.x>GW/2&&mem.prevBx<=GW/2&&b.vx>0))){var chh=GH-GRND-b.y;mem.lob=mem.lob==null?chh:mem.lob*0.75+chh*0.25;}
                 mem.prevBx=b.x;
@@ -4155,11 +4221,22 @@ function makePeerRoom(peer,role,code){
                 }
                 // Dashes, like Hard but timed off the predicted contact.
                 var tw=aiLeft?1:-1,dxB=(b.x-ai.x)*tw,dyB=ai.y-b.y,inAir=ai.y<GH-GRND-2,danger=onOurs&&incoming&&!best;
-                // Air spin dash: in the air with the ball just ahead on the attacking side -> tilt, then fire forward into it.
-                if(inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&dxB>8&&dxB<125&&dyB>-30&&dyB<115){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}
-                if(ai.spinPhase===1&&((dxB>-12&&dxB<70&&Math.abs(dyB)<85)||dxB>170||dxB<-40)){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}
-                // Ground dash: low ball just ahead on the attacking side -> burst through it.
-                if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&GH-GRND-b.y<45&&dxB>18&&dxB<105&&Math.abs(b.vx)<9){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}
+                // Where will the ball be relative to us over the next few frames? (we keep drifting at our current speed)
+                function relAt(k){var q=preds[Math.min(preds.length-1,Math.max(0,k-1))];if(!q)return null;var ax=ai.x+ai.vx*k,ay=Math.min(GH-GRND,ai.y+ai.vy*k+0.5*GRAV*k*k);return{dx:(q.x-ax)*tw,dy:ay-q.y};}
+                // the ball sits in front of our body, about chest high: a forward dash will drive it at the far goal
+                function inStrike(r){return r&&r.dx>-6&&r.dx<SR+BR+18&&r.dy>SR*0.15&&r.dy<SR+BR+12;}
+                // Air spin dash: tilt near the top of the jump when the ball is about to come into the strike window...
+                if(inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&ai.vy>-5){
+                  for(var ak=4;ak<=14;ak++){if(inStrike(relAt(ak))){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;break;}}
+                }
+                // ...and fire exactly when it's there (or bail out if the chance has gone).
+                if(ai.spinPhase===1){var now0=relAt(1),soon=relAt(3),gone=!now0||now0.dx<-30||now0.dx>200||now0.dy<-60;
+                  if(inStrike(now0)||(inStrike(soon)&&Math.random()<0.35)||gone){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}}
+                // Ground dash: a low ball ahead that we'll meet within the dash -> burst through it (mostly; a little randomness keeps it unpredictable).
+                if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0){
+                  for(var gk=2;gk<=Math.min(DASH_F+4,preds.length);gk++){var gq=preds[gk-1],gdx=(gq.x-(ai.x+tw*GDASH_SPD*gk*0.8))*tw,gh=GH-GRND-gq.y;
+                    if(gh<SR+20&&Math.abs(gdx)<SR*0.9&&(gq.x-ai.x)*tw>10){if(Math.random()<0.8){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}break;}}
+                }
               })();
               newT=isImp&&!aiLeft?Math.max(GW/2-50,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+50:GW-SR,newT));if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
@@ -4183,7 +4260,7 @@ function makePeerRoom(peer,role,code){
           var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=0.2;if(bt[bti].life<=0)bt.splice(bti,1);}
           if(ball.x<BR){var wh1=Math.abs(ball.vx);ball.x=BR;ball.vx=-ball.vx*0.88;ball.vy+=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;emitWall(particlesRef.current,ball.x,ball.y,wh1);}
           if(ball.x>GW-BR){var wh2=Math.abs(ball.vx);ball.x=GW-BR;ball.vx=-ball.vx*0.88;ball.vy-=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;emitWall(particlesRef.current,ball.x,ball.y,wh2);}
-          if(ball.y>GH-GRND-BR){var prevVy=ball.vy;ball.y=GH-GRND-BR;ball.vy=-ball.vy*BBOUND;ball.vx+=(ball.spin||0)*BR*0.25;ball.spin=(ball.spin||0)*0.7;emitBounce(particlesRef.current,ball.x,ball.y,prevVy);if(mode==='training'&&trainingChallengeRef.current!=='aim')completeTrainingAttempt(false);if(otRef.current&&!otReadyRef.current&&!goalFlashRef.current&&!frozenRef.current){otReadyRef.current=true;var curL=statsRef.current.lG,curR=statsRef.current.rG;if(curL!==curR){triggerWin(curL>curR?'left':'right');}else{resetPosRef.current(pmRef.current!=='online');if(pmRef.current==='multi'||pmRef.current==='online'||pmRef.current==='single')startReady(true);}}}
+          if(ball.y>GH-GRND-BR){var prevVy=ball.vy;ball.y=GH-GRND-BR;ball.vy=-ball.vy*BBOUND;ball.vx+=(ball.spin||0)*BR*0.25;ball.spin=(ball.spin||0)*0.7;emitBounce(particlesRef.current,ball.x,ball.y,prevVy);if(mode==='training'&&trainingChallengeRef.current!=='aim')completeTrainingAttempt(false);if(otRef.current&&!otReadyRef.current&&!goalFlashRef.current&&!frozenRef.current){otReadyRef.current=true;setOtLive(true);var curL=statsRef.current.lG,curR=statsRef.current.rG;if(curL!==curR){triggerWin(curL>curR?'left':'right');}else{resetPosRef.current(pmRef.current!=='online');if(pmRef.current==='multi'||pmRef.current==='online'||pmRef.current==='single')startReady(true);}}}
           if(ball.y<BR){ball.y=BR;ball.vy=-ball.vy*BBOUND;}
           if(!gameOver){if(ball.x<=BR&&ball.y>GH-GRND-GOALH)scoreGoalRef.current('left');else if(ball.x>=GW-BR&&ball.y>GH-GRND-GOALH)scoreGoalRef.current('right');}
           var colSl=mode==='practice'||mode==='training'?(hSide==='right'?[rs]:[ls]):[ls,rs];
@@ -4212,7 +4289,7 @@ function makePeerRoom(peer,role,code){
               for(var fbi=0;fbi<70;fbi++)particlesRef.current.push(mkP(hitter.x+(Math.random()-0.5)*SR*2,hitter.y-Math.random()*SR,(Math.random()-0.5)*6,-2-Math.random()*6,['#fbbf24','#f97316','#ef4444','#fde68a'][fbi%4],30+Math.random()*30,3+Math.random()*4));
               if(soundEnabledRef.current)playGameSound('dash');
               // a slime that bursts into flames forfeits the match on the spot
-              if(mode!=='practice'&&mode!=='training'){rareMsgRef.current={text:'SPONTANEOUS COMBUSTION · FORFEIT',t:240,col:'#fb923c'};triggerWin(lastTouchRef.current==='left'?'right':'left');}
+              if(mode!=='practice'&&mode!=='training'&&!gsRef.current._combust){var loser=lastTouchRef.current,winSide=loser==='left'?'right':'left';gsRef.current._combust=true;frozenRef.current=true;rareMsgRef.current={text:'SPONTANEOUS COMBUSTION!',t:200,col:'#fb923c'};setTimeout(function(){if(!gsRef.current._combust||goRef.current)return;frozenRef.current=false;rareMsgRef.current={text:'SPONTANEOUS COMBUSTION · FORFEIT',t:240,col:'#fb923c'};triggerWin(winSide);},1300);}
             }
           }
           [ls,rs].forEach(function(bs){if(bs._burnT>0){bs._burnT--;if(bs._burnT%3===0)particlesRef.current.push(mkP(bs.x+(Math.random()-0.5)*SR*1.4,bs.y-SR*0.6,(Math.random()-0.5)*1.5,-1.5-Math.random()*2,bs._burnT>120?(Math.random()<0.5?'#f97316':'#fbbf24'):'rgba(90,90,90,0.6)',35,4+Math.random()*3));}});
@@ -4243,7 +4320,7 @@ function makePeerRoom(peer,role,code){
             if(pg){pbox(44,44,150);ctx.font='11px "Lilita One",sans-serif';ctx.textAlign='left';ctx.fillStyle=fresh?'#fde68a':'rgba(255,255,255,0.6)';ctx.fillText('LAST GOAL',GW-150,56);
               ctx.font='16px "Lilita One",sans-serif';ctx.fillStyle=fresh?'#fbbf24':'#fff';ctx.fillText(pg.kmh+' km/h',GW-150,76);ctx.textAlign='right';ctx.fillText(pg.m+' m',GW-20,76);}
             ctx.restore();}
-          if(otRef.current&&!goRef.current){ctx.save();ctx.font='22px "Lilita One",sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle='rgba(255,100,100,0.9)';ctx.shadowColor='#ff4444';ctx.shadowBlur=10;ctx.fillText('OVERTIME',GW/2,8);ctx.restore();}
+          if(otRef.current&&otReadyRef.current&&!goRef.current){ctx.save();ctx.font='22px "Lilita One",sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle='rgba(255,100,100,0.9)';ctx.shadowColor='#ff4444';ctx.shadowBlur=10;ctx.fillText('OVERTIME',GW/2,8);ctx.restore();}
           ctx.restore();
         }
        }catch(err){if(!window.__slimeErr){window.__slimeErr=err;try{console.error('[Soccer Slime] frame error',err);}catch(e2){}}}
@@ -4335,6 +4412,7 @@ function makePeerRoom(peer,role,code){
       {key:'playerdata',label:'Stats & Social',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
+      tour&&React.createElement(MenuTour,{onDone:finishTour}),
       tutPrompt&&React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'tut-title',style:{position:'fixed',inset:0,zIndex:70,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'rgba(2,6,20,0.65)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)'}},
         React.createElement('div',{className:'rise',style:{width:'min(380px,92vw)',boxSizing:'border-box',padding:'22px 22px 18px',borderRadius:20,background:'rgba(5,12,35,0.96)',border:'1px solid rgba(251,191,36,0.5)',boxShadow:'0 20px 60px rgba(0,0,0,0.55)',textAlign:'center'}},
           React.createElement('div',{'aria-hidden':'true',style:{fontSize:34,marginBottom:4}},'⚽'),
@@ -4351,7 +4429,7 @@ function makePeerRoom(peer,role,code){
         // Daily challenge card
         (function(){
           var dch=todaysChallenge(),done=dailyDoneToday(dailyState),streak=dailyStreakNow(dailyState);
-          return React.createElement('div',{role:'note','aria-label':'Daily challenge: '+dch.title+'. '+dch.desc+(done?' Completed.':''),style:{display:'flex',alignItems:'center',gap:10,width:'min(681px, 100%)',boxSizing:'border-box',padding:'6px 14px',marginTop:-8,marginBottom:-6,borderRadius:14,background:done?'rgba(34,197,94,0.16)':'rgba(5,12,35,0.72)',border:'1px solid '+(done?'rgba(74,222,128,0.6)':'rgba(249,115,22,0.55)'),boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}},
+          return React.createElement('div',{role:'note','data-tour':'daily','aria-label':'Daily challenge: '+dch.title+'. '+dch.desc+(done?' Completed.':''),style:{display:'flex',alignItems:'center',gap:10,width:'min(681px, 100%)',boxSizing:'border-box',padding:'6px 14px',marginTop:-8,marginBottom:-6,borderRadius:14,background:done?'rgba(34,197,94,0.16)':'rgba(5,12,35,0.72)',border:'1px solid '+(done?'rgba(74,222,128,0.6)':'rgba(249,115,22,0.55)'),boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}},
             React.createElement('div',{'aria-hidden':'true',style:{fontSize:20,flex:'0 0 auto'}},done?'✅':'📅'),
             React.createElement('div',{style:{flex:1,minWidth:0,textAlign:'left',lineHeight:1.25}},
               React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff'}},
@@ -4362,7 +4440,7 @@ function makePeerRoom(peer,role,code){
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
-            return React.createElement('button',{key:card.key,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid rgba(255,255,255,0.12)',boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 16px 45px rgba(0,0,0,0.55),0 0 30px '+card.glow:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',transform:hov?'translateY(-7px)':'translateY(0)',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',cursor:'pointer'},focusSty(card.key),{transform:hov?'translateY(-7px)':'none'})},
+            return React.createElement('button',{key:card.key,'data-tour':card.key,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid rgba(255,255,255,0.12)',boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 16px 45px rgba(0,0,0,0.55),0 0 30px '+card.glow:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',transform:hov?'translateY(-7px)':'translateY(0)',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',cursor:'pointer'},focusSty(card.key),{transform:hov?'translateY(-7px)':'none'})},
               React.createElement('div',{style:{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',minHeight:68,padding:'9px 12px',boxSizing:'border-box',background:card.hdr,boxShadow:'inset 0 1px 0 rgba(255,255,255,0.38),inset 0 -3px 0 rgba(0,0,0,0.2)'}},
                 React.createElement('div',{style:{position:'absolute',top:0,left:'22%',width:'56%',height:2,background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.7),rgba(255,255,255,0))'}}),
                 React.createElement('div',{style:{minWidth:0,flex:1}},
@@ -4372,16 +4450,16 @@ function makePeerRoom(peer,role,code){
           })
         ),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:8,flexWrap:'wrap',justifyContent:'center',alignItems:'center'}},
-          React.createElement('button',{key:'accounts',type:'button',title:'Your Account','aria-label':'Your Account',onClick:function(){setScreen('accounts');},onMouseEnter:function(){setHovCard('accounts');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:2,borderRadius:'50%',border:'none',background:'rgba(5,12,35,0.78)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='accounts'||isFocused('accounts')?'translateY(-3px) scale(1.04)':'none'},focusSty('accounts'))},React.createElement(ProfileAvatar,{profile:account.avatar,size:38})),
-          React.createElement('button',{key:'settings',type:'button',title:'Settings','aria-label':'Settings',onClick:function(){setSettingsSaveError('');setShowSettings(true);},onMouseEnter:function(){setHovCard('settings');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:0,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.18)',background:'rgba(5,12,35,0.78)',color:'#fff',fontSize:25,lineHeight:1,cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='settings'||isFocused('settings')?'translateY(-3px) scale(1.04)':'none'},focusSty('settings'))},'\u2699'),
+          React.createElement('button',{key:'accounts','data-tour':'accounts',type:'button',title:'Your Account','aria-label':'Your Account',onClick:function(){setScreen('accounts');},onMouseEnter:function(){setHovCard('accounts');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:2,borderRadius:'50%',border:'none',background:'rgba(5,12,35,0.78)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='accounts'||isFocused('accounts')?'translateY(-3px) scale(1.04)':'none'},focusSty('accounts'))},React.createElement(ProfileAvatar,{profile:account.avatar,size:38})),
+          React.createElement('button',{key:'settings','data-tour':'settings',type:'button',title:'Settings','aria-label':'Settings',onClick:function(){setSettingsSaveError('');setShowSettings(true);},onMouseEnter:function(){setHovCard('settings');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:0,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.18)',background:'rgba(5,12,35,0.78)',color:'#fff',fontSize:25,lineHeight:1,cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='settings'||isFocused('settings')?'translateY(-3px) scale(1.04)':'none'},focusSty('settings'))},'\u2699'),
           menuPills.map(function(btn){
-            var b=React.createElement('button',{key:btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label);
+            var b=React.createElement('button',{key:btn.key,'data-tour':btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label);
             return b;
           })
         ),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',justifyContent:'center',alignItems:'center'}},
           React.createElement('div',{key:'theme','data-theme-dd':'1',style:{display:'flex',alignItems:'center',gap:8,position:'relative',zIndex:themeOpen?2:0,flexWrap:touchUI?'wrap':'nowrap',justifyContent:'center'}},
-            React.createElement('button',{onClick:toggleTheme,'aria-haspopup':'true','aria-expanded':String(themeOpen),onMouseEnter:function(){setHovCard('theme');},onMouseLeave:function(){setHovCard(null);},style:hovPill('theme',THEME_BG[themeMode])},'Theme '+(themeOpen?'\u25B4':'\u25BE')),
+            React.createElement('button',{'data-tour':'theme',onClick:toggleTheme,'aria-haspopup':'true','aria-expanded':String(themeOpen),onMouseEnter:function(){setHovCard('theme');},onMouseLeave:function(){setHovCard(null);},style:hovPill('theme',THEME_BG[themeMode])},'Theme '+(themeOpen?'\u25B4':'\u25BE')),
             React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:touchUI?'center':'flex-start',gap:8,width:themeOpen?(touchUI?'100%':240):0,height:touchUI&&!themeOpen?0:undefined,opacity:themeOpen?1:0,overflow:touchUI&&!themeOpen?'hidden':'visible',flexShrink:0,transition:'width 0.22s ease,opacity 0.16s ease',zIndex:20,pointerEvents:themeOpen?'auto':'none'}},
               [['day','Day'],['night','Night'],['japan','Sakura']].map(function(o){
                 var id='theme_'+o[0],cur=themeMode===o[0];
@@ -4509,7 +4587,7 @@ function makePeerRoom(peer,role,code){
     return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
   }
 
-  if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{onTutorial:startTutorial,theme:themeMode,keybinds:gameSettings.keybinds,touch:touchUI,onBack:function(){setScreen('menu');},focusSty:focusSty})));
+  if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{onTour:function(){try{window.localStorage.removeItem('slime_tour_seen');}catch(e){}setScreen('menu');setTour(true);},onTutorial:startTutorial,theme:themeMode,keybinds:gameSettings.keybinds,touch:touchUI,onBack:function(){setScreen('menu');},focusSty:focusSty})));
 
   // ── PLAYER SELECT ────────────────────────────────────────────────────
   if(screen==='player_select')return React.createElement('div',{key:'player-select',className:'screen-in',style:baseStyle},bgLayer(),
@@ -4844,7 +4922,7 @@ function makePeerRoom(peer,role,code){
                     React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),
                     React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.left)),
                   React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:2}},
-                    React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot?'pulse 1s ease-in-out infinite':'none'}},ot?'OVERTIME':gmode==='training'&&trainingChallengeRef.current==='dash'?Math.max(0,10-trainingAttemptRef.current.tries)+' LEFT':fmt(tl)),
+                    React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot&&otLive?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot&&otLive?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot&&otLive?'pulse 1s ease-in-out infinite':'none'}},ot&&otLive?'OVERTIME':gmode==='training'&&trainingChallengeRef.current==='dash'?Math.max(0,10-trainingAttemptRef.current.tries)+' LEFT':fmt(tl)),
                     !touchUI&&React.createElement('div',{style:{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center'}},
                       (isSingleG||isOnG)&&React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{padding:'2px 8px',fontSize:10,background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'),
                       !isOnG&&React.createElement('button',{onClick:togglePause,style:hudChip(false,{padding:'2px 8px',fontSize:10})},paused?'Resume':'Pause'),
