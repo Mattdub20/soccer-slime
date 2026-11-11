@@ -95,7 +95,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
-var GAME_VERSION='v25.0.0';
+var GAME_VERSION='v25.0.1';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -267,7 +267,7 @@ var SF=['x','y','vx','vy','spinAngle','isSpinning','spinDipY','spinPhase','spinT
 
 var HARD={aggressive:{hl:0.58,ao:-40,sm:1.3,jn:15,jx:115,hx:0.40,ib:1.4,dr:50,cd:4,jf:0.7,ad:true,er:true,def:false,w:3,dj:false},ultra_press:{hl:0.70,ao:-50,sm:1.4,jn:10,jx:120,hx:0.48,ib:1.5,dr:65,cd:3,jf:0.8,ad:true,er:true,def:false,w:3,dj:true},balanced:{hl:0.45,ao:-28,sm:1.15,jn:20,jx:110,hx:0.35,ib:1.2,dr:55,cd:5,jf:0.5,ad:false,er:false,def:false,w:2,dj:false},defensive:{hl:0.30,ao:-18,sm:1.1,jn:20,jx:105,hx:0.28,ib:1.2,dr:50,cd:5,jf:0.4,ad:false,er:false,def:true,w:1,dj:false},deep_block:{hl:0.25,ao:-12,sm:1.05,jn:25,jx:100,hx:0.22,ib:1.15,dr:45,cd:6,jf:0.35,ad:false,er:false,def:true,w:1,dj:false},opportunistic:{hl:0.60,ao:-20,sm:1.1,jn:18,jx:105,hx:0.42,ib:1.2,dr:45,cd:6,jf:0.5,ad:false,er:false,def:false,w:2,dj:false},wide_hunt:{hl:0.50,ao:-55,sm:1.2,jn:12,jx:118,hx:0.38,ib:1.3,dr:60,cd:5,jf:0.6,ad:true,er:true,def:false,w:3,dj:true},counter:{hl:0.35,ao:-30,sm:1.25,jn:22,jx:108,hx:0.30,ib:1.35,dr:52,cd:4,jf:0.6,ad:true,er:false,def:false,w:2,dj:false},blitz:{hl:0.75,ao:-60,sm:1.5,jn:5,jx:125,hx:0.50,ib:1.6,dr:80,cd:2,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},acrobat:{hl:0.52,ao:-38,sm:1.2,jn:8,jx:120,hx:0.40,ib:1.25,dr:55,cd:4,jf:0.95,ad:true,er:false,def:false,w:2,dj:true},berserker:{hl:0.80,ao:-65,sm:1.6,jn:5,jx:130,hx:0.55,ib:1.7,dr:90,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true},kamikaze:{hl:0.90,ao:-70,sm:1.7,jn:5,jx:130,hx:0.60,ib:1.8,dr:100,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true},scrambler:{hl:0.50,ao:-35,sm:1.3,jn:5,jx:120,hx:0.36,ib:1.3,dr:70,cd:3,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},sniper:{hl:0.44,ao:-48,sm:1.15,jn:20,jx:108,hx:0.33,ib:1.3,dr:45,cd:6,jf:0.5,ad:true,er:false,def:false,w:2,dj:false},high_line:{hl:0.55,ao:-45,sm:1.2,jn:15,jx:112,hx:0.44,ib:1.3,dr:58,cd:4,jf:0.65,ad:true,er:true,def:false,w:3,dj:false},poacher:{hl:0.65,ao:-15,sm:1.05,jn:8,jx:90,hx:0.45,ib:1.1,dr:30,cd:9,jf:0.4,ad:false,er:true,def:false,w:2,dj:false},shadow:{hl:0.42,ao:-25,sm:1.08,jn:15,jx:105,hx:0.30,ib:1.15,dr:42,cd:7,jf:0.4,ad:false,er:false,def:true,w:1,dj:false},wall_bouncer:{hl:0.48,ao:-32,sm:1.1,jn:10,jx:115,hx:0.35,ib:1.2,dr:50,cd:5,jf:0.6,ad:true,er:false,def:false,w:2,dj:false},lurker:{hl:0.40,ao:-10,sm:1.0,jn:25,jx:85,hx:0.25,ib:1.1,dr:25,cd:8,jf:0.2,ad:false,er:false,def:true,w:1,dj:false},patient:{hl:0.38,ao:-22,sm:1.05,jn:25,jx:100,hx:0.32,ib:1.2,dr:38,cd:7,jf:0.35,ad:false,er:false,def:true,w:1,dj:false}};
 var EASY={easy_basic:{hl:0.45,ao:-20,sm:0.85,jn:30,jx:90,hx:0.30,ib:0.9,dr:30,cd:12,jf:0.2,ad:false,er:false,def:false,w:1,dj:false},easy_rush:{hl:0.60,ao:-35,sm:0.9,jn:25,jx:95,hx:0.38,ib:1.0,dr:35,cd:10,jf:0.3,ad:false,er:true,def:false,w:1,dj:false},easy_def:{hl:0.28,ao:-10,sm:0.8,jn:35,jx:80,hx:0.22,ib:0.85,dr:20,cd:14,jf:0.15,ad:false,er:false,def:true,w:1,dj:false}};
-var IMPOSSIBLE={imp_press:{hl:0.78,ao:-52,sm:1.55,jn:8,jx:128,hx:0.50,ib:1.65,dr:70,cd:2,jf:0.85,ad:true,er:true,def:false,w:3,dj:true},imp_wall:{hl:0.5,ao:-30,sm:1.45,jn:12,jx:118,hx:0.36,ib:1.55,dr:65,cd:3,jf:0.7,ad:true,er:false,def:false,w:2,dj:true},imp_strike:{hl:0.62,ao:-42,sm:1.5,jn:6,jx:122,hx:0.46,ib:1.55,dr:75,cd:2,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},imp_anchor:{hl:0.55,ao:-36,sm:1.45,jn:12,jx:118,hx:0.4,ib:1.5,dr:65,cd:3,jf:0.7,ad:true,er:false,def:false,w:2,dj:true},imp_blitz:{hl:0.85,ao:-62,sm:1.65,jn:5,jx:130,hx:0.55,ib:1.75,dr:90,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true}};
+var IMPOSSIBLE={imp_press:{hl:0.78,ao:-52,sm:1.55,jn:8,jx:128,hx:0.50,ib:1.65,dr:70,cd:2,jf:0.85,ad:true,er:true,def:false,w:3,dj:true},imp_wall:{hl:0.32,ao:-15,sm:1.35,jn:18,jx:112,hx:0.26,ib:1.5,dr:55,cd:3,jf:0.5,ad:true,er:false,def:true,w:2,dj:true},imp_strike:{hl:0.62,ao:-42,sm:1.5,jn:6,jx:122,hx:0.46,ib:1.55,dr:75,cd:2,jf:0.9,ad:true,er:true,def:false,w:3,dj:true},imp_anchor:{hl:0.40,ao:-22,sm:1.3,jn:22,jx:108,hx:0.30,ib:1.45,dr:50,cd:4,jf:0.45,ad:true,er:false,def:true,w:2,dj:true},imp_blitz:{hl:0.85,ao:-62,sm:1.65,jn:5,jx:130,hx:0.55,ib:1.75,dr:90,cd:2,jf:1.0,ad:true,er:true,def:false,w:3,dj:true}};
 var ALL_S=Object.assign({},HARD,EASY,IMPOSSIBLE);
 function mkPool(o){var p=[],keys=Object.keys(o);for(var ki=0;ki<keys.length;ki++){var k=keys[ki];for(var wi=0;wi<o[k].w;wi++)p.push(k);}return p;}
 var HP=mkPool(HARD),EP=mkPool(EASY),IP=mkPool(IMPOSSIBLE);
@@ -3830,7 +3830,6 @@ function makePeerRoom(peer,role,code){
   function resetPos(defMove){
     gsRef.current._sonic=null;
     gsRef.current._combust=false;
-    impMemRef.current.kickoff=Math.random()<0.6;
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
     var pm=practRef.current?practModeRef.current:'regular',hSide=sideRef.current;
     if(pmRef.current==='training'){
@@ -4206,22 +4205,34 @@ function makePeerRoom(peer,role,code){
               if(smart&&!behind&&bh>40&&(aiLeft?(b.x<GW*0.6&&b.vx<1.2):(b.x>GW*0.4&&b.vx>-1.2))){for(var pra=3;pra<preds.length;pra++){var pq=preds[pra],ph2=GH-GRND-pq.y;if(pq.y>preds[pra-1].y&&ph2<170&&ph2>35&&(aiLeft?pq.x<GW*0.62:pq.x>GW*0.38)&&Math.abs(ai.x-pq.x)/(SPD*s2.ib)<=pq.time+5){aer={x:pq.x,t:pq.time,h:ph2};break;}}}
               if(behind){newT=b.x+(aiLeft?-10:10);spd2=SPD*s2.ib*1.15;if(bh>15&&bh<s2.jx&&ai.y>=GH-GRND-1&&Math.random()<s2.jf*0.7)doJump=true;if(!ai.isSpinning&&ai.y>=GH-GRND-1&&ai.dashFrames===0&&ai.dashCooldown===0){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}}
               else if(aer){var gsd=aiLeft?-1:1;newT=Math.max(SR,Math.min(GW-SR,aer.x+gsd*16));spd2=SPD*s2.ib*1.12;var grd=ai.y>=GH-GRND-1,nrb=Math.abs(ai.x-aer.x)<75;if(grd&&nrb&&aer.t>=2&&aer.t<=(aer.h>105?28:19))doJump=true;if(!grd&&nrb&&!ai.hasDoubleJumped&&!ai.isSpinning&&aer.h>112&&ai.vy>-3&&aer.t<=16){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}
-              else if(threat||s2.def||(alerted&&!isImp)){var bx2=b.x;for(var prj=0;prj<preds.length;prj++){var ttrj=Math.abs(ai.x-preds[prj].x)/SPD;if(ttrj<=preds[prj].time+3){bx2=preds[prj].x;break;}}var shade=smart?Math.max(0.1,Math.min(alerted?0.4:0.3,Math.abs(bx2-ownGx)/GW*0.5)):0,cutX=smart?bx2+(ownGx-bx2)*shade:bx2+(aiLeft?-5:5);newT=aiLeft?Math.max(cutX,ownGx+SR):Math.min(cutX,ownGx-SR);spd2=SPD*s2.ib;if(aDist<100&&bh<120&&ai.y>=GH-GRND-1&&Math.random()<s2.jf)doJump=true;if(ai.stuckCounter>15){doJump=true;newT=aiLeft?b.x+20:b.x-20;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}else if(aiLeft?(b.x>GW*s2.hl):(b.x<GW*(1-s2.hl))){newT=b.x+s2.ao*(aiLeft?1:-1)+(Math.random()<0.3?(Math.random()*28-14):0);if(aDist<130){if(hPatA&&ai.y>=GH-GRND-1&&bh>10&&Math.random()<hPatA.jf*0.6)doJump=true;if(hPatA&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y>=GH-GRND-1&&aDist<s2.dr*1.2&&Math.random()<Math.min(0.5,hPatA.df*3)){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(bh>s2.jn&&bh<s2.jx&&ai.y>=GH-GRND-1&&Math.random()<s2.jf){var ttr2=aDist/SPD,bhy=b.y+b.vy*ttr2+0.5*GRAV*ttr2*ttr2;if(bhy>GH-GRND-s2.jx&&bhy<GH-GRND-8)doJump=true;}if(ai.stuckCounter>18){doJump=true;newT=b.x+s2.ao*(aiLeft?1:-1)-10;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(s2.ad&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y<GH-GRND-15&&aDist<90&&ai.spinPhase===0){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}if(s2.ad&&ai.spinPhase===1&&aDist<70){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}}}else{newT=GW*s2.hx+(Math.random()<0.08?(Math.random()*40-20):0);if(smart)newT+=(b.x-newT)*0.16;for(var prk=0;prk<preds.length;prk++){if(preds[prk].y<GH-GRND-35&&Math.abs(preds[prk].x-newT)<140){var ttr3=Math.abs(ai.x-preds[prk].x)/SPD;if(ttr3<preds[prk].time+6&&preds[prk].time<50&&Math.random()<s2.jf){newT=preds[prk].x+(aiLeft?-18:18);if(preds[prk].time<30&&ai.y>=GH-GRND-1)doJump=true;break;}}}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr*0.7&&bon&&ai.y>=GH-GRND-1&&Math.random()<0.3){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}
+              else if(threat||s2.def||alerted){var bx2=b.x;for(var prj=0;prj<preds.length;prj++){var ttrj=Math.abs(ai.x-preds[prj].x)/SPD;if(ttrj<=preds[prj].time+3){bx2=preds[prj].x;break;}}var shade=smart?Math.max(0.1,Math.min(alerted?0.4:0.3,Math.abs(bx2-ownGx)/GW*0.5)):0,cutX=smart?bx2+(ownGx-bx2)*shade:bx2+(aiLeft?-5:5);newT=aiLeft?Math.max(cutX,ownGx+SR):Math.min(cutX,ownGx-SR);spd2=SPD*s2.ib;if(aDist<100&&bh<120&&ai.y>=GH-GRND-1&&Math.random()<s2.jf)doJump=true;if(ai.stuckCounter>15){doJump=true;newT=aiLeft?b.x+20:b.x-20;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}else if(aiLeft?(b.x>GW*s2.hl):(b.x<GW*(1-s2.hl))){newT=b.x+s2.ao*(aiLeft?1:-1)+(Math.random()<0.3?(Math.random()*28-14):0);if(aDist<130){if(hPatA&&ai.y>=GH-GRND-1&&bh>10&&Math.random()<hPatA.jf*0.6)doJump=true;if(hPatA&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y>=GH-GRND-1&&aDist<s2.dr*1.2&&Math.random()<Math.min(0.5,hPatA.df*3)){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(bh>s2.jn&&bh<s2.jx&&ai.y>=GH-GRND-1&&Math.random()<s2.jf){var ttr2=aDist/SPD,bhy=b.y+b.vy*ttr2+0.5*GRAV*ttr2*ttr2;if(bhy>GH-GRND-s2.jx&&bhy<GH-GRND-8)doJump=true;}if(ai.stuckCounter>18){doJump=true;newT=b.x+s2.ao*(aiLeft?1:-1)-10;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(s2.ad&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y<GH-GRND-15&&aDist<90&&ai.spinPhase===0){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}if(s2.ad&&ai.spinPhase===1&&aDist<70){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}}}else{newT=GW*s2.hx+(Math.random()<0.08?(Math.random()*40-20):0);if(smart)newT+=(b.x-newT)*0.16;for(var prk=0;prk<preds.length;prk++){if(preds[prk].y<GH-GRND-35&&Math.abs(preds[prk].x-newT)<140){var ttr3=Math.abs(ai.x-preds[prk].x)/SPD;if(ttr3<preds[prk].time+6&&preds[prk].time<50&&Math.random()<s2.jf){newT=preds[prk].x+(aiLeft?-18:18);if(preds[prk].time<30&&ai.y>=GH-GRND-1)doJump=true;break;}}}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr*0.7&&bon&&ai.y>=GH-GRND-1&&Math.random()<0.3){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}
               if(isImp)(function(){
                 // Impossible: plan an interception from the full predicted path instead of reacting late.
                 var mem=impMemRef.current,gsd=aiLeft?-1:1;
-                // Follow-up: we just hit the ball hard towards their goal -> chase it up the pitch for ~1.5s.
-                var twp=aiLeft?1:-1,touch=Math.hypot(b.x-ai.x,b.y-ai.y)<SR+BR+6;
-                if(touch&&b.vx*twp>4)mem.pushT=95;
-                if(mem.pushT>0){mem.pushT--;if(b.vx*twp<-1.5)mem.pushT=0;}
-                // Kickoff: on most points, burst straight at the ball so the opponent can't steal it with a first dash.
-                if(mem.kickoff&&!frozenRef.current){var gk0=ai.y>=GH-GRND-1;if(Math.abs(b.x-GW/2)<60&&gk0&&ai.dashCooldown===0&&!ai.isSpinning){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;mem.kickoff=false;newT=b.x;spd2=SPD*1.2;}else if(Math.abs(b.x-GW/2)>=60)mem.kickoff=false;}
                 // How does this opponent attack? Track the ball's height as it crosses halfway towards us (lobs vs drives).
                 if(mem.prevBx!=null&&(aiLeft?(b.x<GW/2&&mem.prevBx>=GW/2&&b.vx<0):(b.x>GW/2&&mem.prevBx<=GW/2&&b.vx>0))){var chh=GH-GRND-b.y;mem.lob=mem.lob==null?chh:mem.lob*0.75+chh*0.25;}
                 mem.prevBx=b.x;
                 // Rebound (ball changed direction off a wall, the bar or a slime): drop any old plan and react this frame.
                 if(mem.pvx!=null&&Math.abs(b.vx)>1.2&&Math.sign(b.vx)!==Math.sign(mem.pvx))ai.decisionCooldown=0;
                 mem.pvx=b.vx;
+                // Read the opponent's aerial power shot BEFORE it's struck: they're in the air with the ball just in front
+                // of them (towards our goal) at body height, or already tilted for an air dash. A shot like that is too fast
+                // to react to afterwards, so drop back to a covering spot in front of our goal now and wait for it.
+                var shootDir=aiLeft?-1:1,hAir=hum.y<GH-GRND-15,hdx=(b.x-hum.x)*shootDir,hdy=hum.y-b.y,toGoal=Math.abs(b.x-(aiLeft?0:GW));
+                var setup=hAir&&hdx>-15&&hdx<SR+BR+55&&hdy>-10&&hdy<SR+BR+50&&toGoal<560;
+                if(setup&&(hum.spinPhase===1||hum.isSpinning||Math.abs(hum.x-b.x)<SR+BR+30))mem.guardT=45;
+                if(mem.guardT>0){
+                  mem.guardT--;
+                  var shotIn=(aiLeft?b.vx<-6:b.vx>6);
+                  if(!shotIn){
+                    // stand just outside the goal box (no camping penalty), on the ground and ready to jump into the shot's path
+                    var guardX=aiLeft?GOALW+SR+14:GW-GOALW-SR-14;
+                    newT=guardX;spd2=SPD*1.25;doJump=false;
+                    if(ai.isSpinning&&ai.spinPhase===1){ai.spinTarget=0;ai.spinSnapBack=true;ai.spinPhase=0;ai.spinDipY=0;}
+                    return;
+                  }
+                  mem.guardT=0; // the shot is on its way: the interception planner below takes it from here
+                }
                 // Ball up against the wall above our own goal: hit it from the field side so it rebounds off the wall
                 // and away, then back off so it can't drop in off us. Repeat until it's cleared.
                 var wallX=aiLeft?0:GW,fromWall=Math.abs(b.x-wallX),barY=GH-GRND-GOALH,fieldX=function(d){return wallX-gsd*d;};
@@ -4247,20 +4258,17 @@ function makePeerRoom(peer,role,code){
                 for(var ip=0;ip<preds.length;ip++){
                   var q=preds[ip],h=GH-GRND-q.y;
                   if(!(aiLeft?q.x<GW-GOALW*0.6:q.x>GOALW*0.6)||h<0||h>SR+118)continue;
-                  var cx=Math.max(SR,Math.min(GW-SR,q.x+gsd*(h>60?20:24))),rise=Math.max(0,h-SR*0.85),tj=h>48?tReach(rise):0;
+                  var cx=Math.max(SR,Math.min(GW-SR,q.x+gsd*(h>60?10:16))),rise=Math.max(0,h-SR*0.85),tj=h>48?tReach(rise):0;
                   if(tj===Infinity)continue;
                   if(Math.abs(cx-ai.x)/runSpd+(h>48?Math.max(0,tj-2):0)<=q.time+1){best={x:cx,t:q.time,h:h,tj:tj};break;}
                 }
-                var incoming=aiLeft?b.vx<-2:b.vx>2; // only real shots count as incoming; slow balls are chances to attack
+                var incoming=aiLeft?b.vx<-0.5:b.vx>0.5;
                 if(best&&!behind&&onOurs&&(threat||incoming)){
                   newT=best.x;spd2=runSpd;
                   var ground=ai.y>=GH-GRND-1;
                   doJump=false;
                   if(ground&&best.h>48&&Math.abs(ai.x-best.x)<46&&best.t-best.tj<=1.5)doJump=true;
                   if(!ground&&!ai.hasDoubleJumped&&!ai.isSpinning&&best.h>SR+100&&ai.vy>-2&&best.t<=14&&Math.abs(ai.x-best.x)<50){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}
-                }else if(mem.pushT>0&&!behind){
-                  // offensive push: stay just behind the ball on its way to their goal, ready for the next touch
-                  newT=b.x-(aiLeft?1:-1)*(SR+BR+6);spd2=runSpd;
                 }else if(!behind&&!ai.isSpinning&&!(onOurs&&incoming)){
                   // Shooting: find the first point on the ball's path we can reach, and meet it from behind so the hit
                   // flies at the far goal (more loft from long range, flatter and harder up close).
@@ -4285,26 +4293,14 @@ function makePeerRoom(peer,role,code){
                   newT=newT*0.35+home2*0.65;spd2=runSpd;
                 }
                 // Dashes, like Hard but timed off the predicted contact.
-                var tw=aiLeft?1:-1,dxB=(b.x-ai.x)*tw,dyB=ai.y-b.y,inAir=ai.y<GH-GRND-2,humGap=(hum.x-b.x)*tw,danger=(onOurs&&incoming&&!best)||b.vx*tw<-4||(humGap>-10&&humGap<SR+BR+45&&Math.abs(hum.y-b.y)<SR+60);
-                // Where will the ball be relative to us over the next few frames? (we keep drifting at our current speed)
-                function relAt(k){var q=preds[Math.min(preds.length-1,Math.max(0,k-1))];if(!q)return null;var ax=ai.x+ai.vx*k,ay=Math.min(GH-GRND,ai.y+ai.vy*k+0.5*GRAV*k*k);return{dx:(q.x-ax)*tw,dy:ay-q.y};}
-                // the ball sits in front of our body, about chest high: a forward dash will drive it at the far goal
-                function inStrike(r){return r&&r.dx>-6&&r.dx<SR+BR+18&&r.dy>SR*0.15&&r.dy<SR+BR+12;}
-                // Air spin dash: tilt near the top of the jump when the ball is about to come into the strike window...
-                if(inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&ai.vy>-5){
-                  for(var ak=4;ak<=14;ak++){if(inStrike(relAt(ak))){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;break;}}
-                }
-                // ...and fire exactly when it's there (or bail out if the chance has gone).
-                if(ai.spinPhase===1){var now0=relAt(1),soon=relAt(3),gone=!now0||now0.dx<-30||now0.dx>200||now0.dy<-60;
-                  if(inStrike(now0)||(inStrike(soon)&&Math.random()<0.35)||gone){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}}
-                // Ground dash: a low ball ahead that we'll meet within the dash -> burst through it (mostly; a little randomness keeps it unpredictable).
-                if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0){
-                  for(var gk=2;gk<=Math.min(DASH_F+4,preds.length);gk++){var gq=preds[gk-1],gdx=(gq.x-(ai.x+tw*GDASH_SPD*gk*0.8))*tw,gh=GH-GRND-gq.y;
-                    if(gh<SR+20&&Math.abs(gdx)<SR*0.9&&(gq.x-ai.x)*tw>10){if(Math.random()<0.6){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}break;}}
-                }
+                var tw=aiLeft?1:-1,dxB=(b.x-ai.x)*tw,dyB=ai.y-b.y,inAir=ai.y<GH-GRND-2,danger=onOurs&&incoming&&!best;
+                // Air spin dash: in the air with the ball just ahead on the attacking side -> tilt, then fire forward into it.
+                if(inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&dxB>8&&dxB<125&&dyB>-30&&dyB<115){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}
+                if(ai.spinPhase===1&&((dxB>-12&&dxB<70&&Math.abs(dyB)<85)||dxB>170||dxB<-40)){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}
+                // Ground dash: low ball just ahead on the attacking side -> burst through it.
+                if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&GH-GRND-b.y<45&&dxB>18&&dxB<105&&Math.abs(b.vx)<9){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}
               })();
-              if(isImp&&ai.goalLineTime>0.5){newT=aiLeft?GOALW+SR+12:GW-GOALW-SR-12;spd2=SPD*1.25;doJump=false;} // never risk the camping penalty
-              var pushOn=isImp&&impMemRef.current.pushT>0,reach=pushOn?GW*0.28:50;newT=isImp&&!aiLeft?Math.max(GW/2-reach,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+reach:GW-SR,newT));if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
+              newT=isImp&&!aiLeft?Math.max(GW/2-50,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+50:GW-SR,newT));if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
           var slimes=[ls,rs];
           for(var sli=0;sli<slimes.length;sli++){
