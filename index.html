@@ -99,7 +99,7 @@ var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos'};
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.0.6';
+var GAME_VERSION='v25.0.7';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -4334,7 +4334,7 @@ function makePeerRoom(peer,role,code){
               }
               newT=isImp&&!aiLeft?Math.max(GW/2-reach,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+reach:GW-SR,newT));
               // Never float around in an air-dash tilt: fire it at the ball after half a second at most.
-              if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;if(superEasy){spd2*=0.5;if(Math.random()<0.75)doJump=false;}ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
+              if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;if(superEasy){spd2*=0.5;if(Math.random()<0.75)doJump=false;if(behind&&ai.groundDash&&ai.dashFrames===DASH_F){if(Math.random()<0.5){ai.dashFrames=0;ai.groundDash=false;}ai.dashCooldown=Math.max(ai.dashCooldown,40);}}ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
           var slimes=[ls,rs];
           for(var sli=0;sli<slimes.length;sli++){
