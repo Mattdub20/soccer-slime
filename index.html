@@ -95,9 +95,11 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 // The game's version. Bump this with every update; open copies of the game compare it with the live site
 // and offer a reload when a newer one is published.
+// Display names for AI difficulties (internal ids stay the same so saved stats keep working).
+var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos'};
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.0.5';
+var GAME_VERSION='v25.0.6';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -218,7 +220,7 @@ function cleanGameSettings(value){
     sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
     uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,value.uiScale)):1,
     // chances (0–1) of the rare hard-hit gags; defaults are 0.0001% and 0.00001%
-    defaultDiff:['easy','hard','impossible'].indexOf(value.defaultDiff)>=0?value.defaultDiff:'easy',
+    defaultDiff:['supereasy','easy','hard','impossible'].indexOf(value.defaultDiff)>=0?value.defaultDiff:'easy',
     rareFire:typeof value.rareFire==='number'&&isFinite(value.rareFire)?Math.max(0,Math.min(1,value.rareFire)):0.000001,
     rareBoom:typeof value.rareBoom==='number'&&isFinite(value.rareBoom)?Math.max(0,Math.min(1,value.rareBoom)):0.0000001
   };
@@ -496,7 +498,7 @@ function cloudQueueSave(){
 
 // ── Public profile (leaderboard + presence), friends and match invites ──
 // leaderboard/{uid} is the only data other players can see: username, display name, look and a few counters.
-var LEADERBOARD_FIELDS=[['wins','Wins'],['goals','Goals'],['bestWinStreak','Best streak'],['onlineWins','Online wins'],['impossibleWins','Impossible wins']];
+var LEADERBOARD_FIELDS=[['wins','Wins'],['goals','Goals'],['bestWinStreak','Best streak'],['onlineWins','Online wins'],['impossibleWins','Chaos wins']];
 var ONLINE_WINDOW_MS=90000;
 function tsMillis(v){return v&&v.toMillis?v.toMillis():typeof v==='number'?v:0;}
 function lastOnlineText(ts){var t=tsMillis(ts);if(!t)return 'Offline';var m=Math.floor((Date.now()-t)/60000);if(m<1)return 'Last online just now';if(m<60)return 'Last online '+m+'m ago';var h=Math.floor(m/60);if(h<24)return 'Last online '+h+'h ago';var d=Math.floor(h/24);return 'Last online '+(d===1?'yesterday':d<30?d+' days ago':'over a month ago');}
@@ -1878,7 +1880,7 @@ function GuideScreen(props){
   var onBack=props.onBack;
   var s_run=useState(0),demoRun=s_run[0],setDemoRun=s_run[1]; // bumping this restarts the controls demo from step 1
   useEffect(function(){function h(e){if(e.key==='Escape')onBack();}window.addEventListener('keydown',h);return function(){window.removeEventListener('keydown',h);};},[onBack]);
-  var S=[{t:'Objective',b:'Score more goals before time runs out. At 0:00, overtime rules apply based on your match settings.',shot:'objective'},{t:'P1 Controls',b:(function(k){return'Move: '+keyLabel(k.left)+'/'+keyLabel(k.right)+'  Jump: '+keyLabel(k.jump)+' (double jump in air)  Dash: '+keyLabel(k.dash);})((props.keybinds||DEFAULT_KEYBINDS).p1),shot:'p1'},{t:'P2 Controls',b:(function(k){return'Move: '+keyLabel(k.left)+'/'+keyLabel(k.right)+'  Jump: '+keyLabel(k.jump)+'  Dash: '+keyLabel(k.dash);})((props.keybinds||DEFAULT_KEYBINDS).p2),shot:'p2'},{t:'Extra keys',b:'J: toggle unlimited jump in Practice only. P/Space: pause outside Practice.',shot:'keys'},{t:'Controller and touch',b:'Connect a gamepad before or during a match: left stick or D-pad moves, A jumps, and B dashes. On phones and tablets, use the on-screen arrows, jump, and dash buttons.',shot:'keys'},{t:'AI difficulty',b:'Easy is relaxed. Hard uses varied tactics, cuts off angles and defends high balls. Impossible also learns from every goal and studies how you score.',shot:'ai'},{t:'Match options',b:'Before a match, choose unlimited scoring or a 3, 5, or 10-goal limit and enable or disable overtime. Choose the arena with the Day, Night, or Sakura theme controls. In online play the host chooses the score limit and overtime rules.',shot:'objective'},{t:'Overtime (0:00)',b:'When overtime is enabled, play continues at 0:00 regardless of the score. The first goal in overtime wins the match. Turn overtime off in match options to end the match when time runs out.',shot:'overtime'},{t:'Replay',b:'After each goal in multiplayer. Scorer skips with jump key.',shot:'replay'},{t:'Training challenges',b:'Practice aiming shots, jump and dash timing, and saving goals in 45-second drills. Score enough points for bronze, silver, or gold medals.',shot:'practice'},{t:'After the match',b:'Review the score and best streak, plus fastest shot, longest goal, saves, and longest rally.',shot:'objective'},{t:'Practice',b:'Just you and the ball, with no clock running. Press R to reset, and J (or the ∞ Jump button) for unlimited jumps.',shot:'practice'},{t:'Camping Penalty',b:'Stay in your own goal 1s = opponent gets free goal.',shot:'camping'}];
+  var S=[{t:'Objective',b:'Score more goals before time runs out. At 0:00, overtime rules apply based on your match settings.',shot:'objective'},{t:'P1 Controls',b:(function(k){return'Move: '+keyLabel(k.left)+'/'+keyLabel(k.right)+'  Jump: '+keyLabel(k.jump)+' (double jump in air)  Dash: '+keyLabel(k.dash);})((props.keybinds||DEFAULT_KEYBINDS).p1),shot:'p1'},{t:'P2 Controls',b:(function(k){return'Move: '+keyLabel(k.left)+'/'+keyLabel(k.right)+'  Jump: '+keyLabel(k.jump)+'  Dash: '+keyLabel(k.dash);})((props.keybinds||DEFAULT_KEYBINDS).p2),shot:'p2'},{t:'Extra keys',b:'J: toggle unlimited jump in Practice only. P/Space: pause outside Practice.',shot:'keys'},{t:'Controller and touch',b:'Connect a gamepad before or during a match: left stick or D-pad moves, A jumps, and B dashes. On phones and tablets, use the on-screen arrows, jump, and dash buttons.',shot:'keys'},{t:'AI difficulty',b:'Easy is relaxed. Hard uses varied tactics, cuts off angles and defends high balls. Chaos also learns from every goal and studies how you score.',shot:'ai'},{t:'Match options',b:'Before a match, choose unlimited scoring or a 3, 5, or 10-goal limit and enable or disable overtime. Choose the arena with the Day, Night, or Sakura theme controls. In online play the host chooses the score limit and overtime rules.',shot:'objective'},{t:'Overtime (0:00)',b:'When overtime is enabled, play continues at 0:00 regardless of the score. The first goal in overtime wins the match. Turn overtime off in match options to end the match when time runs out.',shot:'overtime'},{t:'Replay',b:'After each goal in multiplayer. Scorer skips with jump key.',shot:'replay'},{t:'Training challenges',b:'Practice aiming shots, jump and dash timing, and saving goals in 45-second drills. Score enough points for bronze, silver, or gold medals.',shot:'practice'},{t:'After the match',b:'Review the score and best streak, plus fastest shot, longest goal, saves, and longest rally.',shot:'objective'},{t:'Practice',b:'Just you and the ball, with no clock running. Press R to reset, and J (or the ∞ Jump button) for unlimited jumps.',shot:'practice'},{t:'Camping Penalty',b:'Stay in your own goal 1s = opponent gets free goal.',shot:'camping'}];
   return React.createElement('div',{style:{maxWidth:500,width:'100%',height:'100%',minHeight:0,margin:'0 auto',padding:'4px 0',boxSizing:'border-box',display:'flex',flexDirection:'column',alignItems:'center',overflow:'hidden'}},
     React.createElement('h2',{style:{flex:'0 0 auto',fontFamily:'var(--font-display)',color:'#fff',fontSize:34,fontWeight:700,margin:'0 0 8px',textShadow:'0 0 20px rgba(56,189,248,0.6)',letterSpacing:'0.04em',textAlign:'center'}},'How to Play'),
     React.createElement('div',{style:{flex:'1 1 0',minHeight:0,overflowY:'auto',overscrollBehavior:'contain',display:'flex',flexDirection:'column',gap:10,padding:'0 6px',width:'100%',boxSizing:'border-box'}},
@@ -2155,7 +2157,7 @@ var ACHIEVEMENTS=[
   {id:'five_wins',title:'Winning Habit',description:'Win 5 matches.',stat:'wins',target:5,frame:'royal'},
   {id:'hat_trick',title:'Hat Trick',description:'Score 3 goals in one match.',stat:'hatTricks',target:1,frame:'emerald'},
   {id:'clean_sheet',title:'Clean Sheet',description:'Win a match without conceding.',stat:'cleanSheets',target:1,frame:'ice'},
-  {id:'impossible_win',title:'Impossible!',description:'Beat the Impossible AI.',stat:'impossibleWins',target:1,frame:'prism'},
+  {id:'impossible_win',title:'Chaos Controlled',description:'Beat the Chaos AI.',stat:'impossibleWins',target:1,frame:'prism'},
   {id:'ten_matches',title:'Seasoned Slime',description:'Play 10 completed matches.',stat:'matches',target:10,frame:'violet'},
   {id:'goals_25',title:'Goal Machine',description:'Score 25 goals across matches.',stat:'goals',target:25,skin:'solar'},
   {id:'goals_100',title:'Century Club',description:'Score 100 goals across matches.',stat:'goals',target:100,skin:'nebula'},
@@ -2163,7 +2165,7 @@ var ACHIEVEMENTS=[
   {id:'wins_50',title:'Slime Legend',description:'Win 50 matches.',stat:'wins',target:50,skin:'royal'},
   {id:'matches_50',title:'Dedicated Player',description:'Complete 50 matches.',stat:'matches',target:50,skin:'frost'},
   {id:'matches_100',title:'Hall of Fame',description:'Complete 100 matches.',stat:'matches',target:100,skin:'eclipse'},
-  {id:'impossible_10',title:'Unbreakable',description:'Win 10 matches against Impossible AI.',stat:'impossibleWins',target:10,skin:'inferno'},
+  {id:'impossible_10',title:'Unbreakable',description:'Win 10 matches against Chaos AI.',stat:'impossibleWins',target:10,skin:'inferno'},
   {id:'hat_tricks_10',title:'Hat-Trick Hero',description:'Score 10 hat tricks in completed matches.',stat:'hatTricks',target:10,skin:'prism'},
   {id:'clean_sheets_10',title:'Defensive Wall',description:'Win 10 matches without conceding.',stat:'cleanSheets',target:10,skin:'toxic'},
   {id:'wins_10',title:'Double Digits',description:'Win 10 matches.',stat:'wins',target:10,frame:'neon'},
@@ -2254,9 +2256,9 @@ var DAILY_CHALLENGES=[
   {id:'never_give_up',title:'Never Give Up',desc:'Fall behind against the Hard AI, then come back and win.',diff:'hard',dur:'2min',check:function(c){return c.won&&c.behind>=1;}},
   {id:'hat_trick_win',title:'Hat Trick Hero',desc:'Score 3 or more goals and beat the Hard AI.',diff:'hard',dur:'2min',check:function(c){return c.won&&c.goals>=3;}},
   {id:'sudden_death',title:'Sudden Death',desc:'Beat the Hard AI in overtime.',diff:'hard',dur:'1min',check:function(c){return c.won&&c.ot;}},
-  {id:'mission_impossible',title:'Mission Impossible',desc:'Beat the Impossible AI.',diff:'impossible',dur:'2min',check:function(c){return c.won;}},
+  {id:'mission_impossible',title:'Embrace the Chaos',desc:'Beat the Chaos AI.',diff:'impossible',dur:'2min',check:function(c){return c.won;}},
   {id:'three_in_a_row',title:'Hat Trick of Wins',desc:'Beat the Hard AI 3 matches in a row.',diff:'hard',dur:'1min',series:3,check:function(c){return c.won;}},
-  {id:'gauntlet',title:'The Gauntlet',desc:'Beat Easy, then Hard, then Impossible, without losing.',stages:['easy','hard','impossible'],dur:'1min',series:3,check:function(c){return c.won;}},
+  {id:'gauntlet',title:'The Gauntlet',desc:'Beat Easy, then Hard, then Chaos, without losing.',stages:['easy','hard','impossible'],dur:'1min',series:3,check:function(c){return c.won;}},
   {id:'first_to_3',title:'Race to Three',desc:'Be first to 3 goals against the Hard AI.',diff:'hard',dur:'4min',limit:3,check:function(c){return c.won;}}
 ];
 function dayKey(d){d=d||new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
@@ -2591,7 +2593,7 @@ function AccountScreen(props){
 // First-visit walkthrough of the main menu: a spotlight on each part with a short explanation.
 var MENU_TOUR=[
   {t:null,title:'Welcome to Soccer Slime!',body:'Here\u2019s a quick look around. Use Next (or \u2192 / Enter), Back (\u2190), or Skip (Esc) at any time.'},
-  {t:'single',title:'Player vs AI',body:'Play against the computer. Pick Easy, Hard or Impossible, plus match length, score limit and overtime.'},
+  {t:'single',title:'Player vs AI',body:'Play against the computer. Pick Easy, Hard or Chaos, plus match length, score limit and overtime.'},
   {t:'multi',title:'Multiplayer',body:'Two players on one keyboard (or two controllers). Pick saved players to track wins and head-to-head records.'},
   {t:'practice',title:'Practice',body:'Just you and the ball, with no clock running. Try out shots, dashes and jumps, and save your best goals.'},
   {t:'daily',title:'Daily challenge',body:'A new goal every day. Finish it to build a streak and unlock rewards.'},
@@ -2601,7 +2603,7 @@ var MENU_TOUR=[
   {t:'accounts',title:'Your Account',body:'Set your name, colour, skin, frame and celebrations. Sign in to save your progress to the cloud.'},
   {t:'settings',title:'Settings',body:'Change keybinds, sound, performance mode, interface size and the rare-event chances.'},
   {t:'theme',title:'Theme',body:'Switch the arena between Day, Night and Sakura.'},
-  {t:null,title:'You\u2019re all set!',body:'Have fun, and good luck against Impossible.'}
+  {t:null,title:'You\u2019re all set!',body:'Have fun, and good luck against Chaos.'}
 ];
 function MenuTour(props){
   var s_i=useState(0),i=s_i[0],setI=s_i[1],s_r=useState(null),rect=s_r[0],setRect=s_r[1];
@@ -2768,7 +2770,7 @@ function SettingsScreen(props){
     React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
       React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Default AI difficulty'),
       React.createElement('div',{style:{display:'flex',gap:8}},
-        [['easy','Easy'],['hard','Hard'],['impossible','Impossible']].map(function(o){var active=settings.defaultDiff===o[0];
+        [['supereasy','Super Easy'],['easy','Easy'],['hard','Hard'],['impossible','Chaos']].map(function(o){var active=settings.defaultDiff===o[0];
           return React.createElement('button',{key:o[0],type:'button','data-nav-row':4.5,'aria-pressed':active,onClick:function(){props.onChange({defaultDiff:o[0]});},style:{padding:'9px 16px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'}},o[1]);}))),
     slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.05,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:value});},5),
     // Rare events: type any chance from 0% to 100% (applies to really hard hits)
@@ -2793,8 +2795,8 @@ function SettingsScreen(props){
         keyMsg&&React.createElement('div',{role:'alert',style:{fontSize:12,color:'#fecaca'}},keyMsg)),
       props.saveError&&React.createElement('div',{role:'alert',style:{fontSize:12,lineHeight:1.4,color:'#fecaca'}},props.saveError),
           React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
-        React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#fca5a5'}},'Impossible AI'),
-        React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)',lineHeight:1.4}},'Reset the Impossible AI learning back to its default state.'),
+        React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#fca5a5'}},'Chaos AI'),
+        React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)',lineHeight:1.4}},'Reset the Chaos AI learning back to its default state.'),
         React.createElement('button',{
           type:'button',
           'data-nav-row':9,
@@ -2831,7 +2833,7 @@ function SettingsScreen(props){
             touchAction:'none',
             userSelect:'none'
           }
-        },resetConfirmed?'Impossible AI reset ✓':'Reset Impossible AI'),
+        },resetConfirmed?'Chaos AI reset ✓':'Reset Chaos AI'),
         React.createElement('div',{id:'reset-impossible-ai-help',style:{fontSize:10,color:'rgba(255,255,255,0.58)'}},resetConfirmed?'Learning data has been cleared.':'Hold for 2 seconds to confirm. You can use Enter or Space.'),
         React.createElement('div',{role:'progressbar','aria-label':'Reset confirmation progress','aria-valuemin':0,'aria-valuemax':100,'aria-valuenow':Math.round(resetProgress*100),style:{height:7,width:'100%',overflow:'hidden',borderRadius:10,background:'rgba(255,255,255,0.12)',opacity:resetConfirmed?0:1}}, 
           React.createElement('div',{style:{height:'100%',width:(resetProgress*100)+'%',borderRadius:10,background:'linear-gradient(90deg,#f59e0b,#22c55e)',transition:'width 25ms linear'}}))
@@ -3738,7 +3740,7 @@ function makePeerRoom(peer,role,code){
       if(onl.view==='host'&&onl.peerOn)return[['online_dur1','online_dur2','online_dur4'],['online_score_none','online_score_3','online_score_5','online_score_10'],['online_ot_yes','online_ot_no'],['online_start'],['online_cancel']];
       return[['online_cancel']];
     }
-    if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right','diff_easy','diff_hard','diff_impossible']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
+    if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right','diff_supereasy','diff_easy','diff_hard','diff_impossible']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
     if(screen==='practice_select')return[['prac_regular','prac_air','prac_ground'],['training_open'],['side_left','side_right'],['back']];
     if(screen==='training_select')return[['train_aim','train_jump'],['train_dash','train_save'],['side_left','side_right'],['back']];
     if(screen==='player_select')return[['p1_guest','p2_guest'],['continue','back']];
@@ -3769,7 +3771,7 @@ function makePeerRoom(peer,role,code){
       score_none:function(){setScoreLimit(0);},score_3:function(){setScoreLimit(3);},score_5:function(){setScoreLimit(5);},score_10:function(){setScoreLimit(10);},
       overtime_yes:function(){setOvertimeEnabled(true);},overtime_no:function(){setOvertimeEnabled(false);},
       side_left:function(){setSide('left');},side_right:function(){setSide('right');},
-      diff_easy:function(){setDiff('easy');diffRef.current='easy';},diff_hard:function(){setDiff('hard');diffRef.current='hard';},diff_impossible:function(){setDiff('impossible');diffRef.current='impossible';},
+      diff_supereasy:function(){setDiff('supereasy');diffRef.current='supereasy';},diff_easy:function(){setDiff('easy');diffRef.current='easy';},diff_hard:function(){setDiff('hard');diffRef.current='hard';},diff_impossible:function(){setDiff('impossible');diffRef.current='impossible';},
       play:function(){startGame(pendDur==='custom'?'custom-'+customMinuteValue(customMinutes,10):pendDur,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},
       back:function(){if(screen==='menu')return;if(screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');},
       prac_regular:function(){setPractMode('regular');practModeRef.current='regular';startGame(null,'practice',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},
@@ -4223,7 +4225,7 @@ function makePeerRoom(peer,role,code){
             var hR=(mode==='multi')||(mode==='online')||(mode==='single'&&hSide==='right')||((mode==='practice'||mode==='training')&&hSide==='right');
             if(hL){if(!ls.isSpinning)ls.vx=kk['a']?-SPD:kk['d']?SPD:0;if(kk['w']&&!kk['_wPL']){if(ls.y>=GH-GRND-1&&!ls.isSpinning){ls.vy=JUMP;ls.hasDoubleJumped=false;ls.ballRefreshJump=false;}else if(practRef.current&&unlimJumpRef.current&&!ls.isSpinning){ls.vy=JUMP*0.85;}else if(!ls.hasDoubleJumped&&!ls.isSpinning){ls.vy=JUMP*0.85;ls.hasDoubleJumped=true;}else if(ls.ballRefreshJump&&!ls.isSpinning){ls.vy=JUMP*0.85;ls.ballRefreshJump=false;}}kk['_wPL']=kk['w'];if(kk['s']&&!ls._lastDown)tryDash(ls,true,'a','d',kk);if(jr['s']){snapRel(ls,kk['d']?1:kk['a']?-1:1);jr['s']=false;}ls._lastDown=kk['s'];}
             if(hR){if(!rs.isSpinning)rs.vx=kk['arrowleft']?-SPD:kk['arrowright']?SPD:0;if(kk['arrowup']&&!kk['_wPR']){if(rs.y>=GH-GRND-1&&!rs.isSpinning){rs.vy=JUMP;rs.hasDoubleJumped=false;rs.ballRefreshJump=false;}else if(practRef.current&&unlimJumpRef.current&&!rs.isSpinning){rs.vy=JUMP*0.85;}else if(!rs.hasDoubleJumped&&!rs.isSpinning){rs.vy=JUMP*0.85;rs.hasDoubleJumped=true;}else if(rs.ballRefreshJump&&!rs.isSpinning){rs.vy=JUMP*0.85;rs.ballRefreshJump=false;}}kk['_wPR']=kk['arrowup'];if(kk['arrowdown']&&!rs._lastDown)tryDash(rs,false,'arrowleft','arrowright',kk);if(jr['arrowdown']){snapRel(rs,kk['arrowright']?1:kk['arrowleft']?-1:-1);jr['arrowdown']=false;}rs._lastDown=kk['arrowdown'];}
-            if(mode==='single'){var ai=hSide==='right'?ls:rs,hum=hSide==='right'?rs:ls,aiLeft=hSide==='right',b=ball,dfc=diffRef.current,isImp=dfc==='impossible',smart=dfc!=='easy';stratTimRef.current--;if(stratTimRef.current<=0){var pool2=dfc==='easy'?EP:isImp?IP:HP;if(isImp){var qst2=getQState(ball,aiLeft,statsRef.current,tlRef.current,otRef.current),eps2=Math.max(0.38,0.85-qGoalsRef.current*0.04);stratRef.current=qPickStrat(qTableRef.current,qst2,pool2,eps2);qHistRef.current.push({s:qst2,str:stratRef.current});if(qHistRef.current.length>Q_HIST)qHistRef.current.shift();}else{stratRef.current=pool2[Math.floor(Math.random()*pool2.length)];}stratTimRef.current=isImp?70+Math.floor(Math.random()*90):150+Math.floor(Math.random()*220);}var s2=ALL_S[stratRef.current]||HARD.balanced;
+            if(mode==='single'){var ai=hSide==='right'?ls:rs,hum=hSide==='right'?rs:ls,aiLeft=hSide==='right',b=ball,dfc=diffRef.current==='supereasy'?'easy':diffRef.current,superEasy=diffRef.current==='supereasy',isImp=dfc==='impossible',smart=dfc!=='easy';stratTimRef.current--;if(stratTimRef.current<=0){var pool2=dfc==='easy'?EP:isImp?IP:HP;if(isImp){var qst2=getQState(ball,aiLeft,statsRef.current,tlRef.current,otRef.current),eps2=Math.max(0.38,0.85-qGoalsRef.current*0.04);stratRef.current=qPickStrat(qTableRef.current,qst2,pool2,eps2);qHistRef.current.push({s:qst2,str:stratRef.current});if(qHistRef.current.length>Q_HIST)qHistRef.current.shift();}else{stratRef.current=pool2[Math.floor(Math.random()*pool2.length)];}stratTimRef.current=isImp?70+Math.floor(Math.random()*90):150+Math.floor(Math.random()*220);}var s2=ALL_S[stratRef.current]||HARD.balanced;
               var hPatD=null,hPatA=null;if(isImp){var hmF=hSide==='left'?1:-1,aiF=aiLeft?1:-1,hBk=hpBucket(cl1((b.x-hum.x)/(GW/2)*hmF),cl1((b.y-hum.y)/(GH/2)),b.vx*hmF),aBk=hpBucket(cl1((b.x-ai.x)/(GW/2)*aiF),cl1((b.y-ai.y)/(GH/2)),b.vx*aiF),dArr=hPatternsRef.current[hBk],aArr=hPatternsRef.current[aBk];if(dArr&&dArr.length>=3)hPatD=hpBlend(dArr);if(aArr&&aArr.length>=3)hPatA=hpBlend(aArr);if(hPatD)aiAlertRef.current=40;else if(aiAlertRef.current>0)aiAlertRef.current--;}if(ai.decisionCooldown>0){ai.decisionCooldown--;var ddai=ai.targetX-ai.x;ai.vx=Math.abs(ddai)>5?Math.sign(ddai)*SPD*s2.sm*Math.min(Math.abs(ddai)/30,1):0;}else{if(ai.stableStart){if(s2.er)ai.stableStart=false;else if(tlRef.current>55){ai.targetX=aiLeft?200:600;ai.vx=0;if(Math.abs(b.x-ai.x)<150)ai.stableStart=false;}else ai.stableStart=false;}else{var preds=[],ptx=b.x,pty=b.y,ptvx=b.vx,ptvy=b.vy,ptsp=b.spin||0;for(var pri=0;pri<(isImp?160:120);pri++){ptvy+=GRAV;ptvx*=BDAMP;ptx+=ptvx;pty+=ptvy;if(isImp){ptsp*=0.996;if(pty<BR){pty=BR;ptvy=-ptvy*BBOUND;}}if(ptx<BR){ptx=BR;ptvx=-ptvx*0.88;if(isImp){ptvy+=ptsp*BR*0.45;ptsp*=0.5;}}if(ptx>GW-BR){ptx=GW-BR;ptvx=-ptvx*0.88;if(isImp){ptvy-=ptsp*BR*0.45;ptsp*=0.5;}}preds.push({x:ptx,y:pty,time:pri+1});if(pty>GH-GRND-BR){pty=GH-GRND-BR;ptvy=-ptvy*BBOUND;if(isImp){ptvx+=ptsp*BR*0.25;ptsp*=0.7;}}}var bh=GH-GRND-b.y,aDist=Math.abs(ai.x-b.x),bon=bh<20,behind=aiLeft?(b.x<ai.x-15):(b.x>ai.x+15),threat=aiLeft?(b.x<GW*0.4&&b.vx<-0.5):(b.x>GW*0.6&&b.vx>0.5),stuckB=Math.abs(b.y-ai.lastBallY)<3&&Math.abs(b.vx)<1;ai.stuckCounter=stuckB?ai.stuckCounter+1:0;ai.lastBallY=b.y;var ownGx=aiLeft?GOALW/2:GW-GOALW/2,newT=ai.targetX,doJump=false,spd2=SPD*s2.sm;var aer=null,alerted=isImp&&aiAlertRef.current>0;
               if(smart&&!behind&&bh>40&&(aiLeft?(b.x<GW*0.6&&b.vx<1.2):(b.x>GW*0.4&&b.vx>-1.2))){for(var pra=3;pra<preds.length;pra++){var pq=preds[pra],ph2=GH-GRND-pq.y;if(pq.y>preds[pra-1].y&&ph2<170&&ph2>35&&(aiLeft?pq.x<GW*0.62:pq.x>GW*0.38)&&Math.abs(ai.x-pq.x)/(SPD*s2.ib)<=pq.time+5){aer={x:pq.x,t:pq.time,h:ph2};break;}}}
               if(behind){newT=b.x+(aiLeft?-10:10);spd2=SPD*s2.ib*1.15;if(bh>15&&bh<s2.jx&&ai.y>=GH-GRND-1&&Math.random()<s2.jf*0.7)doJump=true;if(!ai.isSpinning&&ai.y>=GH-GRND-1&&ai.dashFrames===0&&ai.dashCooldown===0){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}}
@@ -4332,7 +4334,7 @@ function makePeerRoom(peer,role,code){
               }
               newT=isImp&&!aiLeft?Math.max(GW/2-reach,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+reach:GW-SR,newT));
               // Never float around in an air-dash tilt: fire it at the ball after half a second at most.
-              if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
+              if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;if(superEasy){spd2*=0.5;if(Math.random()<0.75)doJump=false;}ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.1:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
           var slimes=[ls,rs];
           for(var sli=0;sli<slimes.length;sli++){
@@ -4764,7 +4766,7 @@ function makePeerRoom(peer,role,code){
 
   // ── DURATION / DIFFICULTY ────────────────────────────────────────────
   if(screen==='duration'){
-    var diffInfo={easy:'A relaxed opponent. A good place to learn the moves.',hard:'Varied tactics. Cuts off angles and defends high balls.',impossible:'Studies how you score and learns from every goal. Gets sharper as the match goes on.'};
+    var diffInfo={supereasy:'If u can\u2019t beat this u genuinely suck',easy:'A relaxed opponent. A good place to learn the moves.',hard:'Varied tactics. Cuts off angles and defends high balls.',impossible:'Studies how you score and learns from every goal. Gets sharper as the match goes on.'};
     var selectedChoice=isNightT?'linear-gradient(135deg,#818cf8,#4338ca)':isJapanT?'linear-gradient(135deg,#ec4899,#be185d)':'linear-gradient(135deg,#fde047,#f59e0b)';
     var selectedText=isDay?'#172033':'#fff',selectedBorder=isNightT?'#c7d2fe':isJapanT?'#fce7f3':'#fff7b2';
     var selectedGlow=isNightT?'0 0 0 2px rgba(30,27,75,0.55),0 0 20px rgba(129,140,248,0.85)':isJapanT?'0 0 0 2px rgba(80,20,55,0.45),0 0 20px rgba(236,72,153,0.85)':'0 0 0 2px rgba(15,23,42,0.4),0 0 20px rgba(250,204,21,0.85)';
@@ -4784,7 +4786,7 @@ function makePeerRoom(peer,role,code){
           React.createElement('div',{style:{textAlign:'center'}},label('Your Side'),
             React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
           pmRef.current==='single'&&React.createElement('div',{style:{textAlign:'center'}},label('AI Difficulty'),
-            React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}},['easy','hard','impossible'].map(function(val){var id='diff_'+val,isActive=diff===val;return React.createElement('button',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));})),
+            React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}},['supereasy','easy','hard','impossible'].map(function(val){var id='diff_'+val,isActive=diff===val;return React.createElement('button',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},DIFF_LABEL[val]);})),
             React.createElement('p',{style:{margin:'10px auto 0',maxWidth:300,minHeight:34,fontSize:12,lineHeight:1.45,color:'rgba(255,255,255,0.85)',textShadow:softText}},diffInfo[diff]||''))
         ),
         React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:10,padding:'12px 16px',borderRadius:16,background:'rgba(5,12,35,0.7)',border:'1px solid '+cardBorder}},
@@ -4952,7 +4954,7 @@ function makePeerRoom(peer,role,code){
                 dailyResult&&(function(){var dch=todaysChallenge(),dr=dailyResult;
                   return React.createElement('div',{style:{margin:'0 0 12px',padding:'10px 12px',borderRadius:12,background:dr.done?'rgba(34,197,94,0.15)':dr.passed?'rgba(56,189,248,0.12)':'rgba(239,68,68,0.12)',border:'1px solid '+(dr.done?'rgba(74,222,128,0.6)':dr.passed?'rgba(56,189,248,0.5)':'rgba(248,113,113,0.5)'),textAlign:'center'}},
                     React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:'#fde68a'}},'Daily challenge · '+dch.title),
-                    dr.need>1&&React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',margin:'8px 0 6px'}},Array.from({length:dr.need},function(_,k){var on=k<dr.n,st=dch.stages?dch.stages[k]:null;return React.createElement('div',{key:k,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:3}},React.createElement('span',{style:{width:26,height:26,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,background:on?'#22c55e':'rgba(255,255,255,0.1)',border:'2px solid '+(on?'#86efac':'rgba(255,255,255,0.3)'),color:'#fff'}},on?'✓':k+1),st&&React.createElement('span',{style:{fontSize:9,fontWeight:800,color:'rgba(255,255,255,0.6)',textTransform:'uppercase'}},st));})),
+                    dr.need>1&&React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',margin:'8px 0 6px'}},Array.from({length:dr.need},function(_,k){var on=k<dr.n,st=dch.stages?dch.stages[k]:null;return React.createElement('div',{key:k,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:3}},React.createElement('span',{style:{width:26,height:26,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,background:on?'#22c55e':'rgba(255,255,255,0.1)',border:'2px solid '+(on?'#86efac':'rgba(255,255,255,0.3)'),color:'#fff'}},on?'✓':k+1),st&&React.createElement('span',{style:{fontSize:9,fontWeight:800,color:'rgba(255,255,255,0.6)',textTransform:'uppercase'}},DIFF_LABEL[st]||st));})),
                     React.createElement('div',{style:{fontSize:13,fontWeight:800,color:'#fff',marginTop:4}},dr.done?'Challenge complete! 🔥 See you tomorrow.':dr.passed?(dr.need>1?'Match '+dr.n+' of '+dr.need+' done. Keep going!':'Done!'):(dr.lost?'Streak broken. The series starts again from match 1.':'Not this time. Give it another go!')));
                 })(),
                 React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}},
@@ -5047,7 +5049,7 @@ function makePeerRoom(peer,role,code){
             lLeft&&React.createElement('span',{style:{marginRight:rRight?14:0}},keys([keyLabel(gameSettings.keybinds.p1.left),keyLabel(gameSettings.keybinds.p1.right)]),'move ',keys([keyLabel(gameSettings.keybinds.p1.jump)]),'jump ',keys([keyLabel(gameSettings.keybinds.p1.dash)]),'dash'),
             rRight&&React.createElement('span',null,keys([keyLabel(gameSettings.keybinds.p2.left),keyLabel(gameSettings.keybinds.p2.right)]),'move ',keys([keyLabel(gameSettings.keybinds.p2.jump)]),'jump ',keys([keyLabel(gameSettings.keybinds.p2.dash)]),'dash')),
           isOnG&&React.createElement('div',{style:{opacity:0.85}},(onRoleRef.current==='host'?'You are the blue slime':'You are the red slime')+' · arrow keys work too · 1–5 stickers'),
-          isImpG&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(239,68,68,0.2)',border:'1px solid rgba(248,113,113,0.45)',color:'#fecaca',fontWeight:800,fontSize:11,letterSpacing:'0.06em',textTransform:'uppercase'}},'Impossible AI · has studied '+memCount+' of your goals'),
+          isImpG&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(239,68,68,0.2)',border:'1px solid rgba(248,113,113,0.45)',color:'#fecaca',fontWeight:800,fontSize:11,letterSpacing:'0.06em',textTransform:'uppercase'}},'Chaos AI · has studied '+memCount+' of your goals'),
           gmode==='training'&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(245,158,11,0.2)',border:'1px solid rgba(252,211,77,0.35)',color:'#fde68a',fontWeight:800,fontSize:11}},trainingChallengeRef.current==='dash'?'Dash control · '+trainingScore+' '+(trainingScore===1?'hit':'hits')+' · '+trainingTries+'/10 tries':(trainingChallengeRef.current==='aim'?'Aiming':trainingChallengeRef.current==='jump'?'Jump timing':'Goalkeeping')+' · '+trainingScore+' '+(trainingChallengeRef.current==='aim'?(trainingScore===1?'goal':'goals'):trainingChallengeRef.current==='save'?(trainingScore===1?'save':'saves'):(trainingScore===1?'hit':'hits'))+' · '+fmt(tl)+' left')),
         isOnG&&React.createElement('div',{style:{position:'absolute',zIndex:2,left:(boxW+chatGap)*fit,top:0,bottom:0,width:chatW*fit,boxSizing:'border-box',display:'flex',flexDirection:'column',padding:12,borderRadius:16,background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.18)',boxShadow:'0 18px 50px rgba(0,0,0,0.42)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}},
         React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
