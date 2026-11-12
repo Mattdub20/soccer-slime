@@ -103,7 +103,7 @@ var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos'};
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.1.2';
+var GAME_VERSION='v25.1.4';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -531,6 +531,26 @@ function cloudSendInvite(toUid,code){
 function cloudWatchInvites(cb){return CLOUD.db.collection('invites').doc(CLOUD.user.uid).onSnapshot(function(s){cb(s.exists?s.data():null);},function(e){console.warn('Invite listener stopped.',e);});}
 function cloudClearInvite(){if(CLOUD.user&&CLOUD.db)CLOUD.db.collection('invites').doc(CLOUD.user.uid).delete().catch(function(){});}
 // Friends are a private list in your own save: [{uid, username}].
+// Friend requests: friendReqs/{fromUid}_{toUid} = {fromUid,fromUser,toUid,toUser,status:'pending'|'accepted',at}
+// Move focus to the nearest button in an arrow direction (for screens laid out in rows that wrap).
+function spatialMove(container,dir,from){
+  if(!container)return null;
+  var els=Array.prototype.slice.call(container.querySelectorAll('button:not([disabled]),[role=tab],a[href],[tabindex="0"]')).filter(function(el){var r=el.getBoundingClientRect();return r.width>0&&r.height>0;});
+  if(!from||els.indexOf(from)<0)return els[0]||null;
+  var a=from.getBoundingClientRect(),ax=a.left+a.width/2,ay=a.top+a.height/2,best=null,bs=Infinity;
+  els.forEach(function(el){if(el===from)return;var r=el.getBoundingClientRect(),dx=r.left+r.width/2-ax,dy=r.top+r.height/2-ay,main,side;
+    if(dir==='left'){main=-dx;side=Math.abs(dy);}else if(dir==='right'){main=dx;side=Math.abs(dy);}else if(dir==='up'){main=-dy;side=Math.abs(dx);}else{main=dy;side=Math.abs(dx);}
+    if(main<=4)return;var sc=main+side*2.2;if(sc<bs){bs=sc;best=el;}});
+  return best;
+}
+function arrowDir(key){key=key.toLowerCase();return key==='arrowleft'||key==='a'?'left':key==='arrowright'||key==='d'?'right':key==='arrowup'||key==='w'?'up':key==='arrowdown'||key==='s'?'down':'';}
+function frCol(){return CLOUD.db.collection('friendReqs');}
+function frSend(me,meUser,them,themUser){return frCol().doc(me+'_'+them).set({fromUid:me,fromUser:meUser,toUid:them,toUser:themUser,status:'pending',at:firebase.firestore.FieldValue.serverTimestamp()});}
+function frWatch(me,onIn,onOut){
+  var a=frCol().where('toUid','==',me).onSnapshot(function(q){onIn(q.docs.map(function(d){return Object.assign({id:d.id},d.data());}));},function(){onIn([]);});
+  var b=frCol().where('fromUid','==',me).onSnapshot(function(q){onOut(q.docs.map(function(d){return Object.assign({id:d.id},d.data());}));},function(){onOut([]);});
+  return function(){try{a();b();}catch(e){}};
+}
 function loadFriends(){try{var f=JSON.parse(window.localStorage.getItem('slime_friends')||'[]');return Array.isArray(f)?f.filter(function(x){return x&&typeof x.uid==='string'&&typeof x.username==='string';}).slice(0,50):[];}catch(e){return[];}}
 function saveFriends(list){try{window.localStorage.setItem('slime_friends',JSON.stringify(list));}catch(e){}cloudQueueSave();}
 function dbMk(name){return{id:'p'+Date.now(),name:name,wins:0,losses:0,draws:0,gf:0,ga:0,streak:0,maxStreak:0,hist:[]};}
@@ -1583,15 +1603,22 @@ function FriendsTab(props){
   if(!props.cloudUser)return cloudSignInNotice('your friends',props.panelSty);
   function add(){
     if(busy)return;setBusy(true);setMsg('');
-    props.onAdd(name).then(function(err){setBusy(false);if(err)setMsg(err);else{setMsg('');setName('');}});
+    props.onAdd(name).then(function(err){setBusy(false);if(err)setMsg(err);else{setMsg('');setName('');}if(err&&err.charAt(0)==='✓')setName('');});
   }
   var sorted=props.friends.slice().sort(function(a,b){return (cloudIsOnline(profiles[b.uid])?1:0)-(cloudIsOnline(profiles[a.uid])?1:0)||a.username.localeCompare(b.username);});
   return React.createElement('div',null,
     React.createElement('div',{style:{display:'flex',gap:8,marginBottom:8}},
       React.createElement('input',{type:'text',value:name,maxLength:16,autoCapitalize:'none',spellCheck:false,placeholder:'Friend’s username','aria-label':'Friend’s username',onChange:function(e){setName(e.target.value);setMsg('');},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')add();},style:{flex:1,minWidth:0,padding:'8px 14px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:50,color:'#fff',fontSize:14,outline:'none'}}),
-      React.createElement('button',{type:'button',onClick:add,disabled:busy,style:{padding:'8px 18px',background:'linear-gradient(135deg,#22c55e,#15803d)',border:'none',borderRadius:50,color:'#fff',fontWeight:700,cursor:busy?'wait':'pointer'}},busy?'Adding…':'Add friend')),
-    msg&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:12,marginBottom:8}},msg),
-    props.friends.length===0&&React.createElement('div',{style:Object.assign({},props.panelSty,{padding:16,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.7)'})},'No friends yet. Add someone by their cloud username to see their stats and invite them to online matches.'),
+      React.createElement('button',{type:'button',onClick:add,disabled:busy,style:{padding:'8px 18px',background:'linear-gradient(135deg,#22c55e,#15803d)',border:'none',borderRadius:50,color:'#fff',fontWeight:700,cursor:busy?'wait':'pointer'}},busy?'Sending…':'Send request')),
+    msg&&React.createElement('div',{role:'alert',style:{color:msg.charAt(0)==='✓'?'#86efac':'#fecaca',fontSize:12,marginBottom:8}},msg.charAt(0)==='✓'?msg.slice(2):msg),
+    (props.requests&&props.requests.inc.filter(function(r){return r.status==='pending';}).length>0)&&React.createElement('div',{style:{marginBottom:10}},
+      React.createElement('div',{style:{fontSize:11,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#fde68a',marginBottom:6}},'Friend requests'),
+      props.requests.inc.filter(function(r){return r.status==='pending';}).map(function(r){return React.createElement('div',{key:r.id,style:Object.assign({},props.panelSty,{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',marginBottom:6,border:'1px solid rgba(253,230,138,0.5)'})},
+        React.createElement('div',{style:{flex:1,minWidth:0,fontWeight:900,fontSize:14}},r.fromUser,React.createElement('span',{style:{fontWeight:600,fontSize:12,color:'rgba(255,255,255,0.6)'}},' wants to be friends')),
+        React.createElement('button',{type:'button',onClick:function(){props.onAccept(r);},style:{padding:'7px 14px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:800,fontSize:12,cursor:'pointer'}},'Accept'),
+        React.createElement('button',{type:'button',onClick:function(){props.onDecline(r);},style:{padding:'7px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.25)',background:'transparent',color:'rgba(255,255,255,0.75)',fontWeight:800,fontSize:12,cursor:'pointer'}},'Decline'));})),
+    (props.requests&&props.requests.out.length>0)&&React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.6)',marginBottom:8}},'Waiting for: ',props.requests.out.map(function(r,i){return React.createElement('span',{key:r.id},(i?', ':''),React.createElement('b',null,r.toUser),' ',React.createElement('button',{type:'button','aria-label':'Cancel request to '+r.toUser,onClick:function(){props.onDecline(r);},style:{padding:'0 6px',borderRadius:50,border:'1px solid rgba(255,255,255,0.25)',background:'transparent',color:'rgba(255,255,255,0.6)',fontSize:11,cursor:'pointer'}},'✕'));})),
+    props.friends.length===0&&React.createElement('div',{style:Object.assign({},props.panelSty,{padding:16,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.7)'})},'No friends yet. Send a request to someone by their cloud username. Once they accept, you can see their stats and invite them to online matches.'),
     sorted.map(function(f){
       var p=profiles[f.uid]||{},online=cloudIsOnline(p);
       return React.createElement('div',{key:f.uid,style:Object.assign({},props.panelSty,{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',marginBottom:6})},
@@ -1719,16 +1746,21 @@ function PlayerDataScreen(props){
   var panelSty={background:'rgba(5,12,35,0.72)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:12};
   var tabBtnFn=function(active){return{padding:'8px 20px',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'var(--ghost)',border:'1px solid rgba(255,255,255,'+(active?'0':'0.28')+')',borderRadius:50,color:'#fff',cursor:'pointer',fontWeight:700,fontSize:13,letterSpacing:'0.04em'};};
   function selectPlayerDataTab(nextTab){setTabFocus(nextTab);setTab(nextTab);}
-  function handlePlayerDataKeyCapture(e){
-    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(previewAchievement)setPreviewAchievement(null);else onBack();return;}
-    var target=e.target,tag=target&&target.tagName;
-    if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||target.isContentEditable)return;
-    if(previewAchievement||(target.getAttribute&&target.getAttribute('data-skin-preview')))return;
-    var key=e.key.toLowerCase(),direction=(key==='arrowright'||key==='arrowdown'||key==='d'||key==='s')?1:(key==='arrowleft'||key==='arrowup'||key==='a'||key==='w')?-1:0;
-    if(direction){e.preventDefault();e.stopPropagation();var tabs=['roster','h2h','achievements','leaderboard','friends','replays','suggestions'],index=tabs.indexOf(tabFocus),nextTab=tabs[(index+direction+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();}
-    else if((key==='enter'||key===' ')&&target.getAttribute&&target.getAttribute('role')==='tab'){e.preventDefault();e.stopPropagation();setTab(tabFocus);}
-  }
-  return React.createElement('div',{onKeyDownCapture:handlePlayerDataKeyCapture,style:{color:'#fff',minHeight:'100%',padding:'clamp(20px,7vh,64px) max(16px, env(safe-area-inset-left, 0px)) 24px',maxWidth:700,margin:'0 auto',boxSizing:'border-box'}},
+  var pdRootRef=useRef(null),pdKeyRef=useRef(null);
+  pdKeyRef.current=function(e){
+    var target=e.target,tag=target&&target.tagName,typing=tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(target&&target.isContentEditable);
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(typing){target.blur();return;}if(previewAchievement)setPreviewAchievement(null);else onBack();return;}
+    if(typing||previewAchievement||(target&&target.getAttribute&&target.getAttribute('data-skin-preview')))return;
+    var dir=arrowDir(e.key);if(!dir)return;
+    e.preventDefault();e.stopPropagation();
+    var root=pdRootRef.current,inside=!!(root&&target&&target.nodeType===1&&root.contains(target));
+    if(!inside){var cur=playerDataTabRefs.current[tab];if(cur)cur.focus();return;}
+    var isTab=target.getAttribute&&target.getAttribute('role')==='tab';
+    if(isTab&&(dir==='left'||dir==='right')){var tabs=['roster','h2h','achievements','leaderboard','friends','replays','suggestions'],index=tabs.indexOf(target.getAttribute('data-tab')||tabFocus),nextTab=tabs[(index+(dir==='right'?1:-1)+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();return;}
+    var nx=spatialMove(root,dir,target);if(nx){nx.focus();if(nx.getAttribute('role')==='tab'){var t2=nx.getAttribute('data-tab');if(t2)selectPlayerDataTab(t2);}}
+  };
+  useEffect(function(){function h(e){if(pdKeyRef.current)pdKeyRef.current(e);}window.addEventListener('keydown',h,true);return function(){window.removeEventListener('keydown',h,true);};},[]);
+  return React.createElement('div',{ref:pdRootRef,style:{color:'#fff',minHeight:'100%',padding:'clamp(20px,7vh,64px) max(16px, env(safe-area-inset-left, 0px)) 24px',maxWidth:700,margin:'0 auto',boxSizing:'border-box'}},
     React.createElement('div',{style:{display:'flex',alignItems:'center',marginBottom:16,gap:12}},
       React.createElement('h1',{style:{fontFamily:'var(--font-display)',fontSize:30,fontWeight:700,flex:1,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.6)'}},'Stats & Social'),
       React.createElement('button',{onClick:onBack,style:{padding:'8px 20px',background:'var(--ghost)',border:'1px solid rgba(255,255,255,0.32)',borderRadius:50,color:'#fff',cursor:'pointer',fontWeight:700,fontSize:13}},'Back')
@@ -1745,7 +1777,7 @@ function PlayerDataScreen(props){
           React.createElement('button',{type:'button',autoFocus:true,onClick:function(){setPreviewAchievement(null);},style:{padding:'9px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.14)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Close')));
     })(),
     React.createElement('div',{role:'tablist','aria-label':'Stats and social sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
-      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions'}].map(function(option){return React.createElement('button',{key:option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
+      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions'}].map(function(option){return React.createElement('button',{key:option.id,'data-tab':option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
     ),
     tab==='roster'&&React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
@@ -1794,7 +1826,7 @@ function PlayerDataScreen(props){
     tab==='leaderboard'&&React.createElement(LeaderboardTab,{cloudUser:props.cloudUser,panelSty:panelSty}),
     tab==='replays'&&React.createElement(ReplaysTab,{onPlay:props.onPlayReplay,panelSty:panelSty}),
     tab==='suggestions'&&React.createElement(SuggestionsTab,{isDev:!!(props.achievementProgress&&props.achievementProgress.developerUnlocked),cloudUser:props.cloudUser,accountName:props.accountName,panelSty:panelSty}),
-    tab==='friends'&&React.createElement(FriendsTab,{cloudUser:props.cloudUser,friends:props.friends||[],onAdd:props.onAddFriend,onRemove:props.onRemoveFriend,onInvite:props.onInviteFriend,panelSty:panelSty}),
+    tab==='friends'&&React.createElement(FriendsTab,{requests:props.friendReqs,onAccept:props.onAcceptFriend,onDecline:props.onDeclineFriend,cloudUser:props.cloudUser,friends:props.friends||[],onAdd:props.onAddFriend,onRemove:props.onRemoveFriend,onInvite:props.onInviteFriend,panelSty:panelSty}),
     tab==='achievements'&&React.createElement('div',null,
       React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginBottom:12,textAlign:'center'})},
         React.createElement('div',{style:{fontSize:21,fontWeight:900,color:'#fbbf24'}},unlockedCount+' / '+ACHIEVEMENTS.length+' achievements'),
@@ -2124,7 +2156,10 @@ function rpImport(file){return file.text().then(function(txt){var o=JSON.parse(t
 function rpGet(id){return rpTx('readonly',function(st){return st.get(id);});}
 function rpDelete(id,keepIndex){if(!keepIndex)rpSetIndex(rpIndex().filter(function(m){return m.id!==id;}));return rpTx('readwrite',function(st){return st.delete(id);}).catch(function(){});}
 // For each goal, the frame where play restarts, so replays skip the pause after a goal.
-function rpResumeFrames(frames,goals){return goals.map(function(g){for(var i=g.f+2;i<frames.length&&i<g.f+900;i++){var a=frames[i-1].ball,b=frames[i].ball;if(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)>100)return i;}return -1;});}
+// For each goal, the frame where play restarts (the ball jumps back to the kick-off spot), so replays can skip the pause.
+// Only a short pause that ends before the next goal is skipped; anything else plays normally.
+function rpResumeFrames(frames,goals){return goals.map(function(g,gi){var stop=Math.min(frames.length,g.f+420,gi+1<goals.length?goals[gi+1].f:Infinity);
+  for(var i=g.f+2;i<stop;i++){var a=frames[i-1].ball,b=frames[i].ball;if(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)>100&&Math.abs(b.x-GW/2)<60&&b.y<GH-GRND-120)return i;}return -1;});}
 function MatchReplayScreen(props){
   var frames=props.frames,colors=props.colors,names=props.names,onBack=props.onBack,theme=props.theme||'night',skins=props.skins||null;
   var endedRef=useRef(false),cvRef=useRef(null),posRef=useRef(0),playingRef=useRef(true),speedRef=useRef(1),dragRef=useRef(false);
@@ -2668,10 +2703,11 @@ function AccountScreen(props){
         COSMETIC_KINDS.map(function(kind){
           var owned=(props.unlockedCosmetics&&props.unlockedCosmetics[kind])||[],current=avatar[kind]||'none';
           var options=[{id:'none',name:'Classic',icon:'○'}].concat(COSMETICS[kind].items.filter(function(it){return owned.indexOf(it.id)>=0;}));
-          return React.createElement('div',{key:kind,style:{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}},
-            React.createElement('span',{style:{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.7)',minWidth:110}},COSMETICS[kind].label),
+          return React.createElement('div',{key:kind,style:{display:'flex',alignItems:'flex-start',gap:8}},
+            React.createElement('span',{style:{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.7)',width:110,flex:'0 0 110px',paddingTop:8}},COSMETICS[kind].label),
+            React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:8,flex:1,minWidth:0}},
             options.map(function(it){var on=current===it.id;return React.createElement('button',{key:it.id,type:'button','aria-pressed':on,onClick:function(){var p={};p[kind]=it.id;updateAvatar(p);},style:{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:20,border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer'}},React.createElement('span',{'aria-hidden':'true'},it.icon),it.name);}),
-            owned.length===0&&React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)'}},'Unlock with achievements & daily challenges'));
+            owned.length===0&&React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',paddingTop:8}},'Unlock with achievements & daily challenges')));
         })),
       React.createElement('input',{ref:fileRef,type:'file',accept:'image/jpeg,image/png,image/webp,image/gif,image/svg+xml',onChange:selectPhoto,style:{display:'none'}}),
       photo&&React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,borderRadius:14,background:'rgba(0,0,0,0.2)'}},
@@ -3760,9 +3796,25 @@ function makePeerRoom(peer,role,code){
     if(friends.length>=50)return Promise.resolve('You can have up to 50 friends.');
     return cloudFindPlayer(name).then(function(p){
       if(!p)return'No player called '+name+'. They need to log in once first.';
-      var next=friends.concat([{uid:p.uid,username:p.username}]);setFriends(next);saveFriends(next);return'';
+      if(friendReqs.out.some(function(r){return r.toUid===p.uid&&r.status==='pending';}))return'✓ You already asked '+name+'. Waiting for them to accept.';
+      var theirs=friendReqs.inc.find(function(r){return r.fromUid===p.uid&&r.status==='pending';});
+      if(theirs){acceptFriend(theirs);return'✓ '+name+' had already asked you, so you\u2019re now friends!';}
+      return frSend(CLOUD.user.uid,cloud.user,p.uid,p.username).then(function(){return'✓ Friend request sent to '+name+'. They\u2019ll show up once they accept.';});
     }).catch(function(e){return cloudErrorText(e);});
   }
+  var s_freq=useState({inc:[],out:[]}),friendReqs=s_freq[0],setFriendReqs=s_freq[1];
+  function addFriendLocal(uid,username){setFriends(function(cur){if(cur.some(function(f){return f.uid===uid;}))return cur;var next=cur.concat([{uid:uid,username:username}]);saveFriends(next);return next;});}
+  function acceptFriend(r){addFriendLocal(r.fromUid,r.fromUser);frCol().doc(r.id).update({status:'accepted'}).catch(function(){});}
+  function declineFriend(r){frCol().doc(r.id).delete().catch(function(){});}
+  // Listen for requests sent to me, and for my own requests being accepted.
+  useEffect(function(){
+    if(!cloud.user||!CLOUD.user)return;
+    var meUid=CLOUD.user.uid;
+    return frWatch(meUid,function(inc){setFriendReqs(function(o){return{inc:inc,out:o.out};});},function(out){
+      out.forEach(function(r){if(r.status==='accepted'){addFriendLocal(r.toUid,r.toUser);frCol().doc(r.id).delete().catch(function(){});}});
+      setFriendReqs(function(o){return{inc:o.inc,out:out.filter(function(r){return r.status!=='accepted';})};});
+    });
+  },[cloud.user]);
   function removeFriend(uid){var next=friends.filter(function(f){return f.uid!==uid;});setFriends(next);saveFriends(next);}
   function inviteFriend(friend){
     if(!hasOnlineName())return;
@@ -4574,9 +4626,8 @@ function makePeerRoom(peer,role,code){
     function btns(){var r=document.querySelector('[data-tutdone]');return r?Array.prototype.slice.call(r.querySelectorAll('button')):[];}
     var t=setTimeout(function(){var b=btns();if(b[0])b[0].focus();},100);
     function onKey(e){
-      var raw=e.key.toLowerCase(),b=btns();if(!b.length)return;var i=b.indexOf(document.activeElement);
-      if(raw==='arrowleft'||raw==='a'||raw==='arrowup'||raw==='w'){e.preventDefault();e.stopPropagation();b[(i<=0?b.length:i)-1].focus();}
-      else if(raw==='arrowright'||raw==='d'||raw==='arrowdown'||raw==='s'){e.preventDefault();e.stopPropagation();b[(i+1)%b.length].focus();}
+      var raw=e.key.toLowerCase(),b=btns();if(!b.length)return;var i=b.indexOf(document.activeElement),dir=arrowDir(raw);
+      if(dir){e.preventDefault();e.stopPropagation();var nx=spatialMove(document.querySelector('[data-tutdone]'),dir,i>=0?b[i]:null);if(nx)nx.focus();}
       else if(raw==='enter'||raw===' '){e.preventDefault();e.stopPropagation();(i>=0?b[i]:b[0]).click();}
     }
     window.addEventListener('keydown',onKey,true);
@@ -4589,9 +4640,8 @@ function makePeerRoom(peer,role,code){
     var t=setTimeout(function(){var b=btns();var pick=b.find(function(x){return /restart|rematch|accept/i.test(x.textContent);})||b[0];if(pick)pick.focus();},350);
     function onKey(e){
       var raw=e.key.toLowerCase(),b=btns();if(!b.length)return;
-      var i=b.indexOf(document.activeElement);
-      if(raw==='arrowleft'||raw==='a'||raw==='arrowup'||raw==='w'){e.preventDefault();e.stopPropagation();b[(i<=0?b.length:i)-1].focus();}
-      else if(raw==='arrowright'||raw==='d'||raw==='arrowdown'||raw==='s'){e.preventDefault();e.stopPropagation();b[(i+1)%b.length].focus();}
+      var i=b.indexOf(document.activeElement),dir=arrowDir(raw);
+      if(dir){e.preventDefault();e.stopPropagation();var nx=spatialMove(document.querySelector('[data-results]'),dir,i>=0?b[i]:null);if(nx)nx.focus();}
       else if(raw==='enter'||raw===' '){e.preventDefault();e.stopPropagation();(i>=0?b[i]:b[0]).click();}
     }
     window.addEventListener('keydown',onKey,true);
@@ -4601,7 +4651,7 @@ function makePeerRoom(peer,role,code){
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:lockedScreen()},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress),unlockedCosmetics:{celebration:unlockedCosmetics(achievementProgress,'celebration'),trail:unlockedCosmetics(achievementProgress,'trail'),pose:unlockedCosmetics(achievementProgress,'pose')}})));
-  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
+  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,friendReqs:friendReqs,onAcceptFriend:acceptFriend,onDeclineFriend:declineFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   showReplayRef.current=!!(showMatchReplay&&matchFrames.length>0)||!!viewReplay;
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,theme:themeMode,skins:getGameSlimeSkins(lastPM.current),goalEvents:matchGoals,onSave:saveReplayRange,onBack:function(){setShowMatchReplay(false);}})));
 
