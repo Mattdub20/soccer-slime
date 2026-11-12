@@ -103,7 +103,7 @@ var useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos'};
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.1.0';
+var GAME_VERSION='v25.1.2';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -517,6 +517,12 @@ function cloudPublish(){if(!CLOUD.user||!CLOUD.db)return Promise.resolve();retur
 function cloudHeartbeat(){if(!CLOUD.user||!CLOUD.db)return Promise.resolve();return lbCol().doc(CLOUD.user.uid).set({lastSeen:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(function(){});}
 function cloudTop(field){return lbCol().orderBy(field,'desc').limit(25).get().then(function(s){return s.docs.map(function(d){return Object.assign({uid:d.id},d.data());});});}
 function cloudFindPlayer(username){return lbCol().where('username','==',username).limit(1).get().then(function(s){return s.docs.length?Object.assign({uid:s.docs[0].id},s.docs[0].data()):null;});}
+// Suggestions box: anyone can send one; only the developer account can read them (enforced by the Firestore rules).
+var DEV_USERNAME='mattdub';
+function sugCol(){return CLOUD.db.collection('suggestions');}
+function sugSend(text,name){return cloudInit().then(function(ok){if(!ok)throw new Error('offline');return sugCol().add({text:text,name:String(name||'').slice(0,24),user:CLOUD.user?cloudUsernameOf(CLOUD.user):'',at:firebase.firestore.FieldValue.serverTimestamp(),v:GAME_VERSION});});}
+function sugList(){return cloudInit().then(function(ok){if(!ok)throw new Error('offline');return sugCol().orderBy('at','desc').limit(300).get();}).then(function(q){return q.docs.map(function(d){return Object.assign({id:d.id},d.data());});});}
+function sugDelete(id){return sugCol().doc(id).delete();}
 function cloudProfiles(uids){return Promise.all(uids.map(function(uid){return lbCol().doc(uid).get().then(function(d){return d.exists?Object.assign({uid:uid},d.data()):{uid:uid};}).catch(function(){return{uid:uid};});}));}
 function cloudSendInvite(toUid,code){
   var acct=loadAccountProfile();
@@ -1597,6 +1603,48 @@ function FriendsTab(props){
         React.createElement('button',{type:'button','aria-label':'Remove '+f.username,onClick:function(){props.onRemove(f.uid);},style:{padding:'7px 10px',borderRadius:50,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'rgba(255,255,255,0.7)',fontWeight:800,fontSize:12,cursor:'pointer'}},'✕'));
     }));
 }
+function SuggestionsTab(props){
+  var s_t=useState(''),text=s_t[0],setText=s_t[1],s_m=useState(''),msg=s_m[0],setMsg=s_m[1],s_b=useState(false),busy=s_b[0],setBusy=s_b[1];
+  var s_l=useState(null),list=s_l[0],setList=s_l[1],s_c=useState(null),confirm=s_c[0],setConfirm=s_c[1];
+  var isDevReader=props.isDev&&props.cloudUser===DEV_USERNAME;
+  function load(){setMsg('');setList(null);sugList().then(setList,function(e){setList([]);setMsg(e&&e.code==='permission-denied'?'The cloud won\u2019t share suggestions yet. Publish the updated Firestore rules, and make sure you\u2019re signed in as '+DEV_USERNAME+'.':'Couldn\u2019t load suggestions. Check your internet and try again.');});}
+  useEffect(function(){if(isDevReader)load();},[isDevReader]);
+  var box=Object.assign({},props.panelSty,{padding:14});
+  if(props.isDev){
+    if(!isDevReader)return React.createElement('div',{style:Object.assign({},box,{textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.78)',lineHeight:1.5})},'Developer mode is on, so this is where everyone\u2019s suggestions show up. Sign in to the cloud as ',React.createElement('b',null,DEV_USERNAME),' in Your Account to read them.');
+    function when(a){var ms=a&&a.toMillis?a.toMillis():0;if(!ms)return 'just now';var d=new Date(ms);return d.toLocaleDateString(undefined,{day:'numeric',month:'short'})+' '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});}
+    return React.createElement('div',null,
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:8}},
+        React.createElement('div',{style:{flex:1,fontSize:12,color:'rgba(255,255,255,0.6)'}},list?list.length+' suggestion'+(list.length===1?'':'s')+' from players':'Loading\u2026'),
+        React.createElement('button',{type:'button',onClick:load,style:{padding:'6px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.08)',color:'#fff',fontWeight:800,fontSize:12,cursor:'pointer'}},'\u21BB Refresh')),
+      msg&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:12,marginBottom:8}},msg),
+      list&&list.length===0&&!msg&&React.createElement('div',{style:Object.assign({},box,{textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.7)'})},'No suggestions yet.'),
+      (list||[]).map(function(sg){
+        return React.createElement('div',{key:sg.id,style:Object.assign({},props.panelSty,{padding:'10px 12px',marginBottom:6,display:'flex',gap:10,alignItems:'flex-start'})},
+          React.createElement('div',{style:{flex:1,minWidth:0}},
+            React.createElement('div',{style:{fontSize:14,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word'}},String(sg.text||'')),
+            React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:4}},(sg.name||sg.user||'Anonymous')+(sg.user&&sg.name&&sg.user!==sg.name?' (@'+sg.user+')':'')+' \u00B7 '+when(sg.at)+(sg.v?' \u00B7 '+sg.v:''))),
+          confirm===sg.id
+            ?React.createElement('button',{type:'button',autoFocus:true,onBlur:function(){setConfirm(null);},onClick:function(){sugDelete(sg.id).then(function(){setList(list.filter(function(x){return x.id!==sg.id;}));},function(){setMsg('Couldn\u2019t delete that one.');});setConfirm(null);},style:{padding:'6px 10px',borderRadius:50,border:'1px solid rgba(248,113,113,0.6)',background:'rgba(239,68,68,0.3)',color:'#fecaca',fontWeight:800,fontSize:12,cursor:'pointer'}},'Delete?')
+            :React.createElement('button',{type:'button','aria-label':'Delete suggestion',onClick:function(){setConfirm(sg.id);},style:{padding:'6px 9px',borderRadius:50,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'rgba(255,255,255,0.7)',fontWeight:800,fontSize:12,cursor:'pointer'}},'\u2715'));
+      }));
+  }
+  function send(){
+    var t=text.trim();if(!t||busy)return;
+    var last=0;try{last=+window.localStorage.getItem('slime_sug_last')||0;}catch(e){}
+    if(Date.now()-last<60000){setMsg('Thanks! Give it a minute before sending another one.');return;}
+    setBusy(true);setMsg('');
+    sugSend(t.slice(0,500),props.accountName).then(function(){try{window.localStorage.setItem('slime_sug_last',String(Date.now()));}catch(e){}setText('');setBusy(false);setMsg('sent');},function(){setBusy(false);setMsg('Couldn\u2019t send it right now. Check your internet and try again.');});
+  }
+  return React.createElement('div',{style:box},
+    React.createElement('div',{style:{fontSize:15,fontWeight:900,marginBottom:4}},'Got an idea? Tell the dev!'),
+    React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.7)',marginBottom:10,lineHeight:1.4}},'New modes, skins, fixes, anything. Only the developer can read these.'),
+    React.createElement('textarea',{value:text,maxLength:500,rows:4,placeholder:'I think it would be cool if\u2026','aria-label':'Your suggestion',onChange:function(e){setText(e.target.value);if(msg==='sent')setMsg('');},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))send();},style:{width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,0.22)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:14,fontFamily:'inherit',resize:'vertical',outline:'none'}}),
+    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:10,marginTop:8}},
+      React.createElement('span',{style:{flex:1,fontSize:11,color:'rgba(255,255,255,0.5)'}},text.length+' / 500'),
+      React.createElement('button',{type:'button',disabled:!text.trim()||busy,onClick:send,style:{padding:'8px 18px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:900,fontSize:13,cursor:text.trim()&&!busy?'pointer':'not-allowed',opacity:text.trim()&&!busy?1:0.55}},busy?'Sending\u2026':'Send')),
+    msg&&React.createElement('div',{role:'status',style:{marginTop:8,fontSize:12,fontWeight:800,color:msg==='sent'?'#86efac':'#fecaca'}},msg==='sent'?'Sent! Thanks for the idea \uD83D\uDE4C':msg));
+}
 function ReplaysTab(props){
   var s_l=useState(rpIndex),list=s_l[0],setList=s_l[1];
   var s_c=useState(null),confirm=s_c[0],setConfirm=s_c[1];
@@ -1677,7 +1725,7 @@ function PlayerDataScreen(props){
     if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||target.isContentEditable)return;
     if(previewAchievement||(target.getAttribute&&target.getAttribute('data-skin-preview')))return;
     var key=e.key.toLowerCase(),direction=(key==='arrowright'||key==='arrowdown'||key==='d'||key==='s')?1:(key==='arrowleft'||key==='arrowup'||key==='a'||key==='w')?-1:0;
-    if(direction){e.preventDefault();e.stopPropagation();var tabs=['roster','h2h','achievements','leaderboard','friends','replays'],index=tabs.indexOf(tabFocus),nextTab=tabs[(index+direction+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();}
+    if(direction){e.preventDefault();e.stopPropagation();var tabs=['roster','h2h','achievements','leaderboard','friends','replays','suggestions'],index=tabs.indexOf(tabFocus),nextTab=tabs[(index+direction+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();}
     else if((key==='enter'||key===' ')&&target.getAttribute&&target.getAttribute('role')==='tab'){e.preventDefault();e.stopPropagation();setTab(tabFocus);}
   }
   return React.createElement('div',{onKeyDownCapture:handlePlayerDataKeyCapture,style:{color:'#fff',minHeight:'100%',padding:'clamp(20px,7vh,64px) max(16px, env(safe-area-inset-left, 0px)) 24px',maxWidth:700,margin:'0 auto',boxSizing:'border-box'}},
@@ -1697,7 +1745,7 @@ function PlayerDataScreen(props){
           React.createElement('button',{type:'button',autoFocus:true,onClick:function(){setPreviewAchievement(null);},style:{padding:'9px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.14)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Close')));
     })(),
     React.createElement('div',{role:'tablist','aria-label':'Stats and social sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
-      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'replays',label:'Replays'}].map(function(option){return React.createElement('button',{key:option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
+      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions'}].map(function(option){return React.createElement('button',{key:option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
     ),
     tab==='roster'&&React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
@@ -1745,6 +1793,7 @@ function PlayerDataScreen(props){
     ),
     tab==='leaderboard'&&React.createElement(LeaderboardTab,{cloudUser:props.cloudUser,panelSty:panelSty}),
     tab==='replays'&&React.createElement(ReplaysTab,{onPlay:props.onPlayReplay,panelSty:panelSty}),
+    tab==='suggestions'&&React.createElement(SuggestionsTab,{isDev:!!(props.achievementProgress&&props.achievementProgress.developerUnlocked),cloudUser:props.cloudUser,accountName:props.accountName,panelSty:panelSty}),
     tab==='friends'&&React.createElement(FriendsTab,{cloudUser:props.cloudUser,friends:props.friends||[],onAdd:props.onAddFriend,onRemove:props.onRemoveFriend,onInvite:props.onInviteFriend,panelSty:panelSty}),
     tab==='achievements'&&React.createElement('div',null,
       React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginBottom:12,textAlign:'center'})},
@@ -2647,19 +2696,26 @@ var MENU_TOUR=[
   {t:'online',title:'Play Online',body:'Make a room and send your friend the 4-letter code, or type theirs to join.'},
   {t:'guide',title:'How to Play',body:'Every control and rule, with an animated demo. You can replay the hands-on tutorial and this tour from here.'},
   {t:'playerdata',title:'Stats & Social',body:'Your players, head-to-head records, achievements, the leaderboard, friends and saved replays.'},
+  {t:'playerdata',title:'Suggestions',body:'Got an idea for the game? Open Stats & Social, then the Suggestions tab, to send it straight to the dev.'},
   {t:'accounts',title:'Your Account',body:'Set your name, colour, skin, frame and celebrations. Sign in to save your progress to the cloud.'},
   {t:'settings',title:'Settings',body:'Change keybinds, sound, performance mode, interface size and the rare-event chances.'},
   {t:'theme',title:'Theme',body:'Switch the arena between Day, Night and Sakura.'},
   {t:null,title:'You\u2019re all set!',body:'Have fun, and good luck against Chaos.'}
 ];
+var SUGGEST_TOUR=[
+  {t:null,title:'New: Suggestions \uD83D\uDCA1',body:'You can now send your ideas straight to the developer: new modes, skins, fixes, anything you want to see.'},
+  {t:'playerdata',title:'Where to find it',body:'Open Stats & Social, then pick the Suggestions tab at the end of the row.'},
+  {t:null,title:'How it works',body:'Type your idea (up to 500 characters) and press Send. Only the developer can read suggestions, and you can send one a minute.'},
+  {t:null,title:'That\u2019s it!',body:'Thanks for helping make Soccer Slime better.'}
+];
 function MenuTour(props){
   var s_i=useState(0),i=s_i[0],setI=s_i[1],s_r=useState(null),rect=s_r[0],setRect=s_r[1];
-  var steps=MENU_TOUR.filter(function(st){return !st.t||document.querySelector('[data-tour="'+st.t+'"]');});
+  var steps=(props.steps||MENU_TOUR).filter(function(st){return !st.t||document.querySelector('[data-tour="'+st.t+'"]');});
   var st=steps[Math.min(i,steps.length-1)];
   useEffect(function(){
     function measure(){var el=st.t&&document.querySelector('[data-tour="'+st.t+'"]');if(!el){setRect(null);return;}if(el.scrollIntoView)el.scrollIntoView({block:'nearest'});var r=el.getBoundingClientRect();setRect({x:r.left,y:r.top,w:r.width,h:r.height});}
-    measure();var t=setTimeout(measure,120);window.addEventListener('resize',measure);
-    return function(){clearTimeout(t);window.removeEventListener('resize',measure);};
+    measure();var t=setInterval(function(){var el=st.t&&document.querySelector('[data-tour="'+st.t+'"]');if(!el)return;var r=el.getBoundingClientRect();setRect(function(o){return o&&Math.abs(o.x-r.left)<1&&Math.abs(o.y-r.top)<1&&Math.abs(o.w-r.width)<1&&Math.abs(o.h-r.height)<1?o:{x:r.left,y:r.top,w:r.width,h:r.height};});},200);window.addEventListener('resize',measure);
+    return function(){clearInterval(t);window.removeEventListener('resize',measure);};
   },[i]);
   function next(){if(i>=steps.length-1)props.onDone();else setI(i+1);}
   function back(){if(i>0)setI(i-1);}
@@ -2676,11 +2732,11 @@ function MenuTour(props){
   var below=hole&&hole.top+hole.height+190<vh,boxTop=hole?(below?hole.top+hole.height+14:Math.max(12,hole.top-14-170)):vh/2-90;
   var boxLeft=hole?Math.max(12,Math.min(vw-boxW-12,hole.left+hole.width/2-boxW/2)):(vw-boxW)/2;
   var btn=function(primary){return{padding:'8px 16px',borderRadius:50,border:primary?'none':'1px solid rgba(255,255,255,0.3)',background:primary?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'};};
-  return React.createElement('div',{role:'dialog','aria-modal':'true','aria-label':'Menu tour',style:{position:'fixed',inset:0,zIndex:90}},
+  return React.createElement('div',{role:'dialog','aria-modal':'true','aria-label':props.label||'Menu tour',style:{position:'fixed',inset:0,zIndex:90}},
     hole?React.createElement('div',{style:{position:'fixed',left:hole.left,top:hole.top,width:hole.width,height:hole.height,borderRadius:18,boxShadow:'0 0 0 9999px rgba(2,6,20,0.72),0 0 0 3px #fbbf24,0 0 24px rgba(251,191,36,0.6)',transition:'all 0.25s ease',pointerEvents:'none'}})
         :React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(2,6,20,0.72)'}}),
     React.createElement('div',{className:'rise',key:i,style:{position:'fixed',left:boxLeft,top:boxTop,width:boxW,boxSizing:'border-box',padding:'14px 16px 12px',borderRadius:16,background:'rgba(5,12,35,0.97)',border:'1px solid rgba(251,191,36,0.6)',boxShadow:'0 16px 40px rgba(0,0,0,0.55)',color:'#fff'}},
-      React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:'#fde68a'}},'Tour \u00b7 '+(i+1)+' / '+steps.length),
+      React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:'#fde68a'}},(props.kicker||'Tour')+' \u00b7 '+(i+1)+' / '+steps.length),
       React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:20,margin:'3px 0 4px'}},st.title),
       React.createElement('div',{style:{fontSize:13,lineHeight:1.45,color:'rgba(255,255,255,0.85)'}},st.body),
       React.createElement('div',{style:{display:'flex',gap:8,marginTop:12,alignItems:'center'}},
@@ -3433,7 +3489,14 @@ function makePeerRoom(peer,role,code){
   var s_vr=useState(null),viewReplay=s_vr[0],setViewReplay=s_vr[1];
   var s_fs=useState(''),fullSaved=s_fs[0],setFullSaved=s_fs[1];
   var s_tour=useState(false),tour=s_tour[0],setTour=s_tour[1];
-  function finishTour(){try{window.localStorage.setItem('slime_tour_seen','1');}catch(e){}setTour(false);}
+  function finishTour(){try{window.localStorage.setItem('slime_tour_seen','1');window.localStorage.setItem('slime_tour_suggest','1');}catch(e){}setTour(false);}
+  var s_stour=useState(false),sugTour=s_stour[0],setSugTour=s_stour[1];
+  function finishSugTour(){try{window.localStorage.setItem('slime_tour_suggest','1');}catch(e){}setSugTour(false);}
+  useEffect(function(){
+    if(screen!=='menu'||!introDone||tutPrompt||tour||sugTour||showSettings||showPD)return;
+    var seenMain=false,seenSug=true;try{seenMain=!!window.localStorage.getItem('slime_tour_seen');seenSug=!!window.localStorage.getItem('slime_tour_suggest');}catch(e){}
+    if(!seenMain||seenSug)return;var t=setTimeout(function(){setSugTour(true);},900);return function(){clearTimeout(t);};
+  },[screen,introDone,tutPrompt,tour,sugTour,showSettings,showPD]);
   useEffect(function(){
     if(screen!=='menu'||!introDone||tutPrompt||tour||showSettings||showPD)return;
     var seen=false;try{seen=!!window.localStorage.getItem('slime_tour_seen');}catch(e){seen=true;}
@@ -4538,7 +4601,7 @@ function makePeerRoom(peer,role,code){
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:lockedScreen()},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress),unlockedCosmetics:{celebration:unlockedCosmetics(achievementProgress,'celebration'),trail:unlockedCosmetics(achievementProgress,'trail'),pose:unlockedCosmetics(achievementProgress,'pose')}})));
-  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
+  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   showReplayRef.current=!!(showMatchReplay&&matchFrames.length>0)||!!viewReplay;
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,theme:themeMode,skins:getGameSlimeSkins(lastPM.current),goalEvents:matchGoals,onSave:saveReplayRange,onBack:function(){setShowMatchReplay(false);}})));
 
@@ -4559,6 +4622,7 @@ function makePeerRoom(peer,role,code){
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
       tour&&React.createElement(MenuTour,{onDone:finishTour}),
+      sugTour&&React.createElement(MenuTour,{steps:SUGGEST_TOUR,kicker:'What\u2019s new',label:'Suggestions guide',onDone:finishSugTour}),
       tutPrompt&&React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'tut-title',style:{position:'fixed',inset:0,zIndex:70,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'rgba(2,6,20,0.65)',backdropFilter:'blur(4px)',WebkitBackdropFilter:'blur(4px)'}},
         React.createElement('div',{className:'rise',style:{width:'min(380px,92vw)',boxSizing:'border-box',padding:'22px 22px 18px',borderRadius:20,background:'rgba(5,12,35,0.96)',border:'1px solid rgba(251,191,36,0.5)',boxShadow:'0 20px 60px rgba(0,0,0,0.55)',textAlign:'center'}},
           React.createElement('div',{'aria-hidden':'true',style:{fontSize:34,marginBottom:4}},'⚽'),
