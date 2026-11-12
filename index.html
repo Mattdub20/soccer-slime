@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.1.8';
+var GAME_VERSION='v25.1.9';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -4026,7 +4026,7 @@ function makePeerRoom(peer,role,code){
   },[screen,introDone,focusIdx,pendDur,customMinutes,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots,showPD,showSettings,scoreLimit,overtimeEnabled,themeMode]);
 
   function resetPos(defMove){
-    impMemRef.current.kickoff=true;impMemRef.current.kt=0;
+    impMemRef.current.kickoff=true;impMemRef.current.kt=0;impMemRef.current.kplan=null;
     gsRef.current._sonic=null;
     gsRef.current._combust=false;
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
@@ -4416,14 +4416,70 @@ function makePeerRoom(peer,role,code){
                 // Rebound (ball changed direction off a wall, the bar or a slime): drop any old plan and react this frame.
                 if(mem.pvx!=null&&Math.abs(b.vx)>1.2&&Math.sign(b.vx)!==Math.sign(mem.pvx))ai.decisionCooldown=0;
                 mem.pvx=b.vx;
-                // Kickoff: rush the ball with a dash so the opponent can't win it uncontested, then challenge for it.
+                // Kickoff: a different plan each point so it can't be read.
+                //  rush - dash straight at the ball and challenge for it
+                //  pop  - get under the ball, juggle it up off its head, then jump and air-dash it at goal
+                //  hold - hang back a little, let the opponent commit, and play it from there
                 if(mem.kickoff){
-                  if(Math.abs(b.x-GW/2)>80||lt0()>110||(lt0()>8&&b.vy<-1&&GH-GRND-b.y>SR+110))mem.kickoff=false;
-                  else{
-                    newT=b.x+gsd*(SR*0.4);spd2=SPD*1.3;
-                    if(ai.y>=GH-GRND-1&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&Math.abs(ai.x-b.x)>70){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}
-                    var kh=GH-GRND-b.y;if(ai.y>=GH-GRND-1&&Math.abs(ai.x-b.x)<SR+BR&&kh>30&&kh<SR+110&&b.vy>-2)doJump=true;
-                    mem.kt=(mem.kt||0)+1;return;
+                  if(!mem.kplan){var kr=Math.random(),last2=mem.klast||[];mem.kplan=kr<0.3?'rush':kr<0.78?'pop':'hold';
+                    if(last2.length>=2&&last2[0]===mem.kplan&&last2[1]===mem.kplan)mem.kplan=mem.kplan==='pop'?'rush':'pop';
+                    mem.klast=[mem.kplan].concat(last2).slice(0,2);mem.kst=0;mem.ktouch=0;mem.kcd=0;}
+                  var kh=GH-GRND-b.y,kg=ai.y>=GH-GRND-1,kt=lt0(),hTouch=Math.hypot(b.x-hum.x,b.y-hum.y)<SR+BR+6,fwd=-gsd;
+                  mem.kt=kt+1;
+                  if(mem.kplan==='hold'){
+                    if(ai.groundDash&&ai.dashFrames===DASH_F){ai.dashFrames=0;ai.groundDash=false;}
+                    // walk in to a spot short of the ball and wait; normal play takes over once anyone touches it
+                    if(kt>70||hTouch||Math.abs(b.x-GW/2)>60||Math.hypot(b.x-ai.x,b.y-ai.y)<SR+BR+6)mem.kickoff=false;
+                    else{newT=GW/2+gsd*120;spd2=SPD;return;}
+                  }else if(mem.kplan==='rush'){
+                    if(Math.abs(b.x-GW/2)>80||kt>110||(kt>8&&b.vy<-1&&kh>SR+110))mem.kickoff=false;
+                    else{
+                      newT=b.x+gsd*(SR*0.4);spd2=SPD*1.3;
+                      if(kg&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&Math.abs(ai.x-b.x)>70){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}
+                      if(kg&&Math.abs(ai.x-b.x)<SR+BR&&kh>30&&kh<SR+110&&b.vy>-2)doJump=true;
+                      return;
+                    }
+                  }else{
+                    // pop: give up the plan if the opponent gets a touch in, the ball runs away, or it takes too long
+                    var dB=Math.hypot(b.x-ai.x,b.y-ai.y);
+                    if(hTouch||kt>260||Math.abs(b.x-GW/2)>260||(mem.kst===2&&kg&&mem.kcd<=0))mem.kickoff=false;
+                    else{
+                      if(mem.kcd>0)mem.kcd--;
+                      if(dB<SR+BR+5&&b.vy<0&&mem.kcd<=0&&mem.kst<2){mem.ktouch++;mem.kcd=8;}
+                      var dxF=(b.x-ai.x)*fwd; // how far the ball is ahead of us, towards their goal
+                      doJump=false;
+                      if(ai.groundDash&&ai.dashFrames===DASH_F&&mem.kst===0){ai.dashFrames=0;ai.groundDash=false;} // no stray Hard-style dashes
+                      if(mem.kst===0&&mem.ktouch===0){
+                        // get under it, just goal-side, and pop it straight up with a jump as it comes down onto us.
+                        // If it's dropping now and we're not under it yet, wait just short of it so it doesn't clip us,
+                        // and get under it after it bounces.
+                        newT=b.x+gsd*5;spd2=SPD*1.3;
+                        if(b.vy>0&&kh<SR+BR+90&&Math.abs(ai.x-newT)>22)newT=b.x+gsd*(SR+BR+20);
+                        if(kg&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&Math.abs(ai.x-b.x)>90&&Math.abs(hum.x-b.x)<Math.abs(ai.x-b.x)-20){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}
+                        if(kg&&Math.abs(ai.x-(b.x+gsd*5))<20&&b.vy>0&&kh>SR+28&&kh<SR+75)doJump=true;
+                        return;
+                      }
+                      if(mem.kst===0){
+                        // it's up: find where it comes back down to air-dash height, and jump in time to meet it there
+                        var meet=null;for(var mk=1;mk<preds.length&&mk<90;mk++){var mq=preds[mk];if(mq.y>preds[mk-1].y&&GH-GRND-mq.y<150){meet=mq;break;}}
+                        newT=meet?meet.x+gsd*30:b.x+gsd*30;spd2=SPD*1.3;
+                        if(kg&&meet&&meet.time<=22&&Math.abs(ai.x-newT)<45){doJump=true;mem.kst=1;mem.kjt=0;}
+                        if(!meet&&kg&&kt>160)mem.kickoff=false;
+                        return;
+                      }
+                      if(mem.kst===1){
+                        mem.kjt=(mem.kjt||0)+1;
+                        newT=b.x+gsd*30;spd2=SPD*1.3;
+                        var dyK=ai.y-b.y;
+                        // tilt back once the ball is just ahead and around head height...
+                        if(!kg&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&dxF>0&&dxF<110&&dyK>-30&&dyK<115){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}
+                        // ...then fire through it towards their goal
+                        if(ai.spinPhase===1&&((dxF>-12&&dxF<60&&Math.abs(dyK)<80)||dxF>160||dxF<-40)){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=fwd;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;mem.kst=2;}
+                        if(kg&&mem.kjt>6)mem.kst=2;
+                        return;
+                      }
+                      return;
+                    }
                   }
                 }
                 // Read the opponent's aerial power shot BEFORE it's struck: they're in the air with the ball just in front
@@ -4431,7 +4487,9 @@ function makePeerRoom(peer,role,code){
                 // to react to afterwards, so drop back to a covering spot in front of our goal now and wait for it.
                 var shootDir=aiLeft?-1:1,hAir=hum.y<GH-GRND-15,hdx=(b.x-hum.x)*shootDir,hdy=hum.y-b.y,toGoal=Math.abs(b.x-(aiLeft?0:GW));
                 var setup=hAir&&hdx>-15&&hdx<SR+BR+55&&hdy>-10&&hdy<SR+BR+50&&toGoal<560;
-                if(setup&&(hum.spinPhase===1||hum.isSpinning||Math.abs(hum.x-b.x)<SR+BR+30))mem.guardT=45;
+                var onWall=Math.abs(b.x-(aiLeft?0:GW))<GOALW+70&&b.y<GH-GRND-GOALH-BR*0.5;
+                if(onWall)mem.guardT=0;
+                if(setup&&!onWall&&(hum.spinPhase===1||hum.isSpinning||Math.abs(hum.x-b.x)<SR+BR+30))mem.guardT=45;
                 if(mem.guardT>0){
                   mem.guardT--;
                   var shotIn=(aiLeft?b.vx<-6:b.vx>6);
@@ -4447,6 +4505,24 @@ function makePeerRoom(peer,role,code){
                 // Ball up against the wall above our own goal: hit it from the field side so it rebounds off the wall
                 // and away, then back off so it can't drop in off us. Repeat until it's cleared.
                 var wallX=aiLeft?0:GW,fromWall=Math.abs(b.x-wallX),barY=GH-GRND-GOALH,fieldX=function(d){return wallX-gsd*d;};
+                if(fromWall<GOALW+110&&b.y<barY+20){
+                  // the generic 'ball behind us' reaction dashes at it, which pins us against the wall: not here
+                  if(ai.groundDash&&ai.dashFrames===DASH_F){ai.dashFrames=0;ai.groundDash=false;}
+                  // Is it going to come down into our goal mouth? Then get underneath it on the goal side and head it out.
+                  var drop=null;
+                  for(var dk=0;dk<preds.length&&dk<80;dk++){var dq=preds[dk];if(dq.y>barY-BR&&(dk===0?b.vy>0:dq.y>preds[dk-1].y)){if(Math.abs(dq.x-wallX)<GOALW+12)drop=dq;break;}}
+                  if(drop){
+                    mem.retreat=0;
+                    var gx=Math.max(SR,Math.min(GW-SR,drop.x+gsd*14));
+                    newT=gx;spd2=SPD*1.3;doJump=false;
+                    var kg2=ai.y>=GH-GRND-1,kh2=GH-GRND-b.y;
+                    if(kg2&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&Math.abs(ai.x-gx)>90&&drop.time<26){ai.dashFrames=DASH_F;ai.dashDir=gx>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}
+                    // jump so we meet it just as it gets down to the bar, while it's still above the goal mouth
+                    var tjd=tReach(Math.max(0,(GH-GRND-drop.y)-SR*0.85));
+                    if(kg2&&tjd!==Infinity&&Math.abs(ai.x-gx)<35&&drop.time-tjd<=1.5)doJump=true;
+                    return;
+                  }
+                }
                 if(mem.retreat>0){mem.retreat--;if(fromWall<GOALW+90){newT=fieldX(GOALW+SR+70);spd2=SPD*1.15;doJump=false;return;}}
                 if(fromWall<GOALW+70&&b.y<barY-BR*0.5){
                   var h2=GH-GRND-b.y,dx2=Math.abs(ai.x-b.x),grd3=ai.y>=GH-GRND-1;
@@ -4512,13 +4588,15 @@ function makePeerRoom(peer,role,code){
                 if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&GH-GRND-b.y<45&&dxB>18&&dxB<105&&Math.abs(b.vx)<9){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}
               })();
               if(isImp&&ai.y>=GH-GRND-1&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0){var cTw=aiLeft?1:-1,cFx=(b.x-ai.x)*cTw;if(cFx>15&&cFx<95&&GH-GRND-b.y<55&&Math.random()<0.06){ai.dashFrames=DASH_F;ai.dashDir=cTw;ai.groundDash=true;ai.dashCooldown=3;}}
-              var deadBall=isImp&&(aiLeft?b.x>GW/2:b.x<GW/2)&&Math.abs(b.vx)<3&&Math.abs(b.vy)<4&&(GH-GRND-b.y)<70,reach=deadBall?GW:50;
+              var deadBall=isImp&&(aiLeft?b.x>GW/2:b.x<GW/2)&&Math.abs(b.vx)<3&&Math.abs(b.vy)<4&&(GH-GRND-b.y)<70,reach=deadBall||(isImp&&impMemRef.current.kickoff&&impMemRef.current.kplan==='pop')?GW:50;
               if(deadBall){
                 // The ball has stopped in their half (e.g. parked in front of their goal): go and take it.
                 // Stand just on our side of it so the touch goes towards their goal, and hop over them if they're in the way.
                 newT=b.x-(aiLeft?1:-1)*(SR+BR-6);spd2=SPD*1.2;
                 if(Math.abs(ai.x-hum.x)<SR*2+12&&(hum.x-ai.x)*(b.x-ai.x)>0&&ai.y>=GH-GRND-1)doJump=true;
               }
+              // Never get caught camping in our own goal box (a full second in there gives them the goal): step out in time.
+              if(ai.goalLineTime>0.6)newT=aiLeft?Math.max(newT,GOALW+SR*0.6):Math.min(newT,GW-GOALW-SR*0.6);
               newT=isImp&&!aiLeft?Math.max(GW/2-reach,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+reach:GW-SR,newT));
               // Never float around in an air-dash tilt: fire it at the ball after half a second at most.
               if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd;}var dd2=ai.targetX-ai.x;if(superEasy){spd2*=0.5;if(Math.random()<0.75)doJump=false;if(behind&&ai.groundDash&&ai.dashFrames===DASH_F){if(Math.random()<0.5){ai.dashFrames=0;ai.groundDash=false;}ai.dashCooldown=Math.max(ai.dashCooldown,40);}}ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.18:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
