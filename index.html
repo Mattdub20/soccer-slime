@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.1.7';
+var GAME_VERSION='v25.1.8';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -4026,6 +4026,7 @@ function makePeerRoom(peer,role,code){
   },[screen,introDone,focusIdx,pendDur,customMinutes,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots,showPD,showSettings,scoreLimit,overtimeEnabled,themeMode]);
 
   function resetPos(defMove){
+    impMemRef.current.kickoff=true;impMemRef.current.kt=0;
     gsRef.current._sonic=null;
     gsRef.current._combust=false;
     Object.assign(gsRef.current.left,mkSlime(200));Object.assign(gsRef.current.right,mkSlime(600));
@@ -4408,12 +4409,23 @@ function makePeerRoom(peer,role,code){
               if(isImp)(function(){
                 // Impossible: plan an interception from the full predicted path instead of reacting late.
                 var mem=impMemRef.current,gsd=aiLeft?-1:1;
+                function lt0(){return mem.kt||0;}
                 // How does this opponent attack? Track the ball's height as it crosses halfway towards us (lobs vs drives).
                 if(mem.prevBx!=null&&(aiLeft?(b.x<GW/2&&mem.prevBx>=GW/2&&b.vx<0):(b.x>GW/2&&mem.prevBx<=GW/2&&b.vx>0))){var chh=GH-GRND-b.y;mem.lob=mem.lob==null?chh:mem.lob*0.75+chh*0.25;}
                 mem.prevBx=b.x;
                 // Rebound (ball changed direction off a wall, the bar or a slime): drop any old plan and react this frame.
                 if(mem.pvx!=null&&Math.abs(b.vx)>1.2&&Math.sign(b.vx)!==Math.sign(mem.pvx))ai.decisionCooldown=0;
                 mem.pvx=b.vx;
+                // Kickoff: rush the ball with a dash so the opponent can't win it uncontested, then challenge for it.
+                if(mem.kickoff){
+                  if(Math.abs(b.x-GW/2)>80||lt0()>110||(lt0()>8&&b.vy<-1&&GH-GRND-b.y>SR+110))mem.kickoff=false;
+                  else{
+                    newT=b.x+gsd*(SR*0.4);spd2=SPD*1.3;
+                    if(ai.y>=GH-GRND-1&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&Math.abs(ai.x-b.x)>70){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}
+                    var kh=GH-GRND-b.y;if(ai.y>=GH-GRND-1&&Math.abs(ai.x-b.x)<SR+BR&&kh>30&&kh<SR+110&&b.vy>-2)doJump=true;
+                    mem.kt=(mem.kt||0)+1;return;
+                  }
+                }
                 // Read the opponent's aerial power shot BEFORE it's struck: they're in the air with the ball just in front
                 // of them (towards our goal) at body height, or already tilted for an air dash. A shot like that is too fast
                 // to react to afterwards, so drop back to a covering spot in front of our goal now and wait for it.
@@ -4426,7 +4438,7 @@ function makePeerRoom(peer,role,code){
                   if(!shotIn){
                     // stand just outside the goal box (no camping penalty), on the ground and ready to jump into the shot's path
                     var guardX=aiLeft?GOALW+SR+14:GW-GOALW-SR-14;
-                    newT=guardX;spd2=SPD*1.25;doJump=false;
+                    newT=guardX;spd2=SPD*1.25;doJump=(hum.spinPhase===1||(hum.isSpinning&&hum.dashFrames>0))&&Math.abs(ai.x-guardX)<40&&ai.y>=GH-GRND-1;
                     if(ai.isSpinning&&ai.spinPhase===1){ai.spinTarget=0;ai.spinSnapBack=true;ai.spinPhase=0;ai.spinDipY=0;}
                     return;
                   }
