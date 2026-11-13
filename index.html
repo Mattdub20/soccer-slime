@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.2.1';
+var GAME_VERSION='v25.2.2';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -630,10 +630,56 @@ function paintSlimePattern(ctx,R,skin,dir,t){
     ctx.rotate(dir*0.5);ctx.fillStyle=d;ctx.globalAlpha=0.8;ctx.fillRect(-R*1.4,-R*0.36,R*2.8,R*0.16);
   }else if(p==='robot'){
     drawRobotArmor(ctx,R,dir);
+  }else if(p==='fit'){
+    drawFitOutfit(ctx,R,dir);
   }
   ctx.restore();
 }
 
+// "Clean Fit": black zip jacket over a black shirt and tie, backpack strap on the back.
+function drawFitOutfit(ctx,R,dir){
+  function X(v){return dir*v*R;}
+  ctx.save();
+  // jacket: low at the front (under the smile), higher towards the back
+  ctx.fillStyle='#17171c';
+  ctx.beginPath();ctx.moveTo(X(1.1),R*0.05);ctx.lineTo(X(1.1),-R*0.02);
+  ctx.bezierCurveTo(X(0.55),-R*0.03,X(0.1),-R*0.2,X(-0.4),-R*0.42);
+  ctx.quadraticCurveTo(X(-0.8),-R*0.58,X(-1.1),-R*0.5);ctx.lineTo(X(-1.1),R*0.05);ctx.closePath();ctx.fill();
+  // soft highlight along the jacket's top edge
+  ctx.strokeStyle='rgba(255,255,255,0.14)';ctx.lineWidth=R*0.03;
+  ctx.beginPath();ctx.moveTo(X(0.95),-R*0.02);ctx.bezierCurveTo(X(0.55),-R*0.03,X(0.1),-R*0.2,X(-0.4),-R*0.42);ctx.stroke();
+  // shirt collar + tie peeking out at the neck
+  ctx.fillStyle='#0b0b0f';
+  ctx.beginPath();ctx.moveTo(X(0.12),-R*0.15);ctx.lineTo(X(0.34),-R*0.08);ctx.lineTo(X(0.24),R*0.02);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#26262e';
+  ctx.beginPath();ctx.moveTo(X(0.12),-R*0.15);ctx.lineTo(X(0.2),-R*0.02);ctx.lineTo(X(0.02),-R*0.06);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(X(0.34),-R*0.08);ctx.lineTo(X(0.27),R*0.01);ctx.lineTo(X(0.44),-R*0.01);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#050507';ctx.beginPath();ctx.moveTo(X(0.21),-R*0.1);ctx.lineTo(X(0.27),-R*0.08);ctx.lineTo(X(0.27),R*0.02);ctx.lineTo(X(0.22),R*0.02);ctx.closePath();ctx.fill();
+  // zip
+  ctx.strokeStyle='rgba(255,255,255,0.22)';ctx.lineWidth=Math.max(1,R*0.025);
+  ctx.beginPath();ctx.moveTo(X(0.48),-R*0.03);ctx.lineTo(X(0.5),R*0.05);ctx.stroke();
+  // backpack strap over the shoulder at the back, with a clip
+  ctx.fillStyle='#2b2d33';
+  ctx.beginPath();ctx.moveTo(X(-0.42),R*0.05);ctx.lineTo(X(-0.28),R*0.05);ctx.lineTo(X(-0.42),-R*0.43);ctx.lineTo(X(-0.58),-R*0.5);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#9ca3af';ctx.fillRect(Math.min(X(-0.44),X(-0.32)),-R*0.2,Math.abs(X(0.12)),R*0.06);
+  ctx.restore();
+}
+function drawFitHair(ctx,R,dir){
+  function P(x,y){return [dir*x*R,y*R];}
+  var outer=[P(-1.01,-0.36),P(-1.04,-0.62),P(-0.88,-0.9),P(-0.55,-1.06),P(-0.15,-1.11),P(0.1,-1.19),P(0.22,-1.13),P(0.34,-1.26),P(0.46,-1.15),P(0.6,-1.2),P(0.7,-1.02),P(0.78,-0.86),P(0.74,-0.8),P(0.6,-0.79),P(0.4,-0.8),P(0.18,-0.8),P(0.04,-0.83),P(-0.08,-0.8),P(-0.14,-0.66),P(-0.2,-0.52),P(-0.3,-0.5),P(-0.42,-0.58),P(-0.66,-0.56),P(-0.86,-0.44),P(-0.96,-0.34)];
+  function smooth(pts){ctx.beginPath();var n=pts.length,m0=[(pts[n-1][0]+pts[0][0])/2,(pts[n-1][1]+pts[0][1])/2];ctx.moveTo(m0[0],m0[1]);for(var i=0;i<n;i++){var a=pts[i],b=pts[(i+1)%n];ctx.quadraticCurveTo(a[0],a[1],(a[0]+b[0])/2,(a[1]+b[1])/2);}ctx.closePath();}
+  ctx.save();
+  var g=ctx.createLinearGradient(0,-R*1.33,0,-R*0.6);g.addColorStop(0,'#3d2a1d');g.addColorStop(1,'#1e140d');
+  ctx.fillStyle=g;ctx.strokeStyle='#0f0905';ctx.lineWidth=Math.max(1,R*0.045);ctx.lineJoin='round';
+  smooth(outer);ctx.fill();ctx.stroke();
+  // strands swept up and back from the quiff
+  ctx.strokeStyle='rgba(120,84,58,0.75)';ctx.lineWidth=Math.max(1,R*0.03);ctx.lineCap='round';
+  [[0.58,-1.14,0.1,-1.05,-0.45,-0.98],[0.66,-0.92,0.25,-0.92,-0.3,-0.86],[0.34,-1.2,-0.05,-1.08,-0.6,-0.9],[0.5,-0.82,0.1,-0.86,-0.4,-0.74],[0.3,-0.8,-0.05,-0.82,-0.18,-0.62]].forEach(function(s2){var a=P(s2[0],s2[1]),b=P(s2[2],s2[3]),c=P(s2[4],s2[5]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.quadraticCurveTo(b[0],b[1],c[0],c[1]);ctx.stroke();});
+  // shine
+  ctx.fillStyle='rgba(255,255,255,0.18)';var h=P(0.2,-1.08);ctx.beginPath();ctx.ellipse(h[0],h[1],R*0.18,R*0.04,dir*-0.35,0,Math.PI*2);ctx.fill();
+  // short faded side near the ear
+  ctx.restore();
+}
 function drawRobotArmor(ctx,r,dir){
   dir=dir||1;
   ctx.save();
@@ -671,10 +717,10 @@ function drawRobotEye(ctx,x,y,r,ox,oy){
 
 // Paints the whole slime in local space: origin = centre of the flat base.
 function paintSlime(ctx,R,col,acc,isR,skin,ix,iy,isJapan,glowCol,glowBlur,noBlink){
-  var dir=isR?-1:1,T=slimeTones(col),t=performance.now(),robot=!!(skin&&skin.pattern==='robot');
+  var dir=isR?-1:1,T=slimeTones(col),t=performance.now(),robot=!!(skin&&skin.pattern==='robot'),fit=!!(skin&&skin.pattern==='fit'),band=!robot&&!fit;
   var outline=Math.max(1.2,R*0.06);
   // headband tails trail behind (drawn first so the knot tucks under the body)
-  if(!robot){
+  if(band){
     var kx=-dir*R*0.6,ky=-R*0.8,fl=Math.sin(t*0.012+(isR?2:0));
     ctx.save();ctx.lineJoin='round';ctx.lineCap='round';ctx.strokeStyle=T.line;ctx.lineWidth=outline*0.7;ctx.fillStyle=acc;
     for(var tl=0;tl<2;tl++){
@@ -699,7 +745,7 @@ function paintSlime(ctx,R,col,acc,isR,skin,ix,iy,isJapan,glowCol,glowBlur,noBlin
   ctx.globalAlpha=robot?0.12:0.32;ctx.fillStyle=jg;ctx.fillRect(-R,-R*0.45,R*2,R*0.45);ctx.globalAlpha=1;
   if(skin)paintSlimePattern(ctx,R,skin,dir,t);
   // headband
-  if(!robot){
+  if(band){
     ctx.fillStyle=acc;ctx.beginPath();ctx.moveTo(-R,-R*0.86+dir*R*0.03);ctx.lineTo(R,-R*0.86-dir*R*0.03);ctx.lineTo(R,-R*0.7-dir*R*0.03);ctx.lineTo(-R,-R*0.7+dir*R*0.03);ctx.closePath();ctx.fill();
     ctx.fillStyle='rgba(255,255,255,0.28)';ctx.fillRect(-R,-R*0.86,R*2,R*0.035);
     ctx.fillStyle='rgba(0,0,0,0.18)';ctx.fillRect(-R,-R*0.735,R*2,R*0.035);
@@ -711,14 +757,14 @@ function paintSlime(ctx,R,col,acc,isR,skin,ix,iy,isJapan,glowCol,glowBlur,noBlin
   // outline
   ctx.save();ctx.strokeStyle=T.line;ctx.lineWidth=outline;ctx.lineJoin='round';slimeDome(ctx,R-outline*0.5);ctx.stroke();ctx.restore();
   // headband knot
-  if(!robot){ctx.save();ctx.fillStyle=acc;ctx.strokeStyle=T.line;ctx.lineWidth=outline*0.7;ctx.beginPath();ctx.ellipse(-dir*R*0.6,-R*0.78,R*0.08,R*0.1,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();}
+  if(band){ctx.save();ctx.fillStyle=acc;ctx.strokeStyle=T.line;ctx.lineWidth=outline*0.7;ctx.beginPath();ctx.ellipse(-dir*R*0.6,-R*0.78,R*0.08,R*0.1,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();}
   // gloss
   ctx.save();ctx.fillStyle='#fff';ctx.globalAlpha=0.5;
   ctx.beginPath();ctx.arc(0,0,R*0.84,Math.PI+0.32,Math.PI+0.95);ctx.arc(0,0,R*0.7,Math.PI+0.95,Math.PI+0.32,true);ctx.closePath();ctx.fill();
   ctx.globalAlpha=0.75;ctx.beginPath();ctx.ellipse(-R*0.25,-R*0.9,R*0.05,R*0.035,-0.3,0,Math.PI*2);ctx.fill();
   ctx.restore();
   // face
-  var ex=dir*R*0.32,ey=-R*0.38;
+  var ex=dir*R*(fit?0.36:0.32),ey=-R*(fit?0.52:0.38);
   if(robot){drawRobotEye(ctx,ex,ey,R,ix,iy);
     // antenna
     ctx.save();ctx.strokeStyle='#94a3b8';ctx.lineWidth=R*0.05;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-dir*R*0.15,-R*0.98);ctx.lineTo(-dir*R*0.22,-R*1.24);ctx.stroke();
@@ -729,20 +775,36 @@ function paintSlime(ctx,R,col,acc,isR,skin,ix,iy,isJapan,glowCol,glowBlur,noBlin
     if(closed){ctx.strokeStyle=T.line;ctx.lineWidth=R*0.07;ctx.beginPath();ctx.moveTo(ex-R*0.2,ey);ctx.quadraticCurveTo(ex,ey+R*0.12,ex+R*0.2,ey);ctx.stroke();}
     else{
       ctx.fillStyle='#fff';ctx.strokeStyle=T.line;ctx.lineWidth=R*0.045;
-      ctx.beginPath();ctx.ellipse(ex,ey,R*0.22,R*0.25,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+      var es=fit?0.74:1;ctx.beginPath();ctx.ellipse(ex,ey,R*0.22*es,R*0.25*es,0,0,Math.PI*2);ctx.fill();ctx.stroke();
       var px=ex+ix*1.05,py=ey+iy*1.05;
-      ctx.fillStyle=T.line;ctx.beginPath();ctx.ellipse(px,py,R*0.13,R*0.145,0,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#0b0b14';ctx.beginPath();ctx.arc(px,py,R*0.075,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=fit?'#5a3a24':T.line;ctx.beginPath();ctx.ellipse(px,py,R*0.13*es,R*0.145*es,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#0b0b14';ctx.beginPath();ctx.arc(px,py,R*0.075*es,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(px-R*0.05,py-R*0.06,R*0.045,0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=0.8;ctx.beginPath();ctx.arc(px+R*0.045,py+R*0.05,R*0.02,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
     }
     // determined brow
-    ctx.strokeStyle=T.line;ctx.lineWidth=R*0.075;
-    ctx.beginPath();ctx.moveTo(ex-dir*R*0.2,ey-R*0.33);ctx.lineTo(ex+dir*R*0.17,ey-R*0.25);ctx.stroke();
+    ctx.strokeStyle=fit?'#24170f':T.line;ctx.lineWidth=R*(fit?0.085:0.075);
+    var bo=fit?0.23:0.33;
+    ctx.beginPath();ctx.moveTo(ex-dir*R*0.2,ey-R*bo);ctx.lineTo(ex+dir*R*0.17,ey-R*(bo-0.08));ctx.stroke();
+    if(fit){
+      // big open smile with teeth
+      ctx.fillStyle='#5b1a1a';ctx.strokeStyle=T.line;ctx.lineWidth=R*0.04;
+      // wide grin: top lip almost straight, deep curve underneath, row of top teeth
+      var mL=dir*R*0.04,mR=dir*R*0.7,mY=-R*0.26,cx2=dir*R*0.36;
+      ctx.beginPath();ctx.moveTo(mL,mY);ctx.quadraticCurveTo(cx2,-R*0.2,mR,mY-R*0.02);ctx.quadraticCurveTo(cx2,R*0.16,mL,mY);ctx.closePath();
+      ctx.fillStyle='#5b1a1a';ctx.fill();
+      ctx.save();ctx.clip();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(mL,mY-R*0.04);ctx.quadraticCurveTo(cx2,-R*0.24,mR,mY-R*0.06);ctx.lineTo(mR,mY+R*0.05);ctx.quadraticCurveTo(cx2,-R*0.11,mL,mY+R*0.07);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#d9677a';ctx.beginPath();ctx.ellipse(cx2,-R*0.1,R*0.16,R*0.05,0,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle=T.line;ctx.lineWidth=R*0.04;ctx.beginPath();ctx.moveTo(mL,mY);ctx.quadraticCurveTo(cx2,-R*0.2,mR,mY-R*0.02);ctx.quadraticCurveTo(cx2,R*0.16,mL,mY);ctx.closePath();ctx.stroke();
+    }else{
     // grin
     ctx.lineWidth=R*0.05;ctx.beginPath();ctx.moveTo(dir*R*0.5,-R*0.16);ctx.quadraticCurveTo(dir*R*0.6,-R*0.06,dir*R*0.72,-R*0.17);ctx.stroke();
+    }
     ctx.restore();
   }
+  if(fit)drawFitHair(ctx,R,dir);
   if(isJapan){ctx.save();ctx.globalAlpha=0.5;ctx.fillStyle='#ff8fab';ctx.beginPath();ctx.ellipse(dir*R*0.12,-R*0.12,R*0.15,R*0.09,0,0,Math.PI*2);ctx.fill();ctx.restore();}
   // crown sits on top of the head
   if(skin&&skin.pattern==='crown'){
@@ -2505,7 +2567,8 @@ var ACHIEVEMENT_SKINS=[
   {id:'toxic',name:'Toxic Ooze',color:'#4d7c0f',accent:'#bef264',detail:'#ecfccb',pattern:'spots'},
   {id:'candy',name:'Candy Pop',color:'#ec4899',accent:'#fbcfe8',detail:'#ffffff',pattern:'stripes'},
   {id:'shadow',name:'Shadow',color:'#1f2937',accent:'#ef4444',detail:'#fca5a5',pattern:'waves'},
-  {id:'aurora',name:'Aurora',color:'#0f766e',accent:'#a3e635',detail:'#d9f99d',pattern:'stars'}
+  {id:'aurora',name:'Aurora',color:'#0f766e',accent:'#a3e635',detail:'#d9f99d',pattern:'stars'},
+  {id:'bigtric',name:'BIG TRIC',color:'#e3b08c',accent:'#17171c',detail:'#17171c',pattern:'fit',free:true}
 ];
 function achievementFrameDetails(id){for(var i=0;i<ACHIEVEMENT_FRAMES.length;i++)if(ACHIEVEMENT_FRAMES[i].id===id)return ACHIEVEMENT_FRAMES[i];return null;}
 function achievementSkinDetails(id){for(var i=0;i<ACHIEVEMENT_SKINS.length;i++)if(ACHIEVEMENT_SKINS[i].id===id)return ACHIEVEMENT_SKINS[i];return null;}
@@ -2527,7 +2590,7 @@ function unlockedAchievementFrames(progress){
   return unlocked;
 }
 function unlockedAchievementSkins(progress){
-  var unlocked=[];
+  var unlocked=ACHIEVEMENT_SKINS.filter(function(sk){return sk.free;}).map(function(sk){return sk.id;});
   for(var i=0;i<ACHIEVEMENTS.length;i++)if(ACHIEVEMENTS[i].skin&&isAchievementUnlocked(progress,ACHIEVEMENTS[i])&&unlocked.indexOf(ACHIEVEMENTS[i].skin)<0)unlocked.push(ACHIEVEMENTS[i].skin);
   return unlocked;
 }
