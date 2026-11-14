@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.2.8';
+var GAME_VERSION='v25.2.9';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -4005,10 +4005,12 @@ function makePeerRoom(peer,role,code){
   var s_frTour=useState(false),frTour=s_frTour[0],setFrTour=s_frTour[1];
   function finishFrTour(){try{window.localStorage.setItem('slime_tour_friends','1');}catch(e){}setFrTour(false);}
   useEffect(function(){
-    if(screen!=='menu'||!introDone||tutPrompt||tour||sugTour||frTour||showSettings||showPD||!cloud.ready||cloud.user||!cloudEnabled()||(ann&&(ann.text||ann.img)&&ann.id!==annSeenId&&Date.now()-(tsMillis(ann.at)||Date.now())<30*86400000))return;
+    if(screen!=='menu'||!introDone||tutPrompt||tour||sugTour||frTour||showSettings||showPD||!cloud.ready||!cloud.authKnown||cloud.user||!cloudEnabled()||(ann&&(ann.text||ann.img)&&ann.id!==annSeenId&&Date.now()-(tsMillis(ann.at)||Date.now())<30*86400000))return;
     var seenMain=false,seenSug=false,seenFr=true;try{seenMain=!!window.localStorage.getItem('slime_tour_seen');seenSug=!!window.localStorage.getItem('slime_tour_suggest');seenFr=!!window.localStorage.getItem('slime_tour_friends');}catch(e){}
-    if(!seenMain||!seenSug||seenFr)return;var t=setTimeout(function(){setFrTour(true);},1200);return function(){clearTimeout(t);};
-  },[screen,introDone,tutPrompt,tour,sugTour,frTour,showSettings,showPD,cloud.ready,cloud.user,ann,annSeenId]);
+    if(!seenMain||!seenSug||seenFr)return;
+    if(loadFriends().length){finishFrTour();return;}
+    var t=setTimeout(function(){if(!CLOUD.user)setFrTour(true);},1200);return function(){clearTimeout(t);};
+  },[screen,introDone,tutPrompt,tour,sugTour,frTour,showSettings,showPD,cloud.ready,cloud.authKnown,cloud.user,ann,annSeenId]);
   function patchCloud(p){setCloud(function(c){return Object.assign({},c,p);});}
   // Push a merged save into every piece of state that was loaded from this device.
   function applySave(){
@@ -4025,8 +4027,8 @@ function makePeerRoom(peer,role,code){
     CLOUD.onSynced=function(ok,e){if(alive)patchCloud(ok?{synced:Date.now(),msg:''}:{msg:cloudErrorText(e)});};
     function onUser(u){
       if(!alive)return;
-      if(!u){patchCloud({user:'',busy:false});return;}
-      patchCloud({user:cloudUsernameOf(u),busy:true,msg:'Syncing your progress…'});
+      if(!u){patchCloud({user:'',busy:false,authKnown:true});return;}
+      patchCloud({user:cloudUsernameOf(u),authKnown:true,busy:true,msg:'Syncing your progress…'});
       CLOUD.paused=true;
       cloudPull().then(function(remote){
         writeLocalSave(mergeSaves(readLocalSave(),remote));applySave();
