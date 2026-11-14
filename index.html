@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.3.0';
+var GAME_VERSION='v25.3.1';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -4182,7 +4182,7 @@ function makePeerRoom(peer,role,code){
       if(onl.view==='host'&&onl.peerOn)return[['online_dur1','online_dur2','online_dur4'],['online_score_none','online_score_3','online_score_5','online_score_10'],['online_ot_yes','online_ot_no'],['online_start'],['online_cancel']];
       return[['online_cancel']];
     }
-    if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right'],['diff_bar']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
+    if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right','diff_bar']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
     if(screen==='practice_select')return[['prac_regular','prac_air','prac_ground'],['training_open'],['side_left','side_right'],['back']];
     if(screen==='training_select')return[['train_aim','train_jump'],['train_dash','train_save'],['side_left','side_right'],['back']];
     if(screen==='player_select')return[['p1_guest','p2_guest'],['continue','back']];
@@ -4280,7 +4280,7 @@ function makePeerRoom(peer,role,code){
       if(key==='enter'||key===' '){e.preventDefault();var b=btns[focusIdx];if(b)b.act();return;}
       if(themeOpen&&key!=='enter'&&key!==' '&&key!=='escape'){e.preventDefault();var td=(key==='arrowright'||key==='d'||key==='arrowdown'||key==='s')?1:(key==='arrowleft'||key==='a'||key==='arrowup'||key==='w')?-1:0;if(td)setFocusIdx((focusIdx+td+3)%3);return;}
       if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(8);return;}if(screen==='accounts'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
-      if(btns[focusIdx]&&btns[focusIdx].id==='diff_bar'){var dstep=(key==='arrowright'||key==='d')?1:(key==='arrowleft'||key==='a')?-1:0;if(dstep){e.preventDefault();var di=Math.max(0,Math.min(DIFF_ORDER.length-1,DIFF_ORDER.indexOf(diffRef.current)+dstep));setDiff(DIFF_ORDER[di]);diffRef.current=DIFF_ORDER[di];return;}}
+      if(btns[focusIdx]&&btns[focusIdx].id==='diff_bar'){var dstep=(key==='arrowright'||key==='d')?1:(key==='arrowleft'||key==='a')?-1:0;var dcur=DIFF_ORDER.indexOf(diffRef.current);if(dstep&&!(dstep<0&&dcur<=0)){e.preventDefault();var di=Math.max(0,Math.min(DIFF_ORDER.length-1,dcur+dstep));setDiff(DIFF_ORDER[di]);diffRef.current=DIFF_ORDER[di];return;}}
       var pos=getFocusPos(grid,focusIdx),r=pos[0],c=pos[1],nr=r,nc=c;
       if(key==='arrowdown'||key==='s'){nr=(r+1)%grid.length;}
       else if(key==='arrowup'||key==='w'){nr=(r-1+grid.length)%grid.length;}
