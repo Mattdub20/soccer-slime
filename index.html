@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.3.5';
+var GAME_VERSION='v25.3.7';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -355,7 +355,7 @@ var SKIN_FX={
 function skinFx(P,from,skin,isGoal){
   var fx=skin&&SKIN_FX[skin.id];if(!fx)return;
   // some skins swap the classic goal burst for something special (BIG TRIC: goats)
-  if(isGoal&&fx.goal){var gn=0;for(var gi=from;gi<P.length;gi++){var gp=P[gi];if(gp.keep)continue;if(gp.shape==='streak'||(gn++)%2){P.splice(gi,1);gi--;continue;}gp.shape=fx.goal;gp.size=5+Math.random()*3;gp.rot=(Math.random()-0.5)*0.8;gp.spin=(Math.random()-0.5)*0.2;}return;}
+  if(isGoal&&fx.goal){var gn=0;for(var gi=from;gi<P.length;gi++){var gp=P[gi];if(gp.keep)continue;if(gp.shape==='streak'||(gn++)%3){P.splice(gi,1);gi--;continue;}gp.shape=fx.goal;gp.size=5+Math.random()*3;gp.rot=(Math.random()-0.5)*0.8;gp.spin=(Math.random()-0.5)*0.2;}return;}
   for(var i=from;i<P.length;i++){
     var p=P[i];if(p.keep)continue;p.color=fx.rainbow?hslToHex(Math.random()*360,90,65):fx.c[(Math.random()*fx.c.length)|0];
     if(p.isLine)continue;
@@ -911,6 +911,8 @@ function drawSlimeAt(ctx, x, y, col, acc, isR, spinAngle, spinDipY, isSpinning, 
   var groundY = GH - GRND;
   var heightAbove = Math.max(0, groundY - (y + dY));
   var airFrac = Math.min(1, heightAbove / ((GH - GRND - CEILING_Y) * 0.6));
+  // Ground shadow (drawn separately when the body is rotated or squashed, so it stays flat on the grass)
+  if(!drawSlimeAt.noShadow){
   // Ground shadow
   ctx.save();
   ctx.globalAlpha = Math.max(0.04, 0.3 - airFrac * 0.24);
@@ -918,6 +920,7 @@ function drawSlimeAt(ctx, x, y, col, acc, isR, spinAngle, spinDipY, isSpinning, 
   var shs=Math.max(0.15, 1.0 - airFrac * 0.82);
   ctx.beginPath(); ctx.ellipse(x, groundY + 4, SR * shs, SR * 0.16 * shs, 0, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
+  }
 
   ctx.save();
   ctx.translate(x, y + dY);
@@ -961,11 +964,13 @@ function drawSlime(ctx,sl,isR,col,acc,isNight,isJapan,skin){
   else if(air&&vy>6){var fl=Math.min(1,(vy-6)/8);sx=1+0.1*fl;sy=1-0.1*fl;}
   if(sq>0){sx=1+0.22*sq;sy=1-0.24*sq;}
   var scaled=(sx!==1||sy!==1),px=sl.x,py=sl.y+dY,rot=sl._poseRot||0;
+  if(rot||scaled){var gY=GH-GRND,hA=Math.max(0,gY-py),aF=Math.min(1,hA/((GH-GRND-CEILING_Y)*0.6)),shs=Math.max(0.15,1-aF*0.82);ctx.save();ctx.globalAlpha=Math.max(0.04,0.3-aF*0.24);ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(px,gY+4,SR*shs,SR*0.16*shs,0,0,Math.PI*2);ctx.fill();ctx.restore();drawSlimeAt.noShadow=true;}
   if(rot){ctx.save();ctx.translate(px,py-SR*0.45);ctx.rotate(rot);ctx.translate(-px,-(py-SR*0.45));}
   if(scaled){ctx.save();ctx.translate(px,py);ctx.scale(sx,sy);ctx.translate(-px,-py);}
   drawSlimeAt(ctx,sl.x,sl.y,skin?skin.color:col,skin?skin.accent:acc,isR,sl.spinAngle,sl.spinDipY,sl.isSpinning,isNight,isJapan,sl.ballRefreshJump,sl.ballRefreshTimer,sl._ballX,sl._ballY,skin);
   if(scaled)ctx.restore();
   if(rot)ctx.restore();
+  drawSlimeAt.noShadow=false;
 }
 
 // ─── Mini slime for previews (same art, scaled) ──────────────────────────
@@ -1317,6 +1322,9 @@ function drawCrowdCheer(ctx,fanArr,top,rowHeight,time,cols){
   }
 }
 
+// The goat emoji drawn once into a small image; drawing emoji text every frame is very slow.
+var GOAT_SPRITE=null;
+function goatSprite(){if(GOAT_SPRITE)return GOAT_SPRITE;var c=document.createElement('canvas');c.width=c.height=64;var x=c.getContext('2d');x.font='52px serif';x.textAlign='center';x.textBaseline='middle';x.fillText('🐐',32,35);GOAT_SPRITE=c;return c;}
 function drawParticles(ctx,pts){
   var pcap=PERF_LOW?60:260;if(pts.length>pcap)pts.splice(0,pts.length-pcap);
   for(var pti=pts.length-1;pti>=0;pti--){
@@ -1327,7 +1335,7 @@ function drawParticles(ctx,pts){
     else if(pt.shape==='star'){var sr=psz*1.6;ctx.fillStyle=pt.color;ctx.beginPath();ctx.moveTo(pt.x,pt.y-sr);ctx.lineTo(pt.x+sr*0.3,pt.y-sr*0.3);ctx.lineTo(pt.x+sr,pt.y);ctx.lineTo(pt.x+sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x,pt.y+sr);ctx.lineTo(pt.x-sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x-sr,pt.y);ctx.lineTo(pt.x-sr*0.3,pt.y-sr*0.3);ctx.closePath();ctx.fill();}
     else if(pt.shape==='flake'){ctx.strokeStyle=pt.color;ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();for(var fk=0;fk<3;fk++){var fa=fk*Math.PI/3+pt.life*0.05;ctx.moveTo(pt.x-Math.cos(fa)*psz*1.5,pt.y-Math.sin(fa)*psz*1.5);ctx.lineTo(pt.x+Math.cos(fa)*psz*1.5,pt.y+Math.sin(fa)*psz*1.5);}ctx.stroke();}
     else if(pt.shape==='pixel'){var px=Math.max(1.5,psz*1.4);ctx.fillStyle=pt.color;ctx.fillRect(Math.round(pt.x-px/2),Math.round(pt.y-px/2),px,px);}
-    else if(pt.shape==='goat'){pt.rot=(pt.rot||0)+(pt.spin||0);ctx.translate(pt.x,pt.y);ctx.rotate(pt.rot);ctx.font=Math.round(pt.size*3.4)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🐐',0,0);}
+    else if(pt.shape==='goat'){pt.rot=(pt.rot||0)+(pt.spin||0);var gs=goatSprite(),gw=pt.size*3.4;ctx.translate(pt.x,pt.y);ctx.rotate(pt.rot);ctx.drawImage(gs,-gw/2,-gw/2,gw,gw);}
     else if(pt.shape==='flash'){var fr=pt.size*(1.5-pal*0.5),fgr=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,fr);fgr.addColorStop(0,pt.color);fgr.addColorStop(0.3,pt.color);fgr.addColorStop(1,'rgba(255,255,255,0)');ctx.globalAlpha=pal*pal;ctx.globalCompositeOperation='lighter';ctx.fillStyle=fgr;ctx.beginPath();ctx.arc(pt.x,pt.y,fr,0,Math.PI*2);ctx.fill();}
     else if(pt.shape==='ring'){var re=1-pal,rr=pt.r0+pt.grow*(1-Math.pow(1-re,2.2));ctx.strokeStyle=pt.color;ctx.lineWidth=Math.max(0.5,pt.size*pal);ctx.shadowColor=pt.color;ctx.shadowBlur=PERF_LOW?0:10;ctx.beginPath();if(pt.half>0)ctx.ellipse(pt.x,pt.y,rr,rr*pt.squash,0,-Math.PI/2,Math.PI/2);else if(pt.half<0)ctx.ellipse(pt.x,pt.y,rr,rr*pt.squash,0,Math.PI/2,Math.PI*1.5);else ctx.ellipse(pt.x,pt.y,rr,rr*pt.squash,0,0,Math.PI*2);ctx.stroke();}
     else if(pt.shape==='streak'){var sv=Math.hypot(pt.vx,pt.vy)||1,sln=(pt.len||14)*pal+4;ctx.strokeStyle=pt.color;ctx.lineWidth=psz;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pt.x-pt.vx/sv*sln,pt.y-pt.vy/sv*sln);ctx.stroke();}
@@ -2848,7 +2856,7 @@ function CosmeticPreview(props){
     var VX=220,VY=GH-GRND-230,VW=GW-VX,VH=260,cssW=props.width||300,k=2;canvas.width=Math.round(cssW*k);canvas.height=Math.round(cssW*VH/VW*k);
     var hsl=hexToHsl(color),accent=hslToHex(hsl[0],Math.min(100,hsl[1]+8),Math.max(5,hsl[2]-20)),pal=previewColors(theme);
     var parts=[],trail=[],ball,sl,t=0,raf=0,last=0,acc=0;
-    function reset(){t=0;parts.length=0;trail.length=0;ball={x:430,y:GH-GRND-150,vx:9.5,vy:-5,ang:0};sl=mkSlime(380);sl._poseX=null;sl._spinT=null;sl._poseRot=0;}
+    function reset(){t=0;parts.length=0;trail.length=0;ball={x:430,y:GH-GRND-150,vx:9.5,vy:-1.5,ang:0};sl=mkSlime(380);sl._poseX=null;sl._spinT=null;sl._poseRot=0;}
     reset();
     function step(){
       t++;
@@ -2872,7 +2880,6 @@ function CosmeticPreview(props){
       for(var i=0;i<trail.length;i++){var f=(i+1)/trail.length;ctx.globalAlpha=f*0.75;ctx.fillStyle=trailColor(tst,theme==='japan',now+i*40);ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,BR*(0.35+0.6*f),0,Math.PI*2);ctx.fill();}
       ctx.globalAlpha=1;
       if(ball)drawBall(ctx,ball,theme==='night',theme==='japan');
-      ctx.fillStyle='rgba(0,0,0,0.22)';ctx.beginPath();ctx.ellipse(sl.x,GH-GRND+4,SR*Math.max(0.35,1-(GH-GRND-sl.y)/160),5,0,0,Math.PI*2);ctx.fill();
       drawSlime(ctx,sl,false,color,accent,theme==='night',theme==='japan',skin);
       drawParticles(ctx,parts);
     }
