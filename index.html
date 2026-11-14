@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.3.7';
+var GAME_VERSION='v25.3.9';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -226,6 +226,7 @@ function cleanGameSettings(value){
     defaultSide:value.defaultSide==='left'?'left':'right',
     soundEnabled:typeof value.soundEnabled==='boolean'?value.soundEnabled:true,
     perfMode:['auto','on','off'].indexOf(value.perfMode)>=0?value.perfMode:'auto',
+    battery30:value.battery30===true,
     sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
     uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,value.uiScale)):1,
     // chances (0–1) of the rare hard-hit gags; defaults are 0.0001% and 0.00001%
@@ -255,9 +256,17 @@ function deviceIsWeak(){
   }catch(e){}
   return false;
 }
+// 30 fps: menus whenever performance mode is on, matches too if Battery saver is on. The game logic still steps at
+// 60 per second (each drawn frame catches up two steps), so only the drawing is halved, not the physics.
+var FPS_MENU30=false,FPS_MATCH30=false,IN_MATCH=false;
+function fpsHalf(){return IN_MATCH?FPS_MATCH30:FPS_MENU30;}
+(function(){if(!window.requestAnimationFrame)return;var raf=window.requestAnimationFrame.bind(window),caf=window.cancelAnimationFrame.bind(window),map={},n=0;
+  window.requestAnimationFrame=function(cb){var id=++n;map[id]=raf(function(t){if(!fpsHalf()){delete map[id];cb(t);return;}map[id]=raf(function(t2){delete map[id];cb(t2);});});return id;};
+  window.cancelAnimationFrame=function(id){if(map[id]!=null){caf(map[id]);delete map[id];}};})();
 function updatePerf(mode){
   initBatteryWatch();
   PERF_LOW=mode==='on'?true:mode==='off'?false:(PERF_BATT||deviceIsWeak());
+  FPS_MENU30=PERF_LOW;
 }
 var GAME_AUDIO=null,GAME_AUDIO_WARNED=false,GAMEPAD_WARNED=false;
 function playGameSound(kind){
@@ -2017,6 +2026,32 @@ function ChatRoom(props){
       React.createElement('textarea',{value:text,rows:1,maxLength:500,placeholder:'Message\u2026','aria-label':'Message',onChange:function(e){setText(e.target.value);},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}},style:{flex:1,minWidth:0,resize:'none',padding:'8px 12px',borderRadius:14,border:'1px solid rgba(255,255,255,0.22)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:14,fontFamily:'inherit',outline:'none'}}),
       React.createElement('button',{type:'button',disabled:!text.trim(),onClick:send,style:Object.assign(small('linear-gradient(135deg,#22c55e,#15803d)'),{opacity:text.trim()?1:0.5})},'Send')));
 }
+// News: every message and poll the developer has sent, newest first.
+function NewsTab(props){
+  var s_l=useState(null),list=s_l[0],setList=s_l[1],s_e=useState(''),err=s_e[0],setErr=s_e[1];
+  useEffect(function(){var un=null,alive=true;cloudInit().then(function(ok){if(!alive)return;if(!ok){setList([]);setErr('News needs an internet connection.');return;}
+    un=annWatchList(function(l,e){if(l)setList(l);else{setList([]);setErr('Couldn\u2019t load the news right now.');}});});return function(){alive=false;if(un)un();};},[]);
+  return React.createElement('div',null,
+    React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.65)',marginBottom:10}},'Updates, messages and polls from the developer.'),
+    list===null&&React.createElement('div',{style:{fontSize:13,color:'rgba(255,255,255,0.65)',textAlign:'center'}},'Loading the news\u2026'),
+    err&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:12,marginBottom:8}},err),
+    list&&list.length===0&&!err&&React.createElement('div',{style:Object.assign({},props.panelSty,{padding:16,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.7)'})},'No news yet. Check back soon!'),
+    (list||[]).filter(function(a){return a.text||a.img;}).map(function(a){return React.createElement(NewsItem,{key:a.id,a:a,signedIn:!!props.cloudUser,panelSty:props.panelSty});}));
+}
+function NewsItem(props){
+  var a=props.a,opts=a.opts||[],isPoll=opts.length>=2,s_v=useState({c:[],mine:null,total:0}),v=s_v[0],setV=s_v[1];
+  useEffect(function(){if(!isPoll)return;return annWatchVotes(a.id,function(c,mine,total){setV({c:c,mine:mine,total:total});});},[a.id]);
+  var ms=tsMillis(a.at),d=ms?new Date(ms):null;
+  return React.createElement('div',{style:Object.assign({},props.panelSty,{padding:'12px 14px',marginBottom:8})},
+    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:6}},
+      React.createElement('span',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.12em',textTransform:'uppercase',color:'#fde68a'}},isPoll?'\uD83D\uDCCA Poll':'\uD83D\uDCE3 News'),
+      React.createElement('span',{style:{flex:1}}),
+      React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},d?d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'')),
+    a.img&&/^data:image\/jpeg;base64,/.test(a.img)&&React.createElement('img',{src:a.img,alt:'',style:{display:'block',width:'100%',maxHeight:260,objectFit:'contain',borderRadius:10,marginBottom:8,background:'rgba(0,0,0,0.25)'}}),
+    a.text&&React.createElement('div',{style:{fontSize:14,lineHeight:1.45,whiteSpace:'pre-wrap',wordBreak:'break-word',marginBottom:isPoll?10:0}},String(a.text)),
+    isPoll&&React.createElement(PollBars,{opts:opts,counts:v.c,total:v.total,mine:v.mine,showResults:v.mine!=null||!props.signedIn,onVote:props.signedIn?function(i){annVote(a.id,i).catch(function(){});}:null}),
+    isPoll&&React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',marginTop:6}},v.total+' vote'+(v.total===1?'':'s')+(props.signedIn?(v.mine==null?' \u00B7 tap an option to vote':' \u00B7 tap another option to change your vote'):' \u00B7 make an account to vote')));
+}
 function SuggestionsTab(props){
   var s_t=useState(''),text=s_t[0],setText=s_t[1],s_m=useState(''),msg=s_m[0],setMsg=s_m[1],s_b=useState(false),busy=s_b[0],setBusy=s_b[1];
   var s_l=useState(null),list=s_l[0],setList=s_l[1],s_c=useState(null),confirm=s_c[0],setConfirm=s_c[1];
@@ -2142,7 +2177,7 @@ function PlayerDataScreen(props){
     var root=pdRootRef.current,inside=!!(root&&target&&target.nodeType===1&&root.contains(target));
     if(!inside){var cur=playerDataTabRefs.current[tab];if(cur)cur.focus();return;}
     var isTab=target.getAttribute&&target.getAttribute('role')==='tab';
-    if(isTab&&(dir==='left'||dir==='right')){var tabs=['roster','h2h','achievements','leaderboard','friends','chats','replays','suggestions'],index=tabs.indexOf(target.getAttribute('data-tab')||tabFocus),nextTab=tabs[(index+(dir==='right'?1:-1)+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();return;}
+    if(isTab&&(dir==='left'||dir==='right')){var tabs=['roster','h2h','achievements','leaderboard','friends','chats','news','replays','suggestions'],index=tabs.indexOf(target.getAttribute('data-tab')||tabFocus),nextTab=tabs[(index+(dir==='right'?1:-1)+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();return;}
     var nx=spatialMove(root,dir,target);if(nx){nx.focus();if(nx.getAttribute('role')==='tab'){var t2=nx.getAttribute('data-tab');if(t2)selectPlayerDataTab(t2);}}
   };
   useEffect(function(){function h(e){if(pdKeyRef.current)pdKeyRef.current(e);}window.addEventListener('keydown',h,true);return function(){window.removeEventListener('keydown',h,true);};},[]);
@@ -2163,7 +2198,7 @@ function PlayerDataScreen(props){
           React.createElement('button',{type:'button',autoFocus:true,onClick:function(){setPreviewAchievement(null);},style:{padding:'9px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.14)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Close')));
     })(),
     React.createElement('div',{role:'tablist','aria-label':'Stats and social sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
-      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'chats',label:'Chats',dot:props.chatDot},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions',dot:props.sugDot}].map(function(option){return React.createElement('button',{key:option.id,'data-tab':option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label,option.dot&&React.createElement(RedDot));})
+      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'chats',label:'Chats',dot:props.chatDot},{id:'news',label:'News'},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions',dot:props.sugDot}].map(function(option){return React.createElement('button',{key:option.id,'data-tab':option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label,option.dot&&React.createElement(RedDot));})
     ),
     tab==='roster'&&React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
@@ -2211,6 +2246,7 @@ function PlayerDataScreen(props){
     ),
     tab==='leaderboard'&&React.createElement(LeaderboardTab,{cloudUser:props.cloudUser,panelSty:panelSty}),
     tab==='replays'&&React.createElement(ReplaysTab,{onPlay:props.onPlayReplay,panelSty:panelSty}),
+    tab==='news'&&React.createElement(NewsTab,{cloudUser:props.cloudUser,panelSty:panelSty}),
     tab==='chats'&&React.createElement(ChatsTab,{cloudUser:props.cloudUser,friends:props.friends||[],chats:props.chats,read:props.chatRead,onRead:props.onReadChat,onPlay:props.onPlayReplay,onGuide:props.onFriendsGuide,panelSty:panelSty}),
     tab==='suggestions'&&React.createElement(SuggestionsTab,{onSeen:props.onSugSeen,isDev:props.cloudUser===DEV_USERNAME,cloudUser:props.cloudUser,accountName:props.accountName,panelSty:panelSty}),
     tab==='friends'&&React.createElement(FriendsTab,{onGuide:props.onFriendsGuide,requests:props.friendReqs,onAccept:props.onAcceptFriend,onDecline:props.onDeclineFriend,cloudUser:props.cloudUser,friends:props.friends||[],onAdd:props.onAddFriend,onRemove:props.onRemoveFriend,onInvite:props.onInviteFriend,panelSty:panelSty}),
@@ -2861,7 +2897,7 @@ function CosmeticPreview(props){
     function step(){
       t++;
       if(t<=60){if(ball){ball.vy+=GRAV*0.55;ball.x+=ball.vx;ball.y+=ball.vy;ball.ang=(ball.ang||0)+0.2;trail.push({x:ball.x,y:ball.y});if(trail.length>14)trail.shift();
-        if(ball.x>=GW-BR-4){var gy=GH-GRND-GOALH/2,g0=parts.length;emitGoal(parts,GW-BR,gy,skin&&skin.color?skin.color:color);skinFx(parts,g0,skin,true);if(props.celebration&&props.celebration!=='none')emitCelebration(parts,props.celebration,GW-BR,gy);ball=null;t=60;}}}
+        if(ball.x>=GW-BR-4){var gy=GH-GRND-GOALH/2,g0=parts.length;if(props.celebration&&props.celebration!=='none')emitCelebration(parts,props.celebration,GW-BR,gy);else{emitGoal(parts,GW-BR,gy,skin&&skin.color?skin.color:color);skinFx(parts,g0,skin,true);}ball=null;t=60;}}}
       else if(trail.length)trail.shift();
       if(t>70){poseStep(sl,props.pose&&props.pose!=='none'?props.pose:'hop',t-70,1);}
       sl.vy+=GRAV;sl.y+=sl.vy;sl.x+=sl.vx||0;if(sl.y>=GH-GRND){sl.y=GH-GRND;sl.vy=0;}
@@ -3360,6 +3396,8 @@ function SettingsScreen(props){
       var active=settings.perfMode===o[0];
       return React.createElement('button',{key:o[0],type:'button','data-nav-row':4,'aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
     }))),
+    React.createElement('div',{style:{fontSize:11,lineHeight:1.4,color:'rgba(255,255,255,0.6)',maxWidth:340}},'On: no glows, fewer particles, sharper-but-lighter graphics and menus at 30 fps. Auto turns it on for slower devices and battery saver.'),
+    React.createElement('button',{type:'button','data-nav-row':4.5,'aria-pressed':!!settings.battery30,onClick:function(){props.onChange({battery30:!settings.battery30});},style:{alignSelf:'flex-start',padding:'9px 16px',borderRadius:50,border:settings.battery30?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:settings.battery30?'linear-gradient(135deg,#22c55e,#15803d)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},(settings.battery30?'\u2713 ':'')+'\uD83D\uDD0B Battery saver: 30 fps matches'),
     React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
       React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Default AI difficulty'),
       React.createElement('div',{style:{display:'flex',gap:8}},
@@ -3918,7 +3956,7 @@ function makePeerRoom(peer,role,code){
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
   RARE_P.fire=gameSettings.rareFire;RARE_P.boom=gameSettings.rareBoom;
   GAME_AUDIO_VOLUME=gameSettings.sfxVolume;applyKeybinds(gameSettings.keybinds);
-  updatePerf(gameSettings.perfMode);
+  updatePerf(gameSettings.perfMode);FPS_MATCH30=!!gameSettings.battery30;IN_MATCH=screen==='game';
   var s_settingsErr=useState(''),settingsSaveError=s_settingsErr[0],setSettingsSaveError=s_settingsErr[1];
   var s_showSettings=useState(false),showSettings=s_showSettings[0],setShowSettings=s_showSettings[1];
   var s_gm=useState(null),gmode=s_gm[0],setGmode=s_gm[1];
@@ -4169,7 +4207,7 @@ function makePeerRoom(peer,role,code){
   // Touch: no keyboard-hint strip to make room for. Sideways = fill the height (thumb controls overlay the corners,
   // corner buttons sit in the side gutter); upright = fill the width.
   ?(window.innerWidth>window.innerHeight?Math.max(minFit,Math.min((window.innerWidth-2*(safeSide()+12+46*touchZoom()))/availableWidth,(window.innerHeight-8)/(GH+50))):Math.max(minFit,(window.innerWidth-12)/availableWidth))
-  :Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=(touchUI?Math.max(0.9,Math.min(1.2,window.innerWidth/400,window.innerHeight/420)):Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720)))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(PERF_LOW?3:4,Math.max(1,Math.ceil(z*d),Math.ceil(d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale,touchUI]);
+  :Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=(touchUI?Math.max(0.9,Math.min(1.2,window.innerWidth/400,window.innerHeight/420)):Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720)))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(PERF_LOW?2:3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(PERF_LOW?2:4,Math.max(1,Math.ceil(z*d),Math.ceil(d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale,touchUI]);
   useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad(); var perfTimer=setInterval(function(){updatePerf(gameSettings.perfMode);},5000);},[]);
 
   function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(8);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
@@ -4522,7 +4560,7 @@ function makePeerRoom(peer,role,code){
     shakeRef.current=Math.max(shakeRef.current,10);
     frozenRef.current=true;goalFlashRef.current=true;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;flashRef.current=true;setGoalFlash(true);
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
-    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;var gSkin=getGameSlimeSkins(pmRef.current)[scoring];emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,gSkin&&gSkin.color?gSkin.color:(scoring==='left'?colRef.current.left.body:colRef.current.right.body));skinFx(particlesRef.current,gp0,getGameSlimeSkins(pmRef.current)[scoring],true);var celeb=getGameCosmetics(pmRef.current)[scoring].celebration;emitCelebration(particlesRef.current,celeb,gx,GH-GRND-GOALH/2);if(celeb==='explosion')shakeRef.current=Math.max(shakeRef.current,16);else if(celeb==='sonicboom')shakeRef.current=Math.max(shakeRef.current,9);
+    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;var celeb=getGameCosmetics(pmRef.current)[scoring].celebration;if(!celeb||celeb==='none'){var gSkin=getGameSlimeSkins(pmRef.current)[scoring];emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,gSkin&&gSkin.color?gSkin.color:(scoring==='left'?colRef.current.left.body:colRef.current.right.body));skinFx(particlesRef.current,gp0,gSkin,true);}else emitCelebration(particlesRef.current,celeb,gx,GH-GRND-GOALH/2);if(celeb==='explosion')shakeRef.current=Math.max(shakeRef.current,16);else if(celeb==='sonicboom')shakeRef.current=Math.max(shakeRef.current,9);
     var frames=replayBufRef.current.slice();replayBufRef.current=[];replayScorerRef.current=scoring;otReadyRef.current=false;setOtLive(false);
     if(pmRef.current==='online'&&onRoleRef.current==='host'&&frames.length){
       var packed=frames.map(packReplayFrame),chunks=[];
