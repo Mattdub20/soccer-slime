@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.3.9';
+var GAME_VERSION='v25.4.0';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -2142,8 +2142,8 @@ function SkinBadge(props){
 function PlayerDataScreen(props){
   var onBack=props.onBack;
   var s_skinPv=useState(null),previewAchievement=s_skinPv[0],setPreviewAchievement=s_skinPv[1];
-  var s0=useState(PD_TAB),tab=s0[0],setTab=s0[1];PD_TAB=tab;
-  var s_tabFocus=useState(PD_TAB),tabFocus=s_tabFocus[0],setTabFocus=s_tabFocus[1];
+  var secTabs=PD_SECTIONS[props.section==='social'?'social':'stats'];var s0=useState(function(){return secTabs.indexOf(PD_TAB)>=0?PD_TAB:secTabs[0];}),tab=s0[0],setTab=s0[1];PD_TAB=tab;
+  var s_tabFocus=useState(function(){return secTabs.indexOf(PD_TAB)>=0?PD_TAB:secTabs[0];}),tabFocus=s_tabFocus[0],setTabFocus=s_tabFocus[1];
   var playerDataTabRefs=useRef({});
   var s1=useState(dbLoad),players=s1[0],setPlayers=s1[1];
   var s2=useState(''),newName=s2[0],setNewName=s2[1];
@@ -2177,13 +2177,13 @@ function PlayerDataScreen(props){
     var root=pdRootRef.current,inside=!!(root&&target&&target.nodeType===1&&root.contains(target));
     if(!inside){var cur=playerDataTabRefs.current[tab];if(cur)cur.focus();return;}
     var isTab=target.getAttribute&&target.getAttribute('role')==='tab';
-    if(isTab&&(dir==='left'||dir==='right')){var tabs=['roster','h2h','achievements','leaderboard','friends','chats','news','replays','suggestions'],index=tabs.indexOf(target.getAttribute('data-tab')||tabFocus),nextTab=tabs[(index+(dir==='right'?1:-1)+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();return;}
+    if(isTab&&(dir==='left'||dir==='right')){var tabs=secTabs,index=tabs.indexOf(target.getAttribute('data-tab')||tabFocus),nextTab=tabs[(index+(dir==='right'?1:-1)+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();return;}
     var nx=spatialMove(root,dir,target);if(nx){nx.focus();if(nx.getAttribute('role')==='tab'){var t2=nx.getAttribute('data-tab');if(t2)selectPlayerDataTab(t2);}}
   };
   useEffect(function(){function h(e){if(pdKeyRef.current)pdKeyRef.current(e);}window.addEventListener('keydown',h,true);return function(){window.removeEventListener('keydown',h,true);};},[]);
   return React.createElement('div',{ref:pdRootRef,style:{color:'#fff',minHeight:'100%',padding:'clamp(20px,7vh,64px) max(16px, env(safe-area-inset-left, 0px)) 24px',maxWidth:700,margin:'0 auto',boxSizing:'border-box'}},
     React.createElement('div',{style:{display:'flex',alignItems:'center',marginBottom:16,gap:12}},
-      React.createElement('h1',{style:{fontFamily:'var(--font-display)',fontSize:30,fontWeight:700,flex:1,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.6)'}},'Stats & Social'),
+      React.createElement('h1',{style:{fontFamily:'var(--font-display)',fontSize:30,fontWeight:700,flex:1,margin:0,textShadow:'0 0 20px rgba(56,189,248,0.6)'}},props.section==='social'?'Social':'Stats'),
       React.createElement('button',{onClick:onBack,style:{padding:'8px 20px',background:'var(--ghost)',border:'1px solid rgba(255,255,255,0.32)',borderRadius:50,color:'#fff',cursor:'pointer',fontWeight:700,fontSize:13}},'Back')
     ),
     previewAchievement&&(function(){
@@ -2198,7 +2198,7 @@ function PlayerDataScreen(props){
           React.createElement('button',{type:'button',autoFocus:true,onClick:function(){setPreviewAchievement(null);},style:{padding:'9px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.14)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Close')));
     })(),
     React.createElement('div',{role:'tablist','aria-label':'Stats and social sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
-      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'chats',label:'Chats',dot:props.chatDot},{id:'news',label:'News'},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions',dot:props.sugDot}].map(function(option){return React.createElement('button',{key:option.id,'data-tab':option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label,option.dot&&React.createElement(RedDot));})
+      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'chats',label:'Chats',dot:props.chatDot},{id:'news',label:'News'},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions',dot:props.sugDot}].filter(function(o){return secTabs.indexOf(o.id)>=0;}).map(function(option){return React.createElement('button',{key:option.id,'data-tab':option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label,option.dot&&React.createElement(RedDot));})
     ),
     tab==='roster'&&React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
@@ -2555,6 +2555,8 @@ var TUT_STEPS=[
   {id:'goal',t:'Score a goal',need:1,d:function(){return 'Knock the ball into the far goal.';}}
 ];
 var RP_FIELDS=17,RP_MAX=40,PD_TAB='roster';
+// Stats and Social are two screens built from the same component; each shows its own tabs.
+var PD_SECTIONS={stats:['roster','h2h','achievements','leaderboard','replays'],social:['friends','chats','news','suggestions']};
 function rpPack(frames){var a=new Float32Array(frames.length*RP_FIELDS);for(var i=0;i<frames.length;i++){var f=frames[i],o=i*RP_FIELDS,b=f.ball;a[o]=b.x;a[o+1]=b.y;a[o+2]=b.ang||0;[f.left,f.right].forEach(function(sl,j){var q=o+3+j*7;a[q]=sl.x;a[q+1]=sl.y;a[q+2]=sl.vy||0;a[q+3]=sl.spinAngle||0;a[q+4]=sl.spinDipY||0;a[q+5]=sl.squash||0;a[q+6]=(sl.isSpinning?1:0)|(sl.ballRefreshJump?2:0);});}return a;}
 function rpUnpack(a){var n=Math.floor(a.length/RP_FIELDS),out=new Array(n);function sl(q){var m=mkSlime(a[q]);m.y=a[q+1];m.vy=a[q+2];m.spinAngle=a[q+3];m.spinDipY=a[q+4];m.squash=a[q+5];m.isSpinning=!!(a[q+6]&1);m.ballRefreshJump=!!(a[q+6]&2);return m;}for(var i=0;i<n;i++){var o=i*RP_FIELDS;out[i]={ball:{x:a[o],y:a[o+1],ang:a[o+2],vx:0,vy:0},left:sl(o+3),right:sl(o+10)};}return out;}
 function rpDB(){return new Promise(function(res,rej){if(!window.indexedDB){rej(new Error('no storage'));return;}var r=indexedDB.open('slime_replays',1);r.onupgradeneeded=function(){r.result.createObjectStore('r',{keyPath:'id'});};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
@@ -3214,8 +3216,9 @@ var MENU_TOUR=[
   {t:'daily',title:'Daily challenge',body:'A new goal every day. Finish it to build a streak and unlock rewards.'},
   {t:'online',title:'Play Online',body:'Make a room and send your friend the 4-letter code, or type theirs to join.'},
   {t:'guide',title:'How to Play',body:'Every control and rule, with an animated demo. You can replay the hands-on tutorial and this tour from here.'},
-  {t:'playerdata',title:'Stats & Social',body:'Your players, head-to-head records, achievements, the leaderboard, friends and saved replays.'},
-  {t:'playerdata',title:'Suggestions',body:'Got an idea for the game? Open Stats & Social, then the Suggestions tab, to send it straight to the dev.'},
+  {t:'playerdata',title:'Stats',body:'Your players, head-to-head records, achievements, the leaderboard and saved replays.'},
+  {t:'social',title:'Social',body:'Friends, chats, news from the dev and the suggestions box.'},
+  {t:'social',title:'Suggestions',body:'Got an idea for the game? Open Social, then the Suggestions tab, to send it straight to the dev.'},
   {t:'accounts',title:'Your Account',body:'Set your name, colour, skin, frame and celebrations. Sign in to save your progress to the cloud.'},
   {t:'settings',title:'Settings',body:'Change keybinds, sound, performance mode, interface size and the rare-event chances.'},
   {t:'theme',title:'Theme',body:'Switch the arena between Day, Night and Sakura.'},
@@ -3223,14 +3226,14 @@ var MENU_TOUR=[
 ];
 var SUGGEST_TOUR=[
   {t:null,title:'New: Suggestions \uD83D\uDCA1',body:'You can now send your ideas straight to the developer: new modes, skins, fixes, anything you want to see.'},
-  {t:'playerdata',title:'Where to find it',body:'Open Stats & Social, then pick the Suggestions tab at the end of the row.'},
+  {t:'social',title:'Where to find it',body:'Open Social, then pick the Suggestions tab.'},
   {t:null,title:'How it works',body:'Type your idea (up to 500 characters) and press Send. Only the developer can read suggestions, and you can send one a minute.'},
   {t:null,title:'That\u2019s it!',body:'Thanks for helping make Soccer Slime better.'}
 ];
 var FRIENDS_TOUR=[
   {t:null,title:'Play with friends \uD83D\uDC4B',body:'Make a free account to save your progress, add friends and invite them to online matches. Here\u2019s how.'},
   {t:'accounts',title:'1. Make an account',body:'Open Your Account and find Cloud save. Pick a username and a password, then press Create account. Use a password you don\u2019t use anywhere else.'},
-  {t:'playerdata',title:'2. Open Friends',body:'Open Stats & Social and pick the Friends tab.'},
+  {t:'social',title:'2. Open Friends',body:'Open Social and pick the Friends tab.'},
   {t:null,title:'3. Add your first friend',body:'Start with the developer: type mattdub and press Send request. When someone accepts, you can see when they\u2019re online and invite them to a match.'},
   {t:null,title:'4. Find more players',body:'Press Find players in the Friends tab to see who\u2019s been playing lately, then tap Add to send them a request.'}
 ];
@@ -4401,7 +4404,7 @@ function makePeerRoom(peer,role,code){
     attempt.resetAt=performance.now()+420;
   }
   function getNavGrid(){
-    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','settings','online','guide','playerdata'],['theme']].concat(dailyDoneToday(dailyState)?[]:[['daily_play']]);
+    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social'],['theme']].concat(dailyDoneToday(dailyState)?[]:[['daily_play']]);
     if(screen==='online'){
       if(onl.view==='choose')return cleanName(account.name)?[['online_create'],['online_join'],['online_stickers'],['online_back']]:[['online_create'],['online_join'],['online_name'],['online_stickers'],['online_back']];
       if(onl.view==='stickers'){
@@ -4441,7 +4444,7 @@ function makePeerRoom(peer,role,code){
       settings:function(){setSettingsSaveError('');setShowSettings(true);},
       online:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');},
       guide:function(){setScreen('guide');},
-      playerdata:function(){setShowPD(true);},
+      playerdata:function(){setShowPD('stats');},social:function(){setShowPD('social');},
       theme:toggleTheme,
       theme_day:function(){setThemeMode('day');setThemeOpen(false);setFocusIdx(8);},theme_night:function(){setThemeMode('night');setThemeOpen(false);setFocusIdx(8);},theme_japan:function(){setThemeMode('japan');setThemeOpen(false);setFocusIdx(8);},
       dur_up:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.min(i+1,opts.length-1)]);},
@@ -5260,7 +5263,7 @@ function makePeerRoom(peer,role,code){
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:lockedScreen()},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress),unlockedCosmetics:{celebration:unlockedCosmetics(achievementProgress,'celebration'),trail:unlockedCosmetics(achievementProgress,'trail'),pose:unlockedCosmetics(achievementProgress,'pose')}})));
-  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{chats:chats,chatRead:chatRead,onReadChat:readChat,chatDot:chatDot,sugDot:sugDot,onSugSeen:markSugSeen,onFriendsGuide:function(){setShowPD(false);setFrTour(true);},accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,friendReqs:friendReqs,onAcceptFriend:acceptFriend,onDeclineFriend:declineFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
+  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{section:showPD==='social'?'social':'stats',chats:chats,chatRead:chatRead,onReadChat:readChat,chatDot:chatDot,sugDot:sugDot,onSugSeen:markSugSeen,onFriendsGuide:function(){setShowPD(false);setFrTour(true);},accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,friendReqs:friendReqs,onAcceptFriend:acceptFriend,onDeclineFriend:declineFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   showReplayRef.current=!!(showMatchReplay&&matchFrames.length>0)||!!viewReplay;
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,theme:themeMode,skins:getGameSlimeSkins(lastPM.current),goalEvents:matchGoals,onSave:saveReplayRange,onBack:function(){setShowMatchReplay(false);}})));
 
@@ -5277,7 +5280,8 @@ function makePeerRoom(peer,role,code){
     var menuPills=[
       {key:'online',label:'Play Online',bg:'linear-gradient(135deg,#059669,#047857)',act:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');}},
       {key:'guide',label:'How to Play',bg:'linear-gradient(135deg,#475569,#1e293b)',act:function(){setScreen('guide');}},
-      {key:'playerdata',label:'Stats & Social',dot:chatDot||sugDot,bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
+      {key:'playerdata',label:'Stats',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD('stats');}},
+      {key:'social',label:'Social',dot:chatDot||sugDot,bg:'linear-gradient(135deg,#db2777,#9d174d)',act:function(){setShowPD('social');}}
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
       tour&&React.createElement(MenuTour,{onDone:finishTour}),
