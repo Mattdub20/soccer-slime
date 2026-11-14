@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.4.2';
+var GAME_VERSION='v25.4.3';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3885,10 +3885,11 @@ function makePeerRoom(peer,role,code){
       pr.vy+=GRAV;pr.x+=pr.vx;pr.y+=pr.vy;
       if(pr.x<SR)pr.x=SR;if(pr.x>GW-SR)pr.x=GW-SR;if(pr.y<CEILING_Y){pr.y=CEILING_Y;if(pr.vy<0)pr.vy=-pr.vy*0.4;}
       if(pr.y>GH-GRND){pr.y=GH-GRND;pr.vy=0;pr.dj=false;}
-      // the host's latest view of us is a little behind; only pull in when we've clearly drifted
-      var ex=latest[0]-pr.x,ey=latest[1]-pr.y,ed=Math.hypot(ex,ey);
-      if(ed>140){pr.x=latest[0];pr.y=latest[1];pr.vx=latest[2];pr.vy=latest[3];}
-      else if(ed>45){pr.x+=ex*0.08;pr.y+=ey*0.08;}
+      // The host's view of us always runs a bit behind, so correcting while we move just drags us backwards.
+      // Only settle towards it once we've both come to rest on the ground; snap if we're wildly off (e.g. got shoved).
+      var ex=latest[0]-pr.x,ey=latest[1]-pr.y,ed=Math.hypot(ex,ey),still=!(gin.m&3)&&onG&&pr.y>=GH-GRND-1&&Math.abs(latest[2])<0.6&&latest[1]>=GH-GRND-1;
+      if(ed>170){pr.x=latest[0];pr.y=latest[1];pr.vx=latest[2];pr.vy=latest[3];}
+      else if(still&&ed>2){pr.x+=ex*0.18;}
     }
     me.x=pr.x;me.y=pr.y;me.vx=pr.vx;me.vy=pr.vy;
   }
