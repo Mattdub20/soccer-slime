@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.2.7';
+var GAME_VERSION='v25.2.8';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -5319,13 +5319,16 @@ function makePeerRoom(peer,role,code){
           React.createElement('div',{style:{textAlign:'center'}},label('Your Side'),
             React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
           pmRef.current==='single'&&React.createElement('div',{style:{textAlign:'center'}},label('AI Difficulty'),
-            React.createElement('div',{role:'radiogroup','aria-label':'AI difficulty',style:{display:'flex',gap:5,justifyContent:'center',flexWrap:'wrap',maxWidth:480}},DIFF_ORDER.map(function(val,lvl){var id='diff_'+val,isActive=diff===val,dc=DIFF_COLOR[val];
-              return React.createElement('button',{key:val,role:'radio','aria-checked':isActive,'aria-label':DIFF_LABEL[val]+', level '+(lvl+1)+' of 5',onClick:function(){setDiff(val);diffRef.current=val;},className:val==='impossible'&&isActive?'chaos-pulse':undefined,
-                style:Object.assign({display:'flex',flexDirection:'column',alignItems:'center',gap:6,minWidth:60,padding:'8px 8px 7px',borderRadius:14,cursor:'pointer',fontFamily:'inherit',
-                  background:isActive?'linear-gradient(180deg,'+dc+'33,'+dc+'14)':btnInactive,color:'#fff',
-                  border:'2px solid '+(isActive?dc:'rgba(255,255,255,0.2)'),boxShadow:isActive?'0 0 16px '+dc+'88':'0 4px 14px rgba(0,0,0,0.3)',transition:'all 0.15s ease'},focusSty(id))},
-                React.createElement('span',{'aria-hidden':'true',style:{display:'flex',gap:3}},[0,1,2,3,4].map(function(k){var on=k<=lvl;return React.createElement('span',{key:k,style:{width:9,height:14,borderRadius:3,background:on?dc:'rgba(255,255,255,0.14)',boxShadow:on&&isActive?'0 0 6px '+dc:'none',opacity:on?(isActive?1:0.75):1}});})),
-                React.createElement('span',{style:{fontSize:12,fontWeight:900,whiteSpace:'nowrap',color:isActive?'#fff':'rgba(255,255,255,0.85)'}},DIFF_LABEL[val]));})),
+            (function(){var lvl=Math.max(0,DIFF_ORDER.indexOf(diff)),dc=DIFF_COLOR[DIFF_ORDER[lvl]];
+              return React.createElement('div',{style:{width:'min(340px,84vw)',margin:'0 auto'}},
+                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:20,color:dc,textShadow:'0 0 14px '+dc+'88',marginBottom:6,transition:'color 0.2s'}},DIFF_LABEL[DIFF_ORDER[lvl]]),
+                React.createElement('div',{role:'radiogroup','aria-label':'AI difficulty',className:diff==='impossible'?'chaos-pulse':undefined,style:{display:'flex',height:34,borderRadius:12,overflow:'hidden',border:'2px solid '+dc,background:'rgba(255,255,255,0.08)',boxShadow:'0 0 16px '+dc+'66',transition:'border-color 0.2s, box-shadow 0.2s'}},
+                  DIFF_ORDER.map(function(val,k){var id='diff_'+val,on=k<=lvl,isActive=k===lvl;
+                    return React.createElement('button',{key:val,role:'radio','aria-checked':isActive,'aria-label':DIFF_LABEL[val]+', level '+(k+1)+' of 5',onClick:function(){setDiff(val);diffRef.current=val;},
+                      style:Object.assign({flex:1,padding:0,margin:0,border:'none',borderLeft:k?'2px solid rgba(5,12,35,0.85)':'none',borderRadius:0,cursor:'pointer',
+                        background:on?'linear-gradient(180deg,'+dc+','+dc+'bb)':'transparent',transition:'background 0.2s',position:'relative'},focusSty(id))},
+                      on&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',left:0,right:0,top:0,height:'40%',background:'rgba(255,255,255,0.25)'}}));})),
+                React.createElement('div',{'aria-hidden':'true',style:{display:'flex',marginTop:5}},DIFF_ORDER.map(function(val,k){return React.createElement('div',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:{flex:1,textAlign:'center',fontSize:10.5,fontWeight:900,cursor:'pointer',whiteSpace:'nowrap',color:k===lvl?dc:'rgba(255,255,255,0.55)'}},DIFF_LABEL[val]);})));})(),
             React.createElement('p',{style:{margin:'10px auto 0',maxWidth:300,minHeight:34,fontSize:12,lineHeight:1.45,color:'rgba(255,255,255,0.85)',textShadow:softText}},diffInfo[diff]||''))
         ),
         React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:10,padding:'12px 16px',borderRadius:16,background:'rgba(5,12,35,0.7)',border:'1px solid '+cardBorder}},
