@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.2.9';
+var GAME_VERSION='v25.3.0';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -4182,7 +4182,7 @@ function makePeerRoom(peer,role,code){
       if(onl.view==='host'&&onl.peerOn)return[['online_dur1','online_dur2','online_dur4'],['online_score_none','online_score_3','online_score_5','online_score_10'],['online_ot_yes','online_ot_no'],['online_start'],['online_cancel']];
       return[['online_cancel']];
     }
-    if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right','diff_supereasy','diff_easy','diff_medium','diff_hard','diff_impossible']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
+    if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right'],['diff_bar']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
     if(screen==='practice_select')return[['prac_regular','prac_air','prac_ground'],['training_open'],['side_left','side_right'],['back']];
     if(screen==='training_select')return[['train_aim','train_jump'],['train_dash','train_save'],['side_left','side_right'],['back']];
     if(screen==='player_select')return[['p1_guest','p2_guest'],['continue','back']];
@@ -4213,7 +4213,7 @@ function makePeerRoom(peer,role,code){
       score_none:function(){setScoreLimit(0);},score_3:function(){setScoreLimit(3);},score_5:function(){setScoreLimit(5);},score_10:function(){setScoreLimit(10);},
       overtime_yes:function(){setOvertimeEnabled(true);},overtime_no:function(){setOvertimeEnabled(false);},
       side_left:function(){setSide('left');},side_right:function(){setSide('right');},
-      diff_supereasy:function(){setDiff('supereasy');diffRef.current='supereasy';},diff_easy:function(){setDiff('easy');diffRef.current='easy';},diff_medium:function(){setDiff('medium');diffRef.current='medium';},diff_hard:function(){setDiff('hard');diffRef.current='hard';},diff_impossible:function(){setDiff('impossible');diffRef.current='impossible';},
+      diff_supereasy:function(){setDiff('supereasy');diffRef.current='supereasy';},diff_easy:function(){setDiff('easy');diffRef.current='easy';},diff_medium:function(){setDiff('medium');diffRef.current='medium';},diff_bar:function(){var o=DIFF_ORDER[(DIFF_ORDER.indexOf(diffRef.current)+1)%DIFF_ORDER.length];setDiff(o);diffRef.current=o;},diff_hard:function(){setDiff('hard');diffRef.current='hard';},diff_impossible:function(){setDiff('impossible');diffRef.current='impossible';},
       play:function(){startGame(pendDur==='custom'?'custom-'+customMinuteValue(customMinutes,10):pendDur,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},
       back:function(){if(screen==='menu')return;if(screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');},
       prac_regular:function(){setPractMode('regular');practModeRef.current='regular';startGame(null,'practice',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},
@@ -4280,6 +4280,7 @@ function makePeerRoom(peer,role,code){
       if(key==='enter'||key===' '){e.preventDefault();var b=btns[focusIdx];if(b)b.act();return;}
       if(themeOpen&&key!=='enter'&&key!==' '&&key!=='escape'){e.preventDefault();var td=(key==='arrowright'||key==='d'||key==='arrowdown'||key==='s')?1:(key==='arrowleft'||key==='a'||key==='arrowup'||key==='w')?-1:0;if(td)setFocusIdx((focusIdx+td+3)%3);return;}
       if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(8);return;}if(screen==='accounts'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
+      if(btns[focusIdx]&&btns[focusIdx].id==='diff_bar'){var dstep=(key==='arrowright'||key==='d')?1:(key==='arrowleft'||key==='a')?-1:0;if(dstep){e.preventDefault();var di=Math.max(0,Math.min(DIFF_ORDER.length-1,DIFF_ORDER.indexOf(diffRef.current)+dstep));setDiff(DIFF_ORDER[di]);diffRef.current=DIFF_ORDER[di];return;}}
       var pos=getFocusPos(grid,focusIdx),r=pos[0],c=pos[1],nr=r,nc=c;
       if(key==='arrowdown'||key==='s'){nr=(r+1)%grid.length;}
       else if(key==='arrowup'||key==='w'){nr=(r-1+grid.length)%grid.length;}
@@ -5322,15 +5323,15 @@ function makePeerRoom(peer,role,code){
             React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
           pmRef.current==='single'&&React.createElement('div',{style:{textAlign:'center'}},label('AI Difficulty'),
             (function(){var lvl=Math.max(0,DIFF_ORDER.indexOf(diff)),dc=DIFF_COLOR[DIFF_ORDER[lvl]];
-              return React.createElement('div',{style:{width:'min(340px,84vw)',margin:'0 auto'}},
-                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:20,color:dc,textShadow:'0 0 14px '+dc+'88',marginBottom:6,transition:'color 0.2s'}},DIFF_LABEL[DIFF_ORDER[lvl]]),
-                React.createElement('div',{role:'radiogroup','aria-label':'AI difficulty',className:diff==='impossible'?'chaos-pulse':undefined,style:{display:'flex',height:34,borderRadius:12,overflow:'hidden',border:'2px solid '+dc,background:'rgba(255,255,255,0.08)',boxShadow:'0 0 16px '+dc+'66',transition:'border-color 0.2s, box-shadow 0.2s'}},
+              return React.createElement('div',{style:{width:'min(270px,78vw)',margin:'0 auto'}},
+                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:17,color:dc,textShadow:'0 0 14px '+dc+'88',marginBottom:6,transition:'color 0.2s'}},DIFF_LABEL[DIFF_ORDER[lvl]]),
+                React.createElement('div',{role:'radiogroup','aria-label':'AI difficulty','aria-valuetext':DIFF_LABEL[DIFF_ORDER[lvl]],className:diff==='impossible'&&!isFocused('diff_bar')?'chaos-pulse':undefined,style:Object.assign({display:'flex',height:24,borderRadius:9,overflow:'hidden',border:'2px solid '+dc,background:'rgba(255,255,255,0.08)',boxShadow:'0 0 12px '+dc+'55',transition:'border-color 0.2s, box-shadow 0.2s'},isFocused('diff_bar')?{boxShadow:'0 0 0 3px #fff, 0 0 18px '+dc}:{})},
                   DIFF_ORDER.map(function(val,k){var id='diff_'+val,on=k<=lvl,isActive=k===lvl;
-                    return React.createElement('button',{key:val,role:'radio','aria-checked':isActive,'aria-label':DIFF_LABEL[val]+', level '+(k+1)+' of 5',onClick:function(){setDiff(val);diffRef.current=val;},
-                      style:Object.assign({flex:1,padding:0,margin:0,border:'none',borderLeft:k?'2px solid rgba(5,12,35,0.85)':'none',borderRadius:0,cursor:'pointer',
-                        background:on?'linear-gradient(180deg,'+dc+','+dc+'bb)':'transparent',transition:'background 0.2s',position:'relative'},focusSty(id))},
+                    return React.createElement('button',{key:val,role:'radio','aria-checked':isActive,'aria-label':DIFF_LABEL[val]+', level '+(k+1)+' of 5',tabIndex:-1,onClick:function(){setDiff(val);diffRef.current=val;},
+                      style:{flex:1,padding:0,margin:0,border:'none',outline:'none',borderLeft:k?'2px solid rgba(5,12,35,0.85)':'none',borderRadius:0,cursor:'pointer',
+                        background:on?'linear-gradient(180deg,'+dc+','+dc+'bb)':'transparent',transition:'background 0.2s',position:'relative'}},
                       on&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',left:0,right:0,top:0,height:'40%',background:'rgba(255,255,255,0.25)'}}));})),
-                React.createElement('div',{'aria-hidden':'true',style:{display:'flex',marginTop:5}},DIFF_ORDER.map(function(val,k){return React.createElement('div',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:{flex:1,textAlign:'center',fontSize:10.5,fontWeight:900,cursor:'pointer',whiteSpace:'nowrap',color:k===lvl?dc:'rgba(255,255,255,0.55)'}},DIFF_LABEL[val]);})));})(),
+                React.createElement('div',{'aria-hidden':'true',style:{display:'flex',marginTop:5}},DIFF_ORDER.map(function(val,k){return React.createElement('div',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:{flex:1,textAlign:'center',fontSize:9.5,fontWeight:900,cursor:'pointer',whiteSpace:'nowrap',color:k===lvl?dc:'rgba(255,255,255,0.55)'}},DIFF_LABEL[val]);})));})(),
             React.createElement('p',{style:{margin:'10px auto 0',maxWidth:300,minHeight:34,fontSize:12,lineHeight:1.45,color:'rgba(255,255,255,0.85)',textShadow:softText}},diffInfo[diff]||''))
         ),
         React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:10,padding:'12px 16px',borderRadius:16,background:'rgba(5,12,35,0.7)',border:'1px solid '+cardBorder}},
