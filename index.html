@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.4.1';
+var GAME_VERSION='v25.4.2';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3824,7 +3824,7 @@ function makePeerRoom(peer,role,code){
         }
       }
     }
-    if(pnow-netLastSendRef.current<32)return;
+    if(pnow-netLastSendRef.current<15)return;
     netLastSendRef.current=pnow;netSeqRef.current++;
     var sn=packSnap(),ls=gsRef.current.left,rs=gsRef.current.right,st=statsRef.current;
     netPresence({p:{n:netSeqRef.current,ts:Math.round(pnow),m:netMidRef.current,l:sn.l,r:sn.r,b:sn.b,s:[st.lG,st.rG],t:tlRef.current,o:otRef.current?(otReadyRef.current?2:1):0,g:goalFlashRef.current?1:0,gf:goalFlashFrRef.current,rv:replayActiveRef.current?1:0,ri:replayIdxRef.current,rs:replayScorerRef.current,rf:readyRef.current?readyRef.current.fr:-999,w:goRef.current?(winRef.current||0):0,es:goRef.current?{lG:st.lG,rG:st.rG,lMax:st.lMax,rMax:st.rMax,fastestShot:st.fastestShot,longestGoal:st.longestGoal,saves:st.saves,longestRally:st.longestRally}:0,gl:[r2(ls.goalLineTime||0),r2(rs.goalLineTime||0)]}});
@@ -3860,18 +3860,40 @@ function makePeerRoom(peer,role,code){
     var bf=netBufRef.current;if(!bf.length)return;
     // Render a little in the past on the host's timeline: just enough delay to cover jitter (smaller on good connections).
     var NC2=netClockRef.current,useHt=!!bf[bf.length-1].ht&&NC2.off!==null,tk=useHt?'ht':'t';
-    var rt=useHt?pnow-NC2.off-Math.max(38,Math.min(160,34+NC2.jit*1.4)):pnow-70,a=null,b=null;
+    var rt=useHt?pnow-NC2.off-Math.max(24,Math.min(110,20+NC2.jit*1.2)):pnow-50,a=null,b=null;
     for(var i=bf.length-1;i>=0;i--){if(bf[i][tk]<=rt){a=bf[i];b=bf[i+1]||null;break;}}
     if(!a)a=bf[0];
     var L=a.l,R=a.r,B=a.b;
     // No newer update yet: carry the ball along its path for up to ~100ms instead of freezing it.
-    if(!b&&rt>a[tk]){var ef=Math.min(6,(rt-a[tk])/(1000/60));B=a.b.slice();B[0]=a.b[0]+a.b[2]*ef;B[1]=Math.min(GH-GRND-BR,a.b[1]+a.b[3]*ef+0.5*GRAV*ef*ef);}
+    if(!b&&rt>a[tk]){var ef=Math.min(3,(rt-a[tk])/(1000/60));B=a.b.slice();B[0]=a.b[0]+a.b[2]*ef;B[1]=Math.min(GH-GRND-BR,a.b[1]+a.b[3]*ef+0.5*GRAV*ef*ef);}
     if(b){var tt=Math.max(0,Math.min(1,(rt-a[tk])/Math.max(1,b[tk]-a[tk])));L=lerpSl(a.l,b.l,tt);R=lerpSl(a.r,b.r,tt);B=b.b.slice();if(Math.abs(b.b[0]-a.b[0])<200&&Math.abs(b.b[1]-a.b[1])<200){B[0]=a.b[0]+(b.b[0]-a.b[0])*tt;B[1]=a.b[1]+(b.b[1]-a.b[1])*tt;B[4]=a.b[4]+(b.b[4]-a.b[4])*tt;}}
-    var g=gsRef.current;for(var k=0;k<SF.length;k++){g.left[SF[k]]=L[k];g.right[SF[k]]=R[k];}
-    g.ball.x=B[0];g.ball.y=B[1];g.ball.vx=B[2];g.ball.vy=B[3];g.ball.ang=B[4];
+    var g=gsRef.current,sm=g._smooth||(g._smooth={});
+    // Glide to new positions instead of jumping: small differences ease in over a few frames, big ones (kick-offs) snap.
+    function ease(key,v,lim,f){var o=sm[key];if(o===undefined||Math.abs(v-o)>lim){sm[key]=v;return v;}o+=(v-o)*f;sm[key]=o;return o;}
+    for(var k=0;k<SF.length;k++){g.left[SF[k]]=L[k];g.right[SF[k]]=R[k];}
+    g.left.x=ease('lx',L[0],90,0.55);g.left.y=ease('ly',L[1],90,0.55);
+    g.ball.x=ease('bx',B[0],70,0.6);g.ball.y=ease('by',B[1],70,0.6);g.ball.vx=B[2];g.ball.vy=B[3];g.ball.ang=B[4];
+    // Our own slime (the joiner is always the right one): run and jump straight away from our own keys, then drift
+    // towards where the host says we are. Dashes, spins, kick-offs and goals just follow the host.
+    var me=g.right,pr=g._pred,gin=g._gin||{m:0,jc:0},latest=bf[bf.length-1].r;
+    var follow=goalFlashRef.current||replayActiveRef.current||goRef.current||(netRfRef.current>-999&&netRfRef.current<62)||R[5]||R[10]>0||R[7]===1;
+    if(!pr||pr.mid!==netMidRef.current||follow){pr=g._pred={mid:netMidRef.current,x:R[0],y:R[1],vx:R[2],vy:R[3],dj:!!R[16],jc:gin.jc};}
+    else{
+      var onG=pr.y>=GH-GRND-1;
+      pr.vx=(gin.m&1)?-SPD:(gin.m&2)?SPD:(onG?pr.vx*0.85:pr.vx);
+      if(gin.jc!==pr.jc){pr.jc=gin.jc;if(onG){pr.vy=JUMP;pr.dj=false;}else if(!pr.dj){pr.vy=JUMP*0.85;pr.dj=true;}}
+      pr.vy+=GRAV;pr.x+=pr.vx;pr.y+=pr.vy;
+      if(pr.x<SR)pr.x=SR;if(pr.x>GW-SR)pr.x=GW-SR;if(pr.y<CEILING_Y){pr.y=CEILING_Y;if(pr.vy<0)pr.vy=-pr.vy*0.4;}
+      if(pr.y>GH-GRND){pr.y=GH-GRND;pr.vy=0;pr.dj=false;}
+      // the host's latest view of us is a little behind; only pull in when we've clearly drifted
+      var ex=latest[0]-pr.x,ey=latest[1]-pr.y,ed=Math.hypot(ex,ey);
+      if(ed>140){pr.x=latest[0];pr.y=latest[1];pr.vx=latest[2];pr.vy=latest[3];}
+      else if(ed>45){pr.x+=ex*0.08;pr.y+=ey*0.08;}
+    }
+    me.x=pr.x;me.y=pr.y;me.vx=pr.vx;me.vy=pr.vy;
   }
   function guestSendInput(){
-    var kk=kRef.current,pad=arguments[0]||{},c=netCtrRef.current,m=((kk['a']||pad.a)?1:0)|((kk['d']||pad.d)?2:0)|((kk['w']||pad.w)?4:0)|((kk['s']||pad.s)?8:0),arr=[m,c.jc,c.dc,c.rc],sig=arr.join(','),pnow=performance.now();
+    var kk=kRef.current,pad=arguments[0]||{},c=netCtrRef.current,m=((kk['a']||pad.a)?1:0)|((kk['d']||pad.d)?2:0)|((kk['w']||pad.w)?4:0)|((kk['s']||pad.s)?8:0),arr=[m,c.jc,c.dc,c.rc],sig=arr.join(','),pnow=performance.now();gsRef.current._gin={m:m,jc:c.jc};
     if(sig!==netOutSigRef.current||pnow-netOutAtRef.current>=50){netOutSigRef.current=sig;netOutAtRef.current=pnow;netPresence({i:arr});}
   }
   function onlineCleanup(){
