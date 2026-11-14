@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Netplay test</title>
+<style>body{margin:0;background:#111;color:#ddd;font:12px monospace}iframe{width:50vw;height:60vh;border:0;float:left}#log{clear:both;white-space:pre;padding:6px}</style></head>
+<body>
+<!-- Two copies of the game side by side, so both online players keep running at full speed (hidden tabs barely animate).
+     Serve the repo root (e.g. npx http-server -p 5577) with the local relay running, then open /tools/netplay-test.html. -->
+<iframe id="h" src="../index.html"></iframe><iframe id="g" src="../index.html"></iframe>
+<div id="log"></div>
+<script>
+function st(id){var w=document.getElementById(id).contentWindow,S=w.__slimeRB;return S?{on:S.on,e:S.e,f:S.f,rconf:S.rconf,rbs:S.rbs,stalls:S.stalls,skips:S.skips,desync:S.desync,err:String(w.__slimeErr||'')}:{none:1,err:String(w.__slimeErr||'')};}
+// ?fast: keep both games at ~60 fps even when this page is in the background (browsers pause requestAnimationFrame there).
+if(/fast/.test(location.search))['h','g'].forEach(function(id){var f=document.getElementById(id);f.addEventListener('load',function(){var w=f.contentWindow;w.requestAnimationFrame=function(cb){var ch=new w.MessageChannel(),t0=w.performance.now();ch.port1.onmessage=function(){if(w.performance.now()-t0>=16.6)cb(w.performance.now());else ch.port2.postMessage(0);};ch.port2.postMessage(0);return 1;};w.cancelAnimationFrame=function(){};});});
+setInterval(function(){document.getElementById('log').textContent='host  '+JSON.stringify(st('h'))+'\nguest '+JSON.stringify(st('g'));},250);
+</script>
+</body></html>

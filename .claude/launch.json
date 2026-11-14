@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "relay",
+      "runtimeExecutable": "npx.cmd",
+      "runtimeArgs": ["wrangler", "dev", "--port", "8788", "--local", "--cwd", "relay"],
+      "port": 8788
+    },
+    {
+      "name": "game",
+      "runtimeExecutable": "npx.cmd",
+      "runtimeArgs": ["http-server", "-p", "5577", "-c-1", "."],
+      "port": 5577
+    }
+  ]
+}
