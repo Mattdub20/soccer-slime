@@ -1,0 +1,12 @@
+name = "soccer-slime-relay"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# One Durable Object per room code: it holds the host's and the joiner's connections and passes messages between them.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

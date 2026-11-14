@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.4.0';
+var GAME_VERSION='v25.4.1';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3617,6 +3617,50 @@ function App(){
   // is enough for the guest to find the host. Game traffic is sent directly
   // between the two browsers.
   function makePeerId(code){return 'ss-host-'+code;}
+// Online play goes through our own relay server (a Cloudflare Worker) over a normal WebSocket, so school/work/mobile
+// networks that block direct peer-to-peer connections still work. Testing on this computer uses the local relay.
+var RELAY_URL=/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?'ws://127.0.0.1:8788':'wss://soccer-slime-relay.mattli-personal.workers.dev';
+function makeRelayRoom(role,code){
+  var room={relay:true,role:role,code:code,remotePresence:null,localPresence:{},closed:false,ws:null,state:'connecting'};
+  room.peers=function(){return room.closed||!room.remotePresence?[]:[{isMe:false,presence:room.remotePresence}];};
+  function send(msg){var ws=room.ws;if(!ws||ws.readyState!==1){NET_DIAG.fail++;return false;}try{ws.send(JSON.stringify(msg));NET_DIAG.sent++;return true;}catch(e){NET_DIAG.err=String(e&&e.message||e).slice(0,60);NET_DIAG.fail++;return false;}}
+  room.presence=function(patch){if(room.closed)return;if(patch&&typeof patch==='object')Object.assign(room.localPresence,patch);send({t:'presence',p:patch||{}});};
+  room.sendLocalPresence=function(){var lp={};for(var k in room.localPresence)if(k!=='p'&&k!=='i')lp[k]=room.localPresence[k];send({t:'presence',p:lp});};
+  room.sendChat=function(message){return !room.closed&&send({t:'chat',p:message});};
+  room.sendReplayChunk=function(chunk){return !room.closed&&send({t:'replay',p:chunk});};
+  room._presenceBeat=setInterval(function(){if(room.closed){clearInterval(room._presenceBeat);return;}if(room.remotePresence)room.sendLocalPresence();},1000);
+  function handle(msg){
+    NET_DIAG.recv++;
+    if(!msg||!msg.p)return;
+    if(msg.t==='chat'){var chatText=typeof msg.p.m==='string'?msg.p.m.trim().slice(0,200):'';var sticker=typeof msg.p.s==='string'?findOnlineSticker(msg.p.s):null;if(!chatText&&!sticker)return;if(room._onChat)room._onChat({n:cleanName(msg.p.n)||'Opponent',m:chatText,s:sticker?sticker.id:null});return;}
+    if(msg.t==='replay'){if(room._onReplayChunk)room._onReplayChunk(msg.p);return;}
+    if(msg.t!=='presence')return;
+    var pp=Object.assign({},msg.p);
+    if(Object.prototype.hasOwnProperty.call(pp,'a'))pp.a=cleanAccountAvatar(pp.a);
+    if(Object.prototype.hasOwnProperty.call(pp,'n'))pp.n=cleanName(pp.n);
+    room.remotePresence=Object.assign(room.remotePresence||{},pp);
+    if(msg.p.r===null||msg.p.r===undefined&&msg.p.st===null)room.remotePresence=null;
+  }
+  function peerUp(){room.state='paired';room.remotePresence=room.remotePresence||{};room.sendLocalPresence();if(room._onOpen)room._onOpen();}
+  try{room.ws=new WebSocket(RELAY_URL+'/room/'+String(code).toUpperCase()+'?role='+(role==='h'?'host':'join'));}catch(e){setTimeout(function(){if(room._onFail)room._onFail('Could not start online play. Refresh the page and try again.');},0);return room;}
+  room.ws.onopen=function(){room.state='open';};
+  room.ws.onmessage=function(ev){
+    var msg;try{msg=JSON.parse(ev.data);}catch(e){return;}
+    if(msg&&msg.relay){
+      if(msg.relay==='waiting'){room.state='waiting';if(room._onReady)room._onReady();}
+      else if(msg.relay==='peer-here'||msg.relay==='peer-joined'){if(room._onReady)room._onReady();peerUp();}
+      else if(msg.relay==='peer-left'){room.state='waiting';room.remotePresence=null;if(!room.closed&&room._onClose)room._onClose();}
+      else if(msg.relay==='nohost'){if(room._onFail)room._onFail('Room not found. Check the code and make sure your friend has created the room first.');}
+      else if(msg.relay==='full'){if(room._onFail)room._onFail('That room already has two players.');}
+      return;
+    }
+    handle(msg);
+  };
+  room.ws.onerror=function(){NET_DIAG.err='relay error';};
+  room.ws.onclose=function(){if(room.closed)return;room.state='closed';if(room.remotePresence!==null||room.state==='paired'){room.remotePresence=null;if(room._onClose)room._onClose();}if(room._onFail)room._onFail('Lost the connection to the online server. Check your internet and try again.');};
+  room.leave=function(){clearInterval(room._presenceBeat);room.closed=true;room.remotePresence=null;try{room.ws.close();}catch(e){}};
+  return room;
+}
   // School/work Wi-Fi usually blocks direct WebRTC (UDP), so a TURN relay is
   // needed there. Relays on port 443 over TCP/TLS look like normal HTTPS and
   // get through most firewalls. Paste your own free TURN credentials below
@@ -3643,7 +3687,7 @@ function connSend(c,msg){
   try{if(c.open){c.send(msg);NET_DIAG.sent++;return true;}var dc=c.dataChannel;if(dc&&dc.readyState==='open'){dc.send(JSON.stringify(msg));NET_DIAG.sent++;return true;}}catch(e){NET_DIAG.err=String(e&&e.message||e).slice(0,60);}
   NET_DIAG.fail++;return false;
 }
-function netDiagText(room){var c=room&&room.conn,dc=c&&c.dataChannel,pc=c&&c.peerConnection;return 'diag · '+GAME_VERSION+' · peer '+(c?(c.open?'open':'shut'):'none')+' · chan '+(dc?dc.readyState:'none')+' · ctl '+(room&&room.ctl&&room.ctl.dataChannel?room.ctl.dataChannel.readyState:'none')+' · ice '+(pc?pc.iceConnectionState:'-')+' · sent '+NET_DIAG.sent+' · got '+NET_DIAG.recv+' · fail '+NET_DIAG.fail+(NET_DIAG.err?' · '+NET_DIAG.err:'')+(room&&room.route?' · '+room.route:'');}
+function netDiagText(room){if(room&&room.relay)return 'diag · '+GAME_VERSION+' · relay '+room.state+' · sent '+NET_DIAG.sent+' · got '+NET_DIAG.recv+' · fail '+NET_DIAG.fail+(NET_DIAG.err?' · '+NET_DIAG.err:'');var c=room&&room.conn,dc=c&&c.dataChannel,pc=c&&c.peerConnection;return 'diag · '+GAME_VERSION+' · peer '+(c?(c.open?'open':'shut'):'none')+' · chan '+(dc?dc.readyState:'none')+' · ctl '+(room&&room.ctl&&room.ctl.dataChannel?room.ctl.dataChannel.readyState:'none')+' · ice '+(pc?pc.iceConnectionState:'-')+' · sent '+NET_DIAG.sent+' · got '+NET_DIAG.recv+' · fail '+NET_DIAG.fail+(NET_DIAG.err?' · '+NET_DIAG.err:'')+(room&&room.route?' · '+room.route:'');}
 function makePeerRoom(peer,role,code){
     var room={peer:peer,role:role,code:code,conn:null,remotePresence:null,localPresence:{},closed:false};
     room.peers=function(){
@@ -3841,7 +3885,7 @@ function makePeerRoom(peer,role,code){
     if(!hasOnlineName())return;
     var code=(code0||'').toLowerCase().replace(/[^a-z0-9]/g,'');
     if(code.length<3){setOnl(function(o){return Object.assign({},o,{err:'Enter the room code your friend gave you'});});return;}
-    if(typeof Peer!=='function'){
+    if(!RELAY_URL&&typeof Peer!=='function'){
       setOnl(function(o){return Object.assign({},o,{err:'PeerJS failed to load. Refresh the page and try again.',status:''});});
       return;
     }
@@ -3867,10 +3911,17 @@ function makePeerRoom(peer,role,code){
       setOnl(function(o){return Object.assign({},o,{status:'Connected'});});
     }
     try{
-      var peerId=role==='h'?makePeerId(code):undefined;
-      peer=new Peer(peerId,peerOptions());
-      startConnTimer('Could not reach the matchmaking server. This network may be blocking it. Try a phone hotspot.');
-      room=makePeerRoom(peer,role,code);
+      if(RELAY_URL){
+        startConnTimer('Could not reach the online server. Check your internet and try again.');
+        room=makeRelayRoom(role,code);
+        room._onFail=fail;
+        room._onReady=function(){if(role==='h')connected();else setOnl(function(o){return o.peerOn?o:Object.assign({},o,{status:'Room found! Joining…'});});};
+      }else{
+        var peerId=role==='h'?makePeerId(code):undefined;
+        peer=new Peer(peerId,peerOptions());
+        startConnTimer('Could not reach the matchmaking server. This network may be blocking it. Try a phone hotspot.');
+        room=makePeerRoom(peer,role,code);
+      }
       room._onChat=function(message){
         setChatMessages(function(messages){return messages.concat([Object.assign({mine:false},message)]).slice(-60);});
       };
@@ -3914,7 +3965,7 @@ function makePeerRoom(peer,role,code){
           setOnl(function(o){return Object.assign({},o,{peerOn:false,status:role==='h'?'Your friend left the room':'The host left the room'});});
         }
       };
-      peer.on('open',function(){
+      if(peer)peer.on('open',function(){
         if(finished||onTokRef.current!==tok)return;
         if(role==='h'){
           connected();
@@ -3926,12 +3977,12 @@ function makePeerRoom(peer,role,code){
           room.attach(conn);
         }
       });
-      peer.on('connection',function(conn){
+      if(peer)peer.on('connection',function(conn){
         if(conn&&conn.label==='soccer-slime-ctl'){if(role==='h'&&!finished&&onTokRef.current===tok)room.attachCtl(conn);return;}
         if(role!=='h'||finished||onTokRef.current!==tok)return;
         room.attach(conn);
       });
-      peer.on('error',function(err){
+      if(peer)peer.on('error',function(err){
         if(finished||onTokRef.current!==tok)return;
         var typ=err&&err.type;
         if(role==='h'&&typ==='unavailable-id'){
@@ -3946,7 +3997,7 @@ function makePeerRoom(peer,role,code){
           fail('Could not connect. Check the room code and your internet, then try again.');
         }
       });
-      peer.on('disconnected',function(){
+      if(peer)peer.on('disconnected',function(){
         if(!finished&&onTokRef.current===tok)setOnl(function(o){return Object.assign({},o,{status:'Signalling connection lost…'});});
       });
     }catch(e){fail('Could not start online play. Refresh the page and try again.');}
