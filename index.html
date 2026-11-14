@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.3.1';
+var GAME_VERSION='v25.3.5';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -349,11 +349,13 @@ var SKIN_FX={
   shadow:{c:['#ef4444','#1f2937','#fca5a5'],g:-0.04},
   aurora:{c:['#a3e635','#2dd4bf','#d9f99d','#818cf8'],g:-0.02,s:'flake',slow:true},
   robot:{c:['#38bdf8','#67e8f9','#e2e8f0','#9ca3af'],g:0.12,s:'pixel'},  // the AI: cyan/silver digital pixels
-  bigtric:{c:['#2a1b12','#5a3a24','#8b5e3c','#c49a6c','#111114'],g:0.12,s:'strand'}  // BIG TRIC: brown and black hair flicks
+  bigtric:{c:['#2a1b12','#5a3a24','#8b5e3c','#c49a6c','#111114'],g:0.12,s:'strand',goal:'goat'}  // BIG TRIC: brown and black hair flicks
 };
 // Restyle the particles emitted since index `from` to match a skin.
-function skinFx(P,from,skin){
+function skinFx(P,from,skin,isGoal){
   var fx=skin&&SKIN_FX[skin.id];if(!fx)return;
+  // some skins swap the classic goal burst for something special (BIG TRIC: goats)
+  if(isGoal&&fx.goal){var gn=0;for(var gi=from;gi<P.length;gi++){var gp=P[gi];if(gp.keep)continue;if(gp.shape==='streak'||(gn++)%2){P.splice(gi,1);gi--;continue;}gp.shape=fx.goal;gp.size=5+Math.random()*3;gp.rot=(Math.random()-0.5)*0.8;gp.spin=(Math.random()-0.5)*0.2;}return;}
   for(var i=from;i<P.length;i++){
     var p=P[i];if(p.keep)continue;p.color=fx.rainbow?hslToHex(Math.random()*360,90,65):fx.c[(Math.random()*fx.c.length)|0];
     if(p.isLine)continue;
@@ -373,6 +375,17 @@ function trailColor(style,isJapan,t){
 function emitCelebration(P,style,gx,gy){
   var i,v,p;gx=gx==null?GW-BR:gx;gy=gy==null?GH-GRND-GOALH/2:gy;
   var dir=goalDir(gx),ox=gx+dir*18;
+  if(style&&style.indexOf('ai:')===0){
+    // the AI's celebration: a digital burst in its difficulty colour
+    var ac=style.slice(3)||'#38bdf8';
+    fxFlash(P,ox,gy,110,ac,14);
+    fxRing(P,ox,gy,8,250,ac,28,6,dir,0,0.8);
+    fxRing(P,ox,gy,8,200,'#ffffff',30,3,dir,4,0.8);
+    fxRing(P,ox,gy,8,150,ac,32,2.5,dir,8,0.8);
+    for(i=0;i<46;i++){v=coneVel(dir,4+Math.random()*9,1.9,1.5);p=mkP(ox,gy+(Math.random()-0.5)*50,v[0],v[1],i%3?ac:'#ffffff',36+Math.random()*24,2.5+Math.random()*2.5);p.grav=0.05;p.shape='pixel';p.drag=0.97;p.keep=true;P.push(p);}
+    for(i=0;i<16;i++){p=mkP(ox,gy+(Math.random()-0.5)*GOALH,dir*(12+Math.random()*10),0,ac,14+Math.random()*10,2);p.grav=0;p.shape='streak';p.len=50;p.drag=0.98;p.keep=true;P.push(p);}
+    return;
+  }
   if(style==='explosion'){
     // fireball out of the net: white-hot flash, blast ring, flames, flying debris, smoke rolling across the pitch
     fxFlash(P,ox,gy,130,'#fff4c2',16);
@@ -568,6 +581,37 @@ function sugCol(){return CLOUD.db.collection('suggestions');}
 function sugSend(text,name){return cloudInit().then(function(ok){if(!ok)throw new Error('offline');return sugCol().add({text:text,name:String(name||'').slice(0,24),user:CLOUD.user?cloudUsernameOf(CLOUD.user):'',at:firebase.firestore.FieldValue.serverTimestamp(),v:GAME_VERSION});});}
 function sugList(){return cloudInit().then(function(ok){if(!ok)throw new Error('offline');return sugCol().orderBy('at','desc').limit(300).get();}).then(function(q){return q.docs.map(function(d){return Object.assign({id:d.id},d.data());});});}
 function sugDelete(id){return sugCol().doc(id).delete();}
+function sugWatchLatest(cb){return sugCol().orderBy('at','desc').limit(1).onSnapshot(function(q){cb(q.docs.length?tsMillis(q.docs[0].data().at)||Date.now():0);},function(){cb(0);});}
+// Chats: chats/{id} = {members:[uid], names:{uid:username}, group, title, createdBy, updatedAt, lastText, lastFrom}
+// one-on-one chats use the id "<uidA>_<uidB>" (sorted); messages live in chats/{id}/messages.
+// Replays sent in a chat: sharedReplays/{id} = {chatId, from, meta, goals, n} with the packed data split over chunks/{0..n-1}.
+function chatCol(){return CLOUD.db.collection('chats');}
+function chatDmId(a,b){return a<b?a+'_'+b:b+'_'+a;}
+function chatWatch(uid,cb){return chatCol().where('members','array-contains',uid).onSnapshot(function(q){cb(q.docs.map(function(d){return Object.assign({id:d.id},d.data());}));},function(e){console.warn('Chats unavailable.',e);cb([]);});}
+function chatOpenDM(me,meName,them,themName){var id=chatDmId(me,them),names={};names[me]=meName;names[them]=themName;return chatCol().doc(id).set({members:[me,them].sort(),names:names,group:false},{merge:true}).then(function(){return id;});}
+function chatCreateGroup(me,meName,title,people){var names={},members=[me];names[me]=meName;people.forEach(function(f){members.push(f.uid);names[f.uid]=f.username;});
+  return chatCol().add({members:members,names:names,group:true,title:String(title||'').slice(0,30)||'Group chat',createdBy:me,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),lastText:'Group created',lastFrom:me}).then(function(r){return r.id;});}
+function chatSend(chatId,me,meName,msg,preview){var ref=chatCol().doc(chatId),ts=firebase.firestore.FieldValue.serverTimestamp();
+  return ref.collection('messages').add(Object.assign({from:me,fromName:meName,at:ts},msg)).then(function(){return ref.update({updatedAt:ts,lastText:String(preview||'').slice(0,80),lastFrom:me});});}
+function chatWatchMsgs(chatId,cb){return chatCol().doc(chatId).collection('messages').orderBy('at','desc').limit(80).onSnapshot(function(q){cb(q.docs.map(function(d){return Object.assign({id:d.id},d.data());}).reverse());},function(e){cb(null,e);});}
+function chatShareReplay(chatId,me,replayId){
+  return rpGet(replayId).then(function(rec){if(!rec)throw new Error('missing');
+    var u8=new Uint8Array(rec.data.buffer),bin='';for(var i=0;i<u8.length;i+=8192)bin+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));
+    var b64=btoa(bin),parts=[];for(var k=0;k<b64.length;k+=700000)parts.push(b64.slice(k,k+700000));
+    var meta=Object.assign({},rec.meta||{});delete meta.id;delete meta.at;
+    var ref=CLOUD.db.collection('sharedReplays').doc();
+    return ref.set({chatId:chatId,from:me,meta:meta,goals:rec.goals||[],n:parts.length,at:firebase.firestore.FieldValue.serverTimestamp()}).then(function(){
+      return parts.reduce(function(pr,part,idx){return pr.then(function(){return ref.collection('chunks').doc(String(idx)).set({d:part});});},Promise.resolve());
+    }).then(function(){return {rid:ref.id,title:meta.title||'Replay',secs:meta.secs||0,kind:meta.kind||'match'};});});
+}
+function chatFetchReplay(rid){var ref=CLOUD.db.collection('sharedReplays').doc(rid);
+  return ref.get().then(function(d){if(!d.exists)throw new Error('gone');var o=d.data(),gets=[];for(var i=0;i<o.n;i++)gets.push(ref.collection('chunks').doc(String(i)).get());
+    return Promise.all(gets).then(function(cs){var b64=cs.map(function(c){return c.data().d;}).join(''),bin=atob(b64),u8=new Uint8Array(bin.length);for(var j=0;j<bin.length;j++)u8[j]=bin.charCodeAt(j);
+      var m=Object.assign({},o.meta||{});m.title=(m.title||'Replay')+' (from chat)';return rpSave(m,rpUnpack(new Float32Array(u8.buffer)),o.goals||[]);});});}
+function chatReadMap(){try{return JSON.parse(window.localStorage.getItem('slime_chat_read'))||{};}catch(e){return {};}}
+function chatUnread(c,uid,read){return !!c&&c.lastFrom&&c.lastFrom!==uid&&tsMillis(c.updatedAt)>((read||{})[c.id]||0);}
+function chatTitle(c,uid){if(c.group)return c.title||'Group chat';var other=(c.members||[]).filter(function(m){return m!==uid;})[0];return (c.names&&c.names[other])||'Chat';}
+function RedDot(){return React.createElement('span',{'aria-label':'new',style:{display:'inline-block',width:9,height:9,borderRadius:'50%',background:'#ef4444',boxShadow:'0 0 6px #ef4444',marginLeft:6,verticalAlign:'middle',flexShrink:0}});}
 // Dev announcements: only the developer account can post (Firestore rules), everyone can read.
 // announcements/{id} = {text, opts:[...poll options] , at}; votes in announcements/{id}/votes/{uid} = {o: option index}
 function annCol(){return CLOUD.db.collection('announcements');}
@@ -1283,6 +1327,7 @@ function drawParticles(ctx,pts){
     else if(pt.shape==='star'){var sr=psz*1.6;ctx.fillStyle=pt.color;ctx.beginPath();ctx.moveTo(pt.x,pt.y-sr);ctx.lineTo(pt.x+sr*0.3,pt.y-sr*0.3);ctx.lineTo(pt.x+sr,pt.y);ctx.lineTo(pt.x+sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x,pt.y+sr);ctx.lineTo(pt.x-sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x-sr,pt.y);ctx.lineTo(pt.x-sr*0.3,pt.y-sr*0.3);ctx.closePath();ctx.fill();}
     else if(pt.shape==='flake'){ctx.strokeStyle=pt.color;ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();for(var fk=0;fk<3;fk++){var fa=fk*Math.PI/3+pt.life*0.05;ctx.moveTo(pt.x-Math.cos(fa)*psz*1.5,pt.y-Math.sin(fa)*psz*1.5);ctx.lineTo(pt.x+Math.cos(fa)*psz*1.5,pt.y+Math.sin(fa)*psz*1.5);}ctx.stroke();}
     else if(pt.shape==='pixel'){var px=Math.max(1.5,psz*1.4);ctx.fillStyle=pt.color;ctx.fillRect(Math.round(pt.x-px/2),Math.round(pt.y-px/2),px,px);}
+    else if(pt.shape==='goat'){pt.rot=(pt.rot||0)+(pt.spin||0);ctx.translate(pt.x,pt.y);ctx.rotate(pt.rot);ctx.font=Math.round(pt.size*3.4)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🐐',0,0);}
     else if(pt.shape==='flash'){var fr=pt.size*(1.5-pal*0.5),fgr=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,fr);fgr.addColorStop(0,pt.color);fgr.addColorStop(0.3,pt.color);fgr.addColorStop(1,'rgba(255,255,255,0)');ctx.globalAlpha=pal*pal;ctx.globalCompositeOperation='lighter';ctx.fillStyle=fgr;ctx.beginPath();ctx.arc(pt.x,pt.y,fr,0,Math.PI*2);ctx.fill();}
     else if(pt.shape==='ring'){var re=1-pal,rr=pt.r0+pt.grow*(1-Math.pow(1-re,2.2));ctx.strokeStyle=pt.color;ctx.lineWidth=Math.max(0.5,pt.size*pal);ctx.shadowColor=pt.color;ctx.shadowBlur=PERF_LOW?0:10;ctx.beginPath();if(pt.half>0)ctx.ellipse(pt.x,pt.y,rr,rr*pt.squash,0,-Math.PI/2,Math.PI/2);else if(pt.half<0)ctx.ellipse(pt.x,pt.y,rr,rr*pt.squash,0,Math.PI/2,Math.PI*1.5);else ctx.ellipse(pt.x,pt.y,rr,rr*pt.squash,0,0,Math.PI*2);ctx.stroke();}
     else if(pt.shape==='streak'){var sv=Math.hypot(pt.vx,pt.vy)||1,sln=(pt.len||14)*pal+4;ctx.strokeStyle=pt.color;ctx.lineWidth=psz;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pt.x-pt.vx/sv*sln,pt.y-pt.vy/sv*sln);ctx.stroke();}
@@ -1886,11 +1931,89 @@ function AnnounceRow(props){
     isPoll&&React.createElement('div',{style:{marginTop:8}},React.createElement(PollBars,{opts:a.opts,counts:v.c,total:v.total,mine:null,showResults:true})),
     React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.5)',marginTop:6}},props.when+(isPoll?' \u00B7 '+v.total+' vote'+(v.total===1?'':'s'):'')+(props.latest?' \u00B7 showing to players':'')));
 }
+function ChatsTab(props){
+  var uid=CLOUD.user&&CLOUD.user.uid,me=props.cloudUser;
+  var s_v=useState(null),open=s_v[0],setOpen=s_v[1],s_g=useState(false),newGroup=s_g[0],setNewGroup=s_g[1];
+  var s_t=useState(''),gTitle=s_t[0],setGTitle=s_t[1],s_p=useState({}),picked=s_p[0],setPicked=s_p[1],s_e=useState(''),err=s_e[0],setErr=s_e[1];
+  if(!props.cloudUser)return cloudSignInNotice('your chats',props.panelSty,props.onGuide);
+  var small=function(bg){return{padding:'7px 13px',borderRadius:50,border:'1px solid rgba(255,255,255,0.22)',background:bg||'rgba(255,255,255,0.07)',color:'#fff',fontWeight:800,fontSize:12,cursor:'pointer',whiteSpace:'nowrap'};};
+  if(open){var c=(props.chats||[]).filter(function(x){return x.id===open;})[0]||{id:open,members:[uid],names:{}};return React.createElement(ChatRoom,{chat:c,uid:uid,me:me,panelSty:props.panelSty,onBack:function(){setOpen(null);},onRead:props.onRead,onPlay:props.onPlay});}
+  function dm(f){setErr('');chatOpenDM(uid,me,f.uid,f.username).then(setOpen,function(e){setErr(cloudErrorText(e));});}
+  if(newGroup){var chosen=props.friends.filter(function(f){return picked[f.uid];});
+    return React.createElement('div',{style:Object.assign({},props.panelSty,{padding:14})},
+      React.createElement('div',{style:{fontWeight:900,fontSize:15,marginBottom:8}},'New group chat'),
+      React.createElement('input',{type:'text',value:gTitle,maxLength:30,placeholder:'Group name','aria-label':'Group name',onChange:function(e){setGTitle(e.target.value);},onKeyDown:function(e){e.stopPropagation();},style:{width:'100%',boxSizing:'border-box',padding:'8px 12px',borderRadius:10,border:'1px solid rgba(255,255,255,0.22)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:13,outline:'none',marginBottom:10}}),
+      React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.65)',marginBottom:6}},'Pick at least 2 friends (up to 11):'),
+      props.friends.length===0&&React.createElement('div',{style:{fontSize:13,color:'rgba(255,255,255,0.6)'}},'Add some friends first.'),
+      React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:6}},props.friends.map(function(f){var on=!!picked[f.uid];return React.createElement('button',{key:f.uid,type:'button','aria-pressed':on,onClick:function(){var n=Object.assign({},picked);if(on)delete n[f.uid];else if(Object.keys(n).length<11)n[f.uid]=1;setPicked(n);},style:small(on?'rgba(14,165,233,0.35)':null)},(on?'\u2713 ':'')+f.username);})),
+      err&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:12,marginTop:8}},err),
+      React.createElement('div',{style:{display:'flex',gap:8,marginTop:12,justifyContent:'flex-end'}},
+        React.createElement('button',{type:'button',onClick:function(){setNewGroup(false);setPicked({});setGTitle('');},style:small()},'Cancel'),
+        React.createElement('button',{type:'button',disabled:chosen.length<2,onClick:function(){setErr('');chatCreateGroup(uid,me,gTitle,chosen).then(function(id){setNewGroup(false);setPicked({});setGTitle('');setOpen(id);},function(e){setErr(cloudErrorText(e));});},style:Object.assign(small('linear-gradient(135deg,#22c55e,#15803d)'),{opacity:chosen.length<2?0.5:1})},'Create group')));}
+  var list=(props.chats||[]).slice().sort(function(a,b){return tsMillis(b.updatedAt)-tsMillis(a.updatedAt);});
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:10,flexWrap:'wrap'}},
+      React.createElement('div',{style:{flex:1,fontSize:12,color:'rgba(255,255,255,0.65)'}},'Chat with friends, or start a group. You can send replays too.'),
+      React.createElement('button',{type:'button',onClick:function(){setNewGroup(true);},style:small('rgba(14,165,233,0.25)')},'+ New group')),
+    props.friends.length>0&&React.createElement('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}},props.friends.map(function(f){return React.createElement('button',{key:f.uid,type:'button','aria-label':'Chat with '+f.username,onClick:function(){dm(f);},style:small()},'\uD83D\uDCAC '+f.username);})),
+    err&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:12,marginBottom:8}},err),
+    list.length===0&&React.createElement('div',{style:Object.assign({},props.panelSty,{padding:16,textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.7)'})},props.friends.length?'No chats yet. Tap a friend above to say hi!':'Add friends in the Friends tab to start chatting.'),
+    list.map(function(c){var un=chatUnread(c,uid,props.read);
+      return React.createElement('button',{key:c.id,type:'button',onClick:function(){setOpen(c.id);},style:Object.assign({},props.panelSty,{display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',padding:'10px 12px',marginBottom:6,color:'#fff',cursor:'pointer',fontFamily:'inherit',border:un?'1px solid rgba(239,68,68,0.6)':props.panelSty.border})},
+        React.createElement('span',{'aria-hidden':'true',style:{fontSize:20}},c.group?'\uD83D\uDC65':'\uD83D\uDCAC'),
+        React.createElement('span',{style:{flex:1,minWidth:0}},
+          React.createElement('span',{style:{display:'block',fontWeight:900,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},chatTitle(c,uid),c.group&&React.createElement('span',{style:{fontWeight:600,fontSize:11,color:'rgba(255,255,255,0.5)'}},' \u00B7 '+(c.members||[]).length+' people')),
+          React.createElement('span',{style:{display:'block',fontSize:12,color:un?'#fff':'rgba(255,255,255,0.6)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.lastText?((c.lastFrom===uid?'You: ':'')+c.lastText):'No messages yet')),
+        un&&React.createElement(RedDot));}));
+}
+function ChatRoom(props){
+  var c=props.chat,uid=props.uid;
+  var s_m=useState(null),msgs=s_m[0],setMsgs=s_m[1],s_t=useState(''),text=s_t[0],setText=s_t[1],s_e=useState(''),err=s_e[0],setErr=s_e[1];
+  var s_pick=useState(false),pick=s_pick[0],setPick=s_pick[1],s_busy=useState(''),busy=s_busy[0],setBusy=s_busy[1],s_w=useState({}),watching=s_w[0],setWatching=s_w[1];
+  var boxRef=useRef(null);
+  useEffect(function(){return chatWatchMsgs(c.id,function(l,e){if(l){setMsgs(l);props.onRead(c.id);}else{setMsgs([]);setErr(e&&e.code==='permission-denied'?'Publish the updated Firestore rules to use chats.':'Couldn\u2019t load this chat.');}});},[c.id]);
+  useEffect(function(){var b=boxRef.current;if(b)b.scrollTop=b.scrollHeight;},[msgs&&msgs.length]);
+  function send(){var t=text.trim();if(!t||busy)return;setText('');setErr('');chatSend(c.id,uid,props.me,{text:t.slice(0,500)},t).catch(function(){setErr('Couldn\u2019t send that. Check your internet.');setText(t);});}
+  function sendReplay(r){setPick(false);setBusy('Sending replay\u2026');setErr('');chatShareReplay(c.id,uid,r.id).then(function(rp){return chatSend(c.id,uid,props.me,{replay:rp},'\uD83C\uDFAC '+rp.title);}).then(function(){setBusy('');},function(){setBusy('');setErr('Couldn\u2019t send that replay. Check your internet.');});}
+  function watch(m){var rid=m.replay.rid;setWatching(function(o){var n=Object.assign({},o);n[rid]='Downloading\u2026';return n;});chatFetchReplay(rid).then(function(id){setWatching(function(o){var n=Object.assign({},o);n[rid]='Saved to Replays';return n;});props.onPlay(id);},function(){setWatching(function(o){var n=Object.assign({},o);n[rid]='Couldn\u2019t get it';return n;});});}
+  function when(t){var ms=tsMillis(t);if(!ms)return '';var d=new Date(ms),now=new Date();return d.toDateString()===now.toDateString()?d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):d.toLocaleDateString(undefined,{day:'numeric',month:'short'});}
+  function len(sv){var m=Math.floor(sv/60),x=sv%60;return m+':'+(x<10?'0':'')+x;}
+  var small=function(bg){return{padding:'7px 13px',borderRadius:50,border:'1px solid rgba(255,255,255,0.22)',background:bg||'rgba(255,255,255,0.07)',color:'#fff',fontWeight:800,fontSize:12,cursor:'pointer',whiteSpace:'nowrap'};};
+  var saved=rpIndex();
+  return React.createElement('div',{style:Object.assign({},props.panelSty,{padding:12,display:'flex',flexDirection:'column',gap:8})},
+    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+      React.createElement('button',{type:'button',onClick:props.onBack,'aria-label':'Back to chats',style:small()},'\u2190'),
+      React.createElement('div',{style:{flex:1,minWidth:0}},
+        React.createElement('div',{style:{fontWeight:900,fontSize:15,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},chatTitle(c,uid)),
+        c.group&&React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},(c.members||[]).map(function(m){return m===uid?'You':(c.names&&c.names[m])||'?';}).join(', ')))),
+    React.createElement('div',{ref:boxRef,role:'log','aria-live':'polite',style:{height:'min(46vh,380px)',overflowY:'auto',display:'flex',flexDirection:'column',gap:6,padding:'4px 2px'}},
+      msgs===null&&React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.6)',textAlign:'center'}},'Loading\u2026'),
+      msgs&&msgs.length===0&&React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.6)',textAlign:'center',marginTop:20}},'Say hi! \uD83D\uDC4B'),
+      (msgs||[]).map(function(m){var mine=m.from===uid;
+        return React.createElement('div',{key:m.id,style:{alignSelf:mine?'flex-end':'flex-start',maxWidth:'80%'}},
+          c.group&&!mine&&React.createElement('div',{style:{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.55)',margin:'0 0 2px 8px'}},m.fromName||'?'),
+          React.createElement('div',{style:{padding:'8px 12px',borderRadius:14,borderBottomRightRadius:mine?4:14,borderBottomLeftRadius:mine?14:4,background:mine?'linear-gradient(135deg,#0ea5e9,#0369a1)':'rgba(255,255,255,0.1)',fontSize:14,lineHeight:1.4,whiteSpace:'pre-wrap',wordBreak:'break-word'}},
+            m.replay?React.createElement('div',null,
+                React.createElement('div',{style:{fontWeight:900}},'\uD83C\uDFAC '+String(m.replay.title||'Replay')),
+                React.createElement('div',{style:{fontSize:11,opacity:0.75,margin:'2px 0 6px'}},(m.replay.kind==='goal'?'Goal clip':m.replay.kind==='practice'?'Practice goal':'Full match')+(m.replay.secs?' \u00B7 '+len(m.replay.secs):'')),
+                watching[m.replay.rid]?React.createElement('div',{style:{fontSize:12,fontWeight:800}},watching[m.replay.rid])
+                  :React.createElement('button',{type:'button',onClick:function(){watch(m);},style:small('rgba(0,0,0,0.25)')},'\u25B6 Watch'))
+              :String(m.text||'')),
+          React.createElement('div',{style:{fontSize:10,color:'rgba(255,255,255,0.45)',textAlign:mine?'right':'left',margin:'2px 6px 0'}},when(m.at)));})),
+    pick&&React.createElement('div',{style:{maxHeight:180,overflowY:'auto',borderRadius:12,background:'rgba(0,0,0,0.25)',padding:6}},
+      saved.length===0&&React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.6)',padding:8}},'No saved replays yet. Save one from the end of a match.'),
+      saved.map(function(r){return React.createElement('button',{key:r.id,type:'button',onClick:function(){sendReplay(r);},style:Object.assign(small(),{display:'block',width:'100%',textAlign:'left',borderRadius:10,marginBottom:4})},'\uD83C\uDFAC '+(r.title||'Replay')+(r.secs?' \u00B7 '+len(r.secs):''));})),
+    (busy||err)&&React.createElement('div',{role:err?'alert':'status',style:{fontSize:12,fontWeight:800,color:err?'#fecaca':'#bae6fd'}},err||busy),
+    React.createElement('div',{style:{display:'flex',gap:6,alignItems:'flex-end'}},
+      React.createElement('button',{type:'button','aria-label':'Send a replay','aria-expanded':pick,onClick:function(){setPick(!pick);},style:small(pick?'rgba(14,165,233,0.35)':null)},'\uD83C\uDFAC'),
+      React.createElement('textarea',{value:text,rows:1,maxLength:500,placeholder:'Message\u2026','aria-label':'Message',onChange:function(e){setText(e.target.value);},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}},style:{flex:1,minWidth:0,resize:'none',padding:'8px 12px',borderRadius:14,border:'1px solid rgba(255,255,255,0.22)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:14,fontFamily:'inherit',outline:'none'}}),
+      React.createElement('button',{type:'button',disabled:!text.trim(),onClick:send,style:Object.assign(small('linear-gradient(135deg,#22c55e,#15803d)'),{opacity:text.trim()?1:0.5})},'Send')));
+}
 function SuggestionsTab(props){
   var s_t=useState(''),text=s_t[0],setText=s_t[1],s_m=useState(''),msg=s_m[0],setMsg=s_m[1],s_b=useState(false),busy=s_b[0],setBusy=s_b[1];
   var s_l=useState(null),list=s_l[0],setList=s_l[1],s_c=useState(null),confirm=s_c[0],setConfirm=s_c[1];
   var isDevReader=props.isDev&&props.cloudUser===DEV_USERNAME;
-  function load(){setMsg('');setList(null);sugList().then(setList,function(e){setList([]);setMsg(e&&e.code==='permission-denied'?'The cloud won\u2019t share suggestions yet. Publish the updated Firestore rules, and make sure you\u2019re signed in as '+DEV_USERNAME+'.':'Couldn\u2019t load suggestions. Check your internet and try again.');});}
+  function load(){setMsg('');setList(null);sugList().then(function(l){setList(l);if(props.onSeen)props.onSeen();},function(e){setList([]);setMsg(e&&e.code==='permission-denied'?'The cloud won\u2019t share suggestions yet. Publish the updated Firestore rules, and make sure you\u2019re signed in as '+DEV_USERNAME+'.':'Couldn\u2019t load suggestions. Check your internet and try again.');});}
   useEffect(function(){if(isDevReader)load();},[isDevReader]);
   var box=Object.assign({},props.panelSty,{padding:14});
   if(props.isDev){
@@ -2011,7 +2134,7 @@ function PlayerDataScreen(props){
     var root=pdRootRef.current,inside=!!(root&&target&&target.nodeType===1&&root.contains(target));
     if(!inside){var cur=playerDataTabRefs.current[tab];if(cur)cur.focus();return;}
     var isTab=target.getAttribute&&target.getAttribute('role')==='tab';
-    if(isTab&&(dir==='left'||dir==='right')){var tabs=['roster','h2h','achievements','leaderboard','friends','replays','suggestions'],index=tabs.indexOf(target.getAttribute('data-tab')||tabFocus),nextTab=tabs[(index+(dir==='right'?1:-1)+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();return;}
+    if(isTab&&(dir==='left'||dir==='right')){var tabs=['roster','h2h','achievements','leaderboard','friends','chats','replays','suggestions'],index=tabs.indexOf(target.getAttribute('data-tab')||tabFocus),nextTab=tabs[(index+(dir==='right'?1:-1)+tabs.length)%tabs.length];selectPlayerDataTab(nextTab);if(playerDataTabRefs.current[nextTab])playerDataTabRefs.current[nextTab].focus();return;}
     var nx=spatialMove(root,dir,target);if(nx){nx.focus();if(nx.getAttribute('role')==='tab'){var t2=nx.getAttribute('data-tab');if(t2)selectPlayerDataTab(t2);}}
   };
   useEffect(function(){function h(e){if(pdKeyRef.current)pdKeyRef.current(e);}window.addEventListener('keydown',h,true);return function(){window.removeEventListener('keydown',h,true);};},[]);
@@ -2032,7 +2155,7 @@ function PlayerDataScreen(props){
           React.createElement('button',{type:'button',autoFocus:true,onClick:function(){setPreviewAchievement(null);},style:{padding:'9px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.14)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Close')));
     })(),
     React.createElement('div',{role:'tablist','aria-label':'Stats and social sections',style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
-      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions'}].map(function(option){return React.createElement('button',{key:option.id,'data-tab':option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label);})
+      [{id:'roster',label:'Roster'},{id:'h2h',label:'Head to Head'},{id:'achievements',label:'Achievements'},{id:'leaderboard',label:'Leaderboard'},{id:'friends',label:'Friends'},{id:'chats',label:'Chats',dot:props.chatDot},{id:'replays',label:'Replays'},{id:'suggestions',label:'Suggestions',dot:props.sugDot}].map(function(option){return React.createElement('button',{key:option.id,'data-tab':option.id,ref:function(el){playerDataTabRefs.current[option.id]=el;},role:'tab','aria-selected':tab===option.id,tabIndex:tabFocus===option.id?0:-1,onFocus:function(){setTabFocus(option.id);},onClick:function(){selectPlayerDataTab(option.id);},style:Object.assign({},tabBtnFn(tab===option.id),tabFocus===option.id?{outline:'3px solid #7dd3fc',outlineOffset:2}:null)},option.label,option.dot&&React.createElement(RedDot));})
     ),
     tab==='roster'&&React.createElement('div',null,
       React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
@@ -2080,7 +2203,8 @@ function PlayerDataScreen(props){
     ),
     tab==='leaderboard'&&React.createElement(LeaderboardTab,{cloudUser:props.cloudUser,panelSty:panelSty}),
     tab==='replays'&&React.createElement(ReplaysTab,{onPlay:props.onPlayReplay,panelSty:panelSty}),
-    tab==='suggestions'&&React.createElement(SuggestionsTab,{isDev:props.cloudUser===DEV_USERNAME,cloudUser:props.cloudUser,accountName:props.accountName,panelSty:panelSty}),
+    tab==='chats'&&React.createElement(ChatsTab,{cloudUser:props.cloudUser,friends:props.friends||[],chats:props.chats,read:props.chatRead,onRead:props.onReadChat,onPlay:props.onPlayReplay,onGuide:props.onFriendsGuide,panelSty:panelSty}),
+    tab==='suggestions'&&React.createElement(SuggestionsTab,{onSeen:props.onSugSeen,isDev:props.cloudUser===DEV_USERNAME,cloudUser:props.cloudUser,accountName:props.accountName,panelSty:panelSty}),
     tab==='friends'&&React.createElement(FriendsTab,{onGuide:props.onFriendsGuide,requests:props.friendReqs,onAccept:props.onAcceptFriend,onDecline:props.onDeclineFriend,cloudUser:props.cloudUser,friends:props.friends||[],onAdd:props.onAddFriend,onRemove:props.onRemoveFriend,onInvite:props.onInviteFriend,panelSty:panelSty}),
     tab==='achievements'&&React.createElement('div',null,
       React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginBottom:12,textAlign:'center'})},
@@ -2715,6 +2839,50 @@ function ProfileAvatar(props){
       React.createElement('canvas',{ref:canvasRef,'aria-hidden':'true',style:{display:'block',width:'100%',height:'100%'}}));
 }
 // Looping in-place demo of a skin: jump, S-dash spin in the air, snap back, land.
+// Little looping clip: a shot flies into the net with your ball trail, your goal celebration goes off,
+// then your slime does its victory pose.
+function CosmeticPreview(props){
+  var canvasRef=useRef(null),color=props.color||'#e8192c',theme=props.theme||'night',skin=achievementSkinDetails(props.skin);
+  useEffect(function(){
+    var canvas=canvasRef.current;if(!canvas)return;var ctx=canvas.getContext('2d');if(!ctx)return;
+    var VX=220,VY=GH-GRND-230,VW=GW-VX,VH=260,cssW=props.width||300,k=2;canvas.width=Math.round(cssW*k);canvas.height=Math.round(cssW*VH/VW*k);
+    var hsl=hexToHsl(color),accent=hslToHex(hsl[0],Math.min(100,hsl[1]+8),Math.max(5,hsl[2]-20)),pal=previewColors(theme);
+    var parts=[],trail=[],ball,sl,t=0,raf=0,last=0,acc=0;
+    function reset(){t=0;parts.length=0;trail.length=0;ball={x:430,y:GH-GRND-150,vx:9.5,vy:-5,ang:0};sl=mkSlime(380);sl._poseX=null;sl._spinT=null;sl._poseRot=0;}
+    reset();
+    function step(){
+      t++;
+      if(t<=60){if(ball){ball.vy+=GRAV*0.55;ball.x+=ball.vx;ball.y+=ball.vy;ball.ang=(ball.ang||0)+0.2;trail.push({x:ball.x,y:ball.y});if(trail.length>14)trail.shift();
+        if(ball.x>=GW-BR-4){var gy=GH-GRND-GOALH/2,g0=parts.length;emitGoal(parts,GW-BR,gy,skin&&skin.color?skin.color:color);skinFx(parts,g0,skin,true);if(props.celebration&&props.celebration!=='none')emitCelebration(parts,props.celebration,GW-BR,gy);ball=null;t=60;}}}
+      else if(trail.length)trail.shift();
+      if(t>70){poseStep(sl,props.pose&&props.pose!=='none'?props.pose:'hop',t-70,1);}
+      sl.vy+=GRAV;sl.y+=sl.vy;sl.x+=sl.vx||0;if(sl.y>=GH-GRND){sl.y=GH-GRND;sl.vy=0;}
+      if(t>260)reset();
+    }
+    function draw(){
+      ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
+      var sc=canvas.width/VW;ctx.setTransform(sc,0,0,sc,-VX*sc,-VY*sc);
+      var sky=ctx.createLinearGradient(0,VY,0,GH-GRND);sky.addColorStop(0,pal.skyTop);sky.addColorStop(1,pal.skyBottom);ctx.fillStyle=sky;ctx.fillRect(VX,VY,VW,GH-GRND-VY);
+      ctx.fillStyle=pal.grass;ctx.fillRect(VX,GH-GRND,VW,VH);ctx.fillStyle=pal.line;ctx.fillRect(VX,GH-GRND,VW,2);
+      // goal
+      ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(GW,GH-GRND-GOALH);ctx.lineTo(GW-GOALW,GH-GRND-GOALH);ctx.lineTo(GW-GOALW,GH-GRND);ctx.stroke();
+      ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;for(var nx=GW-GOALW+10;nx<GW;nx+=12){ctx.beginPath();ctx.moveTo(nx,GH-GRND-GOALH);ctx.lineTo(nx,GH-GRND);ctx.stroke();}for(var ny=GH-GRND-GOALH+10;ny<GH-GRND;ny+=12){ctx.beginPath();ctx.moveTo(GW-GOALW,ny);ctx.lineTo(GW,ny);ctx.stroke();}
+      // ball trail
+      var tst=props.trail&&props.trail!=='none'?props.trail:'none',now=performance.now();
+      for(var i=0;i<trail.length;i++){var f=(i+1)/trail.length;ctx.globalAlpha=f*0.75;ctx.fillStyle=trailColor(tst,theme==='japan',now+i*40);ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,BR*(0.35+0.6*f),0,Math.PI*2);ctx.fill();}
+      ctx.globalAlpha=1;
+      if(ball)drawBall(ctx,ball,theme==='night',theme==='japan');
+      ctx.fillStyle='rgba(0,0,0,0.22)';ctx.beginPath();ctx.ellipse(sl.x,GH-GRND+4,SR*Math.max(0.35,1-(GH-GRND-sl.y)/160),5,0,0,Math.PI*2);ctx.fill();
+      drawSlime(ctx,sl,false,color,accent,theme==='night',theme==='japan',skin);
+      drawParticles(ctx,parts);
+    }
+    var reduce=false;try{reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+    if(reduce){for(var q=0;q<75;q++)step();draw();return;}
+    function loop(now){if(!last)last=now;acc+=Math.min(100,now-last);last=now;while(acc>=1000/60){step();acc-=1000/60;}draw();raf=requestAnimationFrame(loop);}
+    raf=requestAnimationFrame(loop);return function(){cancelAnimationFrame(raf);};
+  },[color,theme,props.skin,props.celebration,props.trail,props.pose,props.width]);
+  return React.createElement('canvas',{ref:canvasRef,role:'img','aria-label':'Preview of your goal celebration, ball trail and victory pose',style:{width:props.width||300,maxWidth:'100%',borderRadius:14,border:'1px solid rgba(255,255,255,0.18)',display:'block'}});
+}
 function SkinMotionPreview(props){
   var color=props.color||'#e8192c',theme=props.theme||'night',skin=achievementSkinDetails(props.skin),canvasRef=useRef(null);
   useEffect(function(){
@@ -2811,6 +2979,7 @@ function AccountScreen(props){
         React.createElement('button',{type:'button',disabled:cloud.busy,onClick:function(){cloudSubmit(false);},style:btn('linear-gradient(135deg,#0ea5e9,#0369a1)')},cloud.busy?'Please wait…':'Log in'),
         React.createElement('button',{type:'button',disabled:cloud.busy,onClick:function(){cloudSubmit(true);},style:btn('rgba(255,255,255,0.13)')},'Create account')));
   }
+  var s_peek=useState(null),peek=s_peek[0],setPeek=s_peek[1];
   var s_link=useState(function(){var id=initial.linkedPlayerId||'';return localPlayers.some(function(p){return p.id===id;})?id:'';}),linkedPlayerId=s_link[0],setLinkedPlayerId=s_link[1];
   var unlockedFrames=props.unlockedFrames||[];
   var unlockedSkins=props.unlockedSkins||[];
@@ -2849,7 +3018,7 @@ function AccountScreen(props){
       if(key==='enter'||key===' '){e.preventDefault();e.stopPropagation();startEditingName();return;}
     }
     var inCloudField=target.getAttribute&&target.getAttribute('data-cloud');
-    if(key==='escape'){e.preventDefault();e.stopPropagation();if(inCloudField){var loginBtn=target.parentNode.parentNode.querySelector('button');if(loginBtn)loginBtn.focus();}else props.onBack();return;}
+    if(key==='escape'){e.preventDefault();e.stopPropagation();if(inCloudField){var loginBtn=target.parentNode.parentNode.querySelector('button');if(loginBtn)loginBtn.focus();}else save();return;}
     if(key==='tab'){
       var controls=accountControls();
       if(!controls.length)return;
@@ -2894,6 +3063,13 @@ function AccountScreen(props){
     image.onerror=function(){setError('That image could not be opened. Try another file.');};
     image.src=photo.src;
   }
+  // Changes save on their own (shortly after you stop editing); Done or Esc saves and closes.
+  var firstAuto=useRef(true);
+  useEffect(function(){
+    if(firstAuto.current){firstAuto.current=false;return;}
+    var t=setTimeout(function(){var c=String(name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12);if(name.trim()&&!c)return;var r=props.onSave({name:c,avatar:cleanAccountAvatar(avatar),linkedPlayerId:linkedPlayerId});if(r)setError(r);},350);
+    return function(){clearTimeout(t);};
+  },[name,avatar,linkedPlayerId]);
   function save(){
     var clean=String(name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12);
     if(name.trim()&&!clean){setError('Use letters, numbers, spaces, or - _ . ! characters in your name.');return;}
@@ -2960,14 +3136,18 @@ function AccountScreen(props){
           }))),
       React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',gap:10}},
         React.createElement('div',{style:{fontSize:12,fontWeight:800}},'Celebrations, trails & poses'),
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4}},
+          React.createElement(CosmeticPreview,{color:avatar.color||'#e8192c',theme:avatar.theme||'night',skin:avatar.skin||'none',
+            celebration:peek&&peek.kind==='celebration'?peek.id:(avatar.celebration||'none'),trail:peek&&peek.kind==='trail'?peek.id:(avatar.trail||'none'),pose:peek&&peek.kind==='pose'?peek.id:(avatar.pose||'none'),width:300}),
+          peek&&React.createElement('div',{role:'status',style:{fontSize:11,fontWeight:800,color:'#fde68a'}},'\uD83D\uDD12 Previewing '+(cosmeticDetails(peek.kind,peek.id)||{}).name+' \u00B7 unlock it with achievements or daily challenges')),
         COSMETIC_KINDS.map(function(kind){
           var owned=(props.unlockedCosmetics&&props.unlockedCosmetics[kind])||[],current=avatar[kind]||'none';
-          var options=[{id:'none',name:'Classic',icon:'○'}].concat(COSMETICS[kind].items.filter(function(it){return owned.indexOf(it.id)>=0;}));
+          var options=[{id:'none',name:'Classic',icon:'○'}].concat(COSMETICS[kind].items.map(function(it){return owned.indexOf(it.id)>=0?it:Object.assign({},it,{locked:true});}));
           return React.createElement('div',{key:kind,style:{display:'flex',alignItems:'flex-start',gap:8}},
             React.createElement('span',{style:{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.7)',width:110,flex:'0 0 110px',paddingTop:8}},COSMETICS[kind].label),
             React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:8,flex:1,minWidth:0}},
-            options.map(function(it){var on=current===it.id;return React.createElement('button',{key:it.id,type:'button','aria-pressed':on,onClick:function(){var p={};p[kind]=it.id;updateAvatar(p);},style:{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:20,border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer'}},React.createElement('span',{'aria-hidden':'true'},it.icon),it.name);}),
-            owned.length===0&&React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',paddingTop:8}},'Unlock with achievements & daily challenges')));
+            options.map(function(it){var on=!it.locked&&current===it.id,pk=!!(peek&&peek.kind===kind&&peek.id===it.id);return React.createElement('button',{key:it.id,type:'button','aria-pressed':on,'aria-label':it.locked?it.name+' (locked, tap to preview)':undefined,onClick:function(){if(it.locked){setPeek(pk?null:{kind:kind,id:it.id});return;}setPeek(null);var p={};p[kind]=it.id;updateAvatar(p);},style:{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:20,border:on?'2px solid #fff':pk?'2px dashed #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer',opacity:it.locked&&!pk?0.55:1}},it.locked&&React.createElement('span',{'aria-hidden':'true'},'\uD83D\uDD12'),React.createElement('span',{'aria-hidden':'true'},it.icon),it.name);}),
+            null));
         })),
       React.createElement('input',{ref:fileRef,type:'file',accept:'image/jpeg,image/png,image/webp,image/gif,image/svg+xml',onChange:selectPhoto,style:{display:'none'}}),
       photo&&React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,borderRadius:14,background:'rgba(0,0,0,0.2)'}},
@@ -2979,8 +3159,8 @@ function AccountScreen(props){
       error&&React.createElement('div',{role:'alert',style:{width:'100%',boxSizing:'border-box',padding:'8px 11px',borderRadius:10,color:'#fecaca',background:'rgba(239,68,68,0.2)',fontSize:12,lineHeight:1.4}},error),
       notice&&React.createElement('div',{role:'status',style:{width:'100%',textAlign:'center',color:'rgba(255,255,255,0.78)',fontSize:12}},notice),
       React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}},
-        React.createElement('button',{onClick:save,style:{padding:'11px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.6)',background:'linear-gradient(135deg,#059669,#047857)',color:'#fff',fontWeight:900,fontSize:14,letterSpacing:'0.05em',cursor:'pointer',boxShadow:'0 5px 18px rgba(5,150,105,0.38)'}},'Save account'),
-        React.createElement('button',{onClick:props.onBack,style:{padding:'10px 22px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.12)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Cancel'))));
+        React.createElement('button',{onClick:save,style:{padding:'11px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.6)',background:'linear-gradient(135deg,#059669,#047857)',color:'#fff',fontWeight:900,fontSize:14,letterSpacing:'0.05em',cursor:'pointer',boxShadow:'0 5px 18px rgba(5,150,105,0.38)'}},'Done'),
+        React.createElement('div',{style:{width:'100%',textAlign:'center',fontSize:11,color:'rgba(255,255,255,0.55)'}},'Changes save automatically'))));
 }
 // First-visit walkthrough of the main menu: a spotlight on each part with a short explanation.
 var MENU_TOUR=[
@@ -3902,6 +4082,7 @@ function makePeerRoom(peer,role,code){
     var out={left:none,right:none};
     if(mode==='online'){var them=remoteCosRef.current?cleanAccountAvatar(remoteCosRef.current):none,theirs={celebration:them.celebration,trail:them.trail,pose:them.pose};if(onRoleRef.current==='host'){out.left=mine;out.right=theirs;}else{out.left=theirs;out.right=mine;}}
     else if(achievementSideRef.current==='left'||achievementSideRef.current==='right')out[achievementSideRef.current]=mine;
+    if(mode==='single'&&(achievementSideRef.current==='left'||achievementSideRef.current==='right'))out[achievementSideRef.current==='left'?'right':'left']={celebration:'ai:'+(DIFF_COLOR[diffRef.current]||'#38bdf8'),trail:'none',pose:'none'};
     return out;
   }
   function getGameSlimeSkins(mode){
@@ -4002,6 +4183,16 @@ function makePeerRoom(peer,role,code){
   var s_ann=useState(null),ann=s_ann[0],setAnn=s_ann[1],s_annSeen=useState(annSeen),annSeenId=s_annSeen[0],setAnnSeenId=s_annSeen[1];
   useEffect(function(){var un=null,alive=true;cloudInit().then(function(ok){if(ok&&alive)un=annWatchLatest(setAnn);});return function(){alive=false;if(un)un();};},[]);
   function closeAnn(){if(ann){annMarkSeen(ann.id);setAnnSeenId(ann.id);}}
+  // red dots: new suggestions (developer) and unread chats
+  var s_sugLatest=useState(0),sugLatest=s_sugLatest[0],setSugLatest=s_sugLatest[1];
+  var s_sugSeen=useState(function(){try{return +window.localStorage.getItem('slime_sug_seen')||0;}catch(e){return 0;}}),sugSeen=s_sugSeen[0],setSugSeen=s_sugSeen[1];
+  useEffect(function(){if(cloud.user!==DEV_USERNAME||!CLOUD.db)return;return sugWatchLatest(setSugLatest);},[cloud.user]);
+  function markSugSeen(){var t=Math.max(Date.now(),sugLatest);try{window.localStorage.setItem('slime_sug_seen',String(t));}catch(e){}setSugSeen(t);}
+  var sugDot=cloud.user===DEV_USERNAME&&sugLatest>sugSeen;
+  var s_chats=useState([]),chats=s_chats[0],setChats=s_chats[1],s_cread=useState(chatReadMap),chatRead=s_cread[0],setChatRead=s_cread[1];
+  useEffect(function(){if(!cloud.user||!CLOUD.user||!CLOUD.db){setChats([]);return;}return chatWatch(CLOUD.user.uid,setChats);},[cloud.user]);
+  function readChat(id){setChatRead(function(r){var n=Object.assign({},r);n[id]=Date.now()+1000;try{window.localStorage.setItem('slime_chat_read',JSON.stringify(n));}catch(e){}return n;});}
+  var chatDot=!!(CLOUD.user&&chats.some(function(c){return chatUnread(c,CLOUD.user.uid,chatRead);}));
   var s_frTour=useState(false),frTour=s_frTour[0],setFrTour=s_frTour[1];
   function finishFrTour(){try{window.localStorage.setItem('slime_tour_friends','1');}catch(e){}setFrTour(false);}
   useEffect(function(){
@@ -4324,7 +4515,7 @@ function makePeerRoom(peer,role,code){
     shakeRef.current=Math.max(shakeRef.current,10);
     frozenRef.current=true;goalFlashRef.current=true;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;flashRef.current=true;setGoalFlash(true);
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
-    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,scoring==='left'?colRef.current.left.body:colRef.current.right.body);skinFx(particlesRef.current,gp0,getGameSlimeSkins(pmRef.current)[scoring]);var celeb=getGameCosmetics(pmRef.current)[scoring].celebration;emitCelebration(particlesRef.current,celeb,gx,GH-GRND-GOALH/2);if(celeb==='explosion')shakeRef.current=Math.max(shakeRef.current,16);else if(celeb==='sonicboom')shakeRef.current=Math.max(shakeRef.current,9);
+    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;var gSkin=getGameSlimeSkins(pmRef.current)[scoring];emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,gSkin&&gSkin.color?gSkin.color:(scoring==='left'?colRef.current.left.body:colRef.current.right.body));skinFx(particlesRef.current,gp0,getGameSlimeSkins(pmRef.current)[scoring],true);var celeb=getGameCosmetics(pmRef.current)[scoring].celebration;emitCelebration(particlesRef.current,celeb,gx,GH-GRND-GOALH/2);if(celeb==='explosion')shakeRef.current=Math.max(shakeRef.current,16);else if(celeb==='sonicboom')shakeRef.current=Math.max(shakeRef.current,9);
     var frames=replayBufRef.current.slice();replayBufRef.current=[];replayScorerRef.current=scoring;otReadyRef.current=false;setOtLive(false);
     if(pmRef.current==='online'&&onRoleRef.current==='host'&&frames.length){
       var packed=frames.map(packReplayFrame),chunks=[];
@@ -5024,7 +5215,7 @@ function makePeerRoom(peer,role,code){
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:lockedScreen()},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
   if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress),unlockedCosmetics:{celebration:unlockedCosmetics(achievementProgress,'celebration'),trail:unlockedCosmetics(achievementProgress,'trail'),pose:unlockedCosmetics(achievementProgress,'pose')}})));
-  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{onFriendsGuide:function(){setShowPD(false);setFrTour(true);},accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,friendReqs:friendReqs,onAcceptFriend:acceptFriend,onDeclineFriend:declineFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
+  if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{chats:chats,chatRead:chatRead,onReadChat:readChat,chatDot:chatDot,sugDot:sugDot,onSugSeen:markSugSeen,onFriendsGuide:function(){setShowPD(false);setFrTour(true);},accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,friendReqs:friendReqs,onAcceptFriend:acceptFriend,onDeclineFriend:declineFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   showReplayRef.current=!!(showMatchReplay&&matchFrames.length>0)||!!viewReplay;
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,theme:themeMode,skins:getGameSlimeSkins(lastPM.current),goalEvents:matchGoals,onSave:saveReplayRange,onBack:function(){setShowMatchReplay(false);}})));
 
@@ -5041,7 +5232,7 @@ function makePeerRoom(peer,role,code){
     var menuPills=[
       {key:'online',label:'Play Online',bg:'linear-gradient(135deg,#059669,#047857)',act:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');}},
       {key:'guide',label:'How to Play',bg:'linear-gradient(135deg,#475569,#1e293b)',act:function(){setScreen('guide');}},
-      {key:'playerdata',label:'Stats & Social',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
+      {key:'playerdata',label:'Stats & Social',dot:chatDot||sugDot,bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD(true);}}
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
       tour&&React.createElement(MenuTour,{onDone:finishTour}),
@@ -5089,7 +5280,7 @@ function makePeerRoom(peer,role,code){
           React.createElement('button',{key:'accounts','data-tour':'accounts',type:'button',title:'Your Account','aria-label':'Your Account',onClick:function(){setScreen('accounts');},onMouseEnter:function(){setHovCard('accounts');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:2,borderRadius:'50%',border:'none',background:'rgba(5,12,35,0.78)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='accounts'||isFocused('accounts')?'translateY(-3px) scale(1.04)':'none'},focusSty('accounts'))},React.createElement(ProfileAvatar,{profile:account.avatar,size:38})),
           React.createElement('button',{key:'settings','data-tour':'settings',type:'button',title:'Settings','aria-label':'Settings',onClick:function(){setSettingsSaveError('');setShowSettings(true);},onMouseEnter:function(){setHovCard('settings');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:0,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.18)',background:'rgba(5,12,35,0.78)',color:'#fff',fontSize:25,lineHeight:1,cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='settings'||isFocused('settings')?'translateY(-3px) scale(1.04)':'none'},focusSty('settings'))},'\u2699'),
           menuPills.map(function(btn){
-            var b=React.createElement('button',{key:btn.key,'data-tour':btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label);
+            var b=React.createElement('button',{key:btn.key,'data-tour':btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label,btn.dot&&React.createElement(RedDot));
             return b;
           })
         ),
@@ -5220,7 +5411,7 @@ function makePeerRoom(peer,role,code){
     var backAct=oV==='choose'?oBack:oV==='stickers'?cancelOnlineStickerPicker:oBackToChoose;
     oBody.push(React.createElement('button',{key:'b',onClick:backAct,style:Object.assign(pill('rgba(255,255,255,0.12)',{fontSize:13,padding:'9px 22px',textTransform:'none',letterSpacing:0,flexShrink:0}),focusSty(backId))},oV==='choose'?'Back':'Cancel'));
     var onlineStyle=oV==='stickers'?lockedScreen({minHeight:0,padding:'8px 16px'}):baseStyle;
-    return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
+    return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
   }
 
   if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{onTour:function(){try{window.localStorage.removeItem('slime_tour_seen');}catch(e){}setScreen('menu');setTour(true);},onTutorial:startTutorial,theme:themeMode,keybinds:gameSettings.keybinds,touch:touchUI,onBack:function(){setScreen('menu');},focusSty:focusSty})));
