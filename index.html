@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.4.3';
+var GAME_VERSION='v25.4.4';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -5971,12 +5971,19 @@ function UpdateBanner(){
     GAME_UI.listeners.push(onGameUi);
     function check(){
       if(Date.now()-last<20000)return;last=Date.now();
-      fetchLiveVersion().then(function(v){if(alive&&v&&isNewerVersion(v,GAME_VERSION))setNewVersion(v);});
+      fetchLiveVersion().then(function(v){
+        if(!alive||!v||!isNewerVersion(v,GAME_VERSION))return;
+        // An old copy was opened (from cache or an old link): if we're not mid-match, jump straight to the new one.
+        // Only once per version per tab, so a stubborn cache can't cause a reload loop; the banner covers the rest.
+        var key='slime_autoupd_'+v,done=false;try{done=!!window.sessionStorage.getItem(key);if(!done)window.sessionStorage.setItem(key,'1');}catch(e){done=true;}
+        if(!done&&!GAME_UI.inGame){location.replace(location.pathname+'?v='+encodeURIComponent(v));return;}
+        setNewVersion(v);
+      });
     }
     var t=setInterval(check,60000);
     function onVisible(){if(document.visibilityState==='visible')check();}
     document.addEventListener('visibilitychange',onVisible);window.addEventListener('focus',onVisible);
-    setTimeout(check,5000);
+    setTimeout(check,1200);
     return function(){alive=false;clearInterval(t);document.removeEventListener('visibilitychange',onVisible);window.removeEventListener('focus',onVisible);GAME_UI.listeners=GAME_UI.listeners.filter(function(f){return f!==onGameUi;});};
   },[]);
   if(!newVersion||inGame||dismissed===newVersion)return null;
