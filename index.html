@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',hard:'Hard',impossible:'Chaos
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.2.3';
+var GAME_VERSION='v25.2.4';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -550,6 +550,14 @@ function annVote(id,o){return annCol().doc(id).collection('votes').doc(CLOUD.use
 function annWatchVotes(id,cb){return annCol().doc(id).collection('votes').onSnapshot(function(q){var c=[],mine=null;q.docs.forEach(function(d){var o=d.data().o;c[o]=(c[o]||0)+1;if(CLOUD.user&&d.id===CLOUD.user.uid)mine=o;});cb(c,mine,q.size);},function(){cb([],null,0);});}
 function annSeen(){try{return window.localStorage.getItem('slime_ann_seen')||'';}catch(e){return '';}}
 function annMarkSeen(id){try{window.localStorage.setItem('slime_ann_seen',id);}catch(e){}}
+// Developer tools: only for the developer's cloud account, confirmed by re-entering that account's password.
+// The password is checked by Firebase, so it never appears in the game's code.
+function cloudIsDev(){return !!(CLOUD.user&&cloudUsernameOf(CLOUD.user)===DEV_USERNAME);}
+function cloudConfirmDev(password){
+  if(!cloudIsDev())return Promise.reject(new Error('not-dev'));
+  var cred=firebase.auth.EmailAuthProvider.credential(CLOUD.user.email,String(password||''));
+  return CLOUD.user.reauthenticateWithCredential(cred);
+}
 function cloudProfiles(uids){return Promise.all(uids.map(function(uid){return lbCol().doc(uid).get().then(function(d){return d.exists?Object.assign({uid:uid},d.data()):{uid:uid};}).catch(function(){return{uid:uid};});}));}
 function cloudSendInvite(toUid,code){
   var acct=loadAccountProfile();
@@ -1946,7 +1954,15 @@ function PlayerDataScreen(props){
   var achievementProgress=cleanAchievementProgress(props.achievementProgress);
   var unlockedCount=ACHIEVEMENTS.filter(function(achievement){return isAchievementUnlocked(achievementProgress,achievement);}).length;
   var s_devpw=useState(''),devPassword=s_devpw[0],setDevPassword=s_devpw[1];
-  var s_deverr=useState(''),devPasswordError=s_deverr[0],setDevPasswordError=s_deverr[1];
+  var s_deverr=useState(''),devPasswordError=s_deverr[0],setDevPasswordError=s_deverr[1],s_devbusy=useState(false),devBusy=s_devbusy[0],setDevBusy=s_devbusy[1];
+  function devUnlock(){
+    if(devBusy)return;
+    if(!devPassword){setDevPasswordError('Type your account password.');return;}
+    setDevBusy(true);setDevPasswordError('');
+    cloudConfirmDev(devPassword).then(function(){setDevBusy(false);setDevPassword('');props.onUnlockAll();},function(e){
+      setDevBusy(false);var code=e&&e.code||'';
+      setDevPasswordError(code==='auth/too-many-requests'?'Too many tries. Wait a few minutes and try again.':code==='auth/network-request-failed'?'No internet connection.':e&&e.message==='not-dev'?'Log in as the developer account first.':'That password is not correct.');});
+  }
   function addPlayer(){var n=newName.trim();if(!n||players.length>=20)return;var u=players.concat([dbMk(n)]);setPlayers(u);dbSave(u);if(props.onChange)props.onChange(u);setNewName('');}
   function delPlayer(id){var u=players.filter(function(p){return p.id!==id;});setPlayers(u);dbSave(u);if(props.onChange)props.onChange(u);}
   function saveEdit(){var n=editName.trim();if(!n)return;var u=players.map(function(p){return p.id===editId?Object.assign({},p,{name:n}):p;});setPlayers(u);dbSave(u);if(props.onChange)props.onChange(u);setEditId(null);}
@@ -2038,7 +2054,7 @@ function PlayerDataScreen(props){
     ),
     tab==='leaderboard'&&React.createElement(LeaderboardTab,{cloudUser:props.cloudUser,panelSty:panelSty}),
     tab==='replays'&&React.createElement(ReplaysTab,{onPlay:props.onPlayReplay,panelSty:panelSty}),
-    tab==='suggestions'&&React.createElement(SuggestionsTab,{isDev:!!(props.achievementProgress&&props.achievementProgress.developerUnlocked),cloudUser:props.cloudUser,accountName:props.accountName,panelSty:panelSty}),
+    tab==='suggestions'&&React.createElement(SuggestionsTab,{isDev:!!(props.achievementProgress&&props.achievementProgress.developerUnlocked&&props.cloudUser===DEV_USERNAME),cloudUser:props.cloudUser,accountName:props.accountName,panelSty:panelSty}),
     tab==='friends'&&React.createElement(FriendsTab,{onGuide:props.onFriendsGuide,requests:props.friendReqs,onAccept:props.onAcceptFriend,onDecline:props.onDeclineFriend,cloudUser:props.cloudUser,friends:props.friends||[],onAdd:props.onAddFriend,onRemove:props.onRemoveFriend,onInvite:props.onInviteFriend,panelSty:panelSty}),
     tab==='achievements'&&React.createElement('div',null,
       React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginBottom:12,textAlign:'center'})},
@@ -2069,12 +2085,12 @@ function PlayerDataScreen(props){
           )
         );
       }),
-      React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginTop:12})},
+      props.cloudUser===DEV_USERNAME&&React.createElement('div',{style:Object.assign({},panelSty,{padding:14,marginTop:12})},
         React.createElement('div',{style:{fontWeight:900,fontSize:14,marginBottom:5}},'Developer tools'),
-        React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.7)',lineHeight:1.45,marginBottom:10}},'Enter the developer password to unlock every achievement, frame, and slime skin in this browser.'),
+        React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.7)',lineHeight:1.45,marginBottom:10}},'You’re logged in as the developer. Re-enter your account password to unlock every achievement, frame, and slime skin.'),
         React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap'}},
-          React.createElement('input',{type:'password',value:devPassword,onChange:function(e){setDevPassword(e.target.value);setDevPasswordError('');},onKeyDown:function(e){if(e.key==='Enter'){e.preventDefault();e.stopPropagation();if(devPassword==='SOCCERSLIME26'){props.onUnlockAll();setDevPassword('');setDevPasswordError('');}else setDevPasswordError('That developer password is not correct.');}else e.stopPropagation();},autoComplete:'off','aria-label':'Developer password',placeholder:'Developer password',style:{flex:'1 1 160px',minWidth:140,padding:'9px 12px',borderRadius:20,border:'1px solid rgba(255,255,255,0.25)',background:'rgba(0,0,0,0.28)',color:'#fff',fontSize:12,outline:'none'}}),
-          React.createElement('button',{type:'button',onClick:function(){if(devPassword==='SOCCERSLIME26'){props.onUnlockAll();setDevPassword('');setDevPasswordError('');}else setDevPasswordError('That developer password is not correct.');},style:{padding:'9px 16px',borderRadius:50,border:'1px solid rgba(251,191,36,0.5)',background:'linear-gradient(135deg,#b45309,#92400e)',color:'#fff',fontWeight:900,cursor:'pointer'}},achievementProgress.developerUnlocked?'Unlock everything (Dev)':'Unlock everything')),
+          React.createElement('input',{type:'password',value:devPassword,onChange:function(e){setDevPassword(e.target.value);setDevPasswordError('');},onKeyDown:function(e){if(e.key==='Enter'){e.preventDefault();e.stopPropagation();devUnlock();}else e.stopPropagation();},autoComplete:'off','aria-label':'Your account password',placeholder:'Your account password',style:{flex:'1 1 160px',minWidth:140,padding:'9px 12px',borderRadius:20,border:'1px solid rgba(255,255,255,0.25)',background:'rgba(0,0,0,0.28)',color:'#fff',fontSize:12,outline:'none'}}),
+          React.createElement('button',{type:'button',disabled:devBusy,onClick:function(){devUnlock();},style:{padding:'9px 16px',borderRadius:50,border:'1px solid rgba(251,191,36,0.5)',background:'linear-gradient(135deg,#b45309,#92400e)',color:'#fff',fontWeight:900,cursor:'pointer'}},achievementProgress.developerUnlocked?'Unlock everything (Dev)':'Unlock everything')),
         (devPasswordError||props.saveError)&&React.createElement('div',{role:'alert',style:{color:'#fecaca',fontSize:12,marginTop:8}},devPasswordError||props.saveError))
     )
   );
@@ -2585,7 +2601,7 @@ function loadAchievementProgress(){
   try{return cleanAchievementProgress(JSON.parse(window.localStorage.getItem('slime_achievements')||'null'));}
   catch(e){return blankAchievementProgress();}
 }
-function isAchievementUnlocked(progress,achievement){return !!(progress.developerUnlocked||progress[achievement.stat]>=achievement.target);}
+function isAchievementUnlocked(progress,achievement){return !!((progress.developerUnlocked&&cloudIsDev())||progress[achievement.stat]>=achievement.target);}
 function unlockedAchievementFrames(progress){
   var unlocked=[];
   for(var i=0;i<ACHIEVEMENTS.length;i++)if(isAchievementUnlocked(progress,ACHIEVEMENTS[i])&&unlocked.indexOf(ACHIEVEMENTS[i].frame)<0)unlocked.push(ACHIEVEMENTS[i].frame);
