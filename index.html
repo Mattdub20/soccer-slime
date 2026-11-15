@@ -3192,11 +3192,14 @@ function shopNow(){if(!SHOP_STATE)SHOP_STATE=loadShop();return SHOP_STATE;}
 function saveShop(v){SHOP_STATE=cleanShop(v);try{window.localStorage.setItem('slime_shop',JSON.stringify(SHOP_STATE));}catch(e){return false;}cloudQueueSave();return true;}
 function shopSpent(v){return v.owned.reduce(function(t,k){var it=shopItem(k);return t+(it?it.price:0);},0);}
 function shopBalance(v){v=v||shopNow();return Math.max(0,v.earned-shopSpent(v));}
-function shopOwned(kind){return shopNow().owned.filter(function(k){return k.indexOf(kind+':')===0;}).map(function(k){return k.slice(kind.length+1);});}
+// The dev account owns every shop item (same rule as achievements), without spending any Bucks.
+function shopOwned(kind){if(cloudIsDev())return SHOP_STOCK.filter(function(it){return it.kind===kind;}).map(function(it){return it.id;});return shopNow().owned.filter(function(k){return k.indexOf(kind+':')===0;}).map(function(k){return k.slice(kind.length+1);});}
 function cosmeticDetails(kind,id){var list=COSMETICS[kind]?COSMETICS[kind].items:[];for(var i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
-function achievementCosmetic(a){for(var i=0;i<COSMETIC_KINDS.length;i++){var k=COSMETIC_KINDS[i];if(a[k])return{kind:k,item:cosmeticDetails(k,a[k])};}return null;}
+// Achievements only ever reward these three kinds (achievements have their own 'title' field, which is their name, not a title cosmetic).
+var ACH_COSMETIC_KINDS=['celebration','trail','pose'];
+function achievementCosmetic(a){for(var i=0;i<ACH_COSMETIC_KINDS.length;i++){var k=ACH_COSMETIC_KINDS[i];if(a[k])return{kind:k,item:cosmeticDetails(k,a[k])};}return null;}
 function unlockedCosmetics(progress,kind){
-  var out=shopOwned(kind);for(var i=0;i<ACHIEVEMENTS.length;i++){var a=ACHIEVEMENTS[i];if(a[kind]&&isAchievementUnlocked(progress,a)&&out.indexOf(a[kind])<0)out.push(a[kind]);}return out;
+  var out=shopOwned(kind);if(ACH_COSMETIC_KINDS.indexOf(kind)<0)return out;for(var i=0;i<ACHIEVEMENTS.length;i++){var a=ACHIEVEMENTS[i];if(a[kind]&&isAchievementUnlocked(progress,a)&&out.indexOf(a[kind])<0)out.push(a[kind]);}return out;
 }
 function defaultAccountAvatar(){return{kind:'slime',color:'#e8192c',theme:'night',frame:'none',skin:'none',celebration:'none',trail:'none',pose:'none',accessory:'none',title:'none'};}
 function cleanAccountAvatar(value){
@@ -3556,7 +3559,7 @@ function ShopScreen(props){
   function itemsOf(kind){return kind==='skin'?ACHIEVEMENT_SKINS:kind==='frame'?ACHIEVEMENT_FRAMES:COSMETICS[kind].items;}
   function current(kind){return avatar[kind]||'none';}
   function shown(kind){return peek&&peek.kind===kind?peek.id:current(kind);}
-  function achFor(kind,id){for(var i=0;i<ACHIEVEMENTS.length;i++)if(ACHIEVEMENTS[i][kind]===id)return ACHIEVEMENTS[i];return null;}
+  function achFor(kind,id){if(kind!=='skin'&&kind!=='frame'&&ACH_COSMETIC_KINDS.indexOf(kind)<0)return null;for(var i=0;i<ACHIEVEMENTS.length;i++)if(ACHIEVEMENTS[i][kind]===id)return ACHIEVEMENTS[i];return null;}
   function equip(kind,id){var p={};p[kind]=id;var r=props.onEquip(p);if(r)setMsg({err:true,text:r});}
   function buy(kind,it){
     var r=props.onBuy(kind,it.id);
