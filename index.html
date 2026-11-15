@@ -106,7 +106,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.4.9';
+var GAME_VERSION='v25.5.1';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -443,6 +443,13 @@ function trailColor(style,isJapan,t){
   if(style==='fire')return ['#f97316','#facc15','#ef4444'][Math.floor(t/90)%3];
   if(style==='ice')return ['#a5f3fc','#e0f2fe','#67e8f9'][Math.floor(t/90)%3];
   if(style==='neon')return '#4ade80';
+  // Slime Bucks shop trails
+  if(style==='galaxy')return ['#7c3aed','#2563eb','#db2777','#c4b5fd'][Math.floor(t/80)%4];
+  if(style==='toxic')return ['#84cc16','#bef264','#4d7c0f'][Math.floor(t/90)%3];
+  if(style==='sakura')return ['#fbcfe8','#f9a8d4','#ffffff'][Math.floor(t/90)%3];
+  if(style==='shadow')return ['#4c1d95','#1f2937','#6d28d9'][Math.floor(t/90)%3];
+  if(style==='candy')return ['#f472b6','#ffffff','#67e8f9'][Math.floor(t/70)%3];
+  if(style==='electric')return Math.random()<0.45?'#facc15':Math.random()<0.5?'#ffffff':'#38bdf8';
   return isJapan?'#cc0000':'#FFD700';
 }
 // Extra goal celebration on top of the normal goal burst. Every one fires out of the goal that was scored in.
@@ -509,6 +516,57 @@ function emitCelebration(P,style,gx,gy){
     for(i=0;i<52;i++){p=mkP(ox,gy+(Math.random()-0.5)*30,dir*(2.5+Math.random()*7),-(6+Math.random()*6),i%3?'#fde68a':'#ffffff',70+Math.random()*35,2.5+Math.random()*1.8);p.grav=0.16;p.shape='star';p.drag=0.985;P.push(p);}
     return;
   }
+  // ── Slime Bucks shop goal explosions ──
+  if(style==='confetti'){
+    // a party cannon: a cone of paper confetti and ribbons that flutters down over the pitch
+    var cc=['#f43f5e','#facc15','#22c55e','#3b82f6','#a855f7','#f97316','#ffffff'];
+    fxFlash(P,ox,gy,70,'#ffffff',10);
+    for(i=0;i<70;i++){v=coneVel(dir,5+Math.random()*9,1.6,4);p=mkP(ox,gy+(Math.random()-0.5)*30,v[0],v[1],cc[i%cc.length],70+Math.random()*40,2.2+Math.random()*1.5);p.grav=0.12;p.drag=0.975;p.shape='pixel';P.push(p);}
+    for(i=0;i<20;i++){v=coneVel(dir,4+Math.random()*7,1.4,5);p=mkP(ox,gy,v[0],v[1],cc[i%cc.length],55+Math.random()*30,2);p.grav=0.1;p.shape='strand';p.drag=0.97;P.push(p);}
+    return;
+  }
+  if(style==='slimesplash'){
+    // the net bursts into goo: big green blobs splatter out, bubbles fizz along the grass
+    var gc=['#4ade80','#22c55e','#86efac','#bef264'];
+    fxFlash(P,ox,gy,70,'#bbf7d0',10);
+    fxRing(P,ox,gy,8,150,'#4ade80',24,5,dir,0,0.8);
+    for(i=0;i<38;i++){v=coneVel(dir,3+Math.random()*9,1.8,4);p=mkP(ox,gy+(Math.random()-0.5)*30,v[0],v[1],gc[i%4],50+Math.random()*30,4+Math.random()*5);p.grav=0.25;p.drag=0.97;P.push(p);}
+    for(i=0;i<14;i++){p=mkP(gx+dir*(10+Math.random()*80),GH-GRND-2,dir*Math.random()*2,-Math.random()*1.5,gc[i%4],60+Math.random()*30,3+Math.random()*3);p.grav=-0.03;p.shape='bubble';P.push(p);}
+    return;
+  }
+  if(style==='coinshower'){
+    // jackpot: a fountain of spinning gold Slime Bucks
+    fxFlash(P,ox,gy,90,'#fef3c7',12);
+    fxRing(P,ox,gy,8,180,'#fbbf24',26,5,dir,0,0.8);
+    for(i=0;i<40;i++){v=coneVel(dir,4+Math.random()*8,1.5,7);p=mkP(ox,gy,v[0],v[1],i%4?'#fbbf24':'#fde68a',70+Math.random()*30,4+Math.random()*1.5);p.grav=0.22;p.drag=0.985;p.shape='coin';p.spin=Math.random()*6;P.push(p);}
+    for(i=0;i<16;i++){v=coneVel(dir,2+Math.random()*6,2,3);p=mkP(ox,gy+(Math.random()-0.5)*40,v[0],v[1],'#fff7cc',40+Math.random()*20,2.2);p.grav=0.05;p.shape='star';P.push(p);}
+    return;
+  }
+  if(style==='lightning'){
+    // thunderstrike: forked bolts crash down from the sky into the goal
+    fxFlash(P,ox,gy,150,'#e0f2fe',10);
+    for(var b=0;b<3;b++){
+      var xx=ox+dir*b*26+(Math.random()-0.5)*50,yy=-10,segs=8,dy=(gy+10)/segs;
+      for(var sg=0;sg<segs;sg++){var nx=(sg===segs-1?ox:xx+(Math.random()-0.5)*44),ny=yy+dy,ddx=nx-xx,ddy=ny-yy;
+        p=mkP(nx,ny,ddx*0.001,ddy*0.001,b===0?'#ffffff':'#7dd3fc',20+b*4,b===0?4:2.5);p.grav=0;p.shape='streak';p.len=Math.hypot(ddx,ddy);p.keep=true;p.delay=b*7;P.push(p);xx=nx;yy=ny;}
+    }
+    fxRing(P,ox,gy,8,210,'#7dd3fc',24,5,dir,2,0.8);
+    fxRing(P,ox,gy,8,160,'#ffffff',26,3,dir,6,0.8);
+    for(i=0;i<34;i++){v=coneVel(dir,4+Math.random()*9,2.2,2);p=mkP(ox,gy+(Math.random()-0.5)*40,v[0],v[1],i%2?'#facc15':'#e0f2fe',24+Math.random()*16,2.4);p.grav=0.12;p.shape='pixel';p.drag=0.96;p.delay=2;P.push(p);}
+    return;
+  }
+  if(style==='blackhole'){
+    // a black hole opens in the net, swallows the light, then bursts
+    fxFlash(P,ox,gy,90,'#c084fc',14);
+    fxRing(P,ox,gy,150,-140,'#a855f7',30,4,0,0,0.9);
+    fxRing(P,ox,gy,110,-100,'#22d3ee',26,3,0,6,0.9);
+    fxFlash(P,ox,gy,44,'#05010d',40);
+    for(i=0;i<40;i++){var ba=Math.random()*Math.PI*2,br=70+Math.random()*70;p=mkP(ox+Math.cos(ba)*br,gy+Math.sin(ba)*br*0.8,-Math.cos(ba)*3.4-Math.sin(ba)*1.6,(-Math.sin(ba)*3.4+Math.cos(ba)*1.6)*0.8,i%3?'#a855f7':'#e9d5ff',22+Math.random()*10,2.2);p.grav=0;p.drag=1;p.shape='pixel';P.push(p);}
+    fxFlash(P,ox,gy,120,'#f5d0fe',12);P[P.length-1].delay=34;
+    fxRing(P,ox,gy,10,260,'#e879f9',30,6,0,34,0.85);
+    for(i=0;i<30;i++){var ea=i/30*Math.PI*2,es=3+Math.random()*5;p=mkP(ox,gy,Math.cos(ea)*es,Math.sin(ea)*es,i%2?'#f0abfc':'#ffffff',40+Math.random()*20,2.4);p.grav=0.03;p.shape='star';p.delay=34;P.push(p);}
+    return;
+  }
 }
 // Victory pose for the winning slime on the end screen. t counts frames since the match ended.
 function poseStep(sl,pose,t,dirToCentre){
@@ -522,6 +580,29 @@ function poseStep(sl,pose,t,dirToCentre){
     var air=Math.round(2*Math.abs(JUMP*0.75)/GRAV);
     if(onGround&&(sl._spinT==null||sl._spinT>=air+28)){sl.vy=JUMP*0.75;sl._spinT=0;}
     if(sl._spinT!=null){sl._spinT++;var k=Math.min(1,sl._spinT/air),e=k<0.5?2*k*k:1-2*(1-k)*(1-k);sl._poseRot=dirToCentre*Math.PI*2*e;if(k>=1)sl._poseRot=0;}
+  }
+  // ── Slime Bucks shop celebrations ──
+  else if(pose==='backflip'){
+    // a big jump with a full flip backwards, landing on the same spot
+    if(sl._poseX==null)sl._poseX=sl.x;
+    sl.x=sl._poseX;sl.vx=0;sl.isSpinning=false;sl.spinAngle=0;sl.spinDipY=0;
+    var air2=Math.round(2*Math.abs(JUMP*0.95)/GRAV);
+    if(onGround&&(sl._spinT==null||sl._spinT>=air2+34)){sl.vy=JUMP*0.95;sl._spinT=0;}
+    if(sl._spinT!=null){sl._spinT++;var k2=Math.min(1,sl._spinT/air2),e2=k2<0.5?2*k2*k2:1-2*(1-k2)*(1-k2);sl._poseRot=-dirToCentre*Math.PI*2*e2;if(k2>=1)sl._poseRot=0;}
+  }
+  else if(pose==='pogo'){if(onGround)sl.vy=JUMP*0.78;sl.vx=0;}
+  else if(pose==='wobble'){sl.vx=0;if(onGround)sl.squash=Math.abs(Math.sin(t*0.16))*0.9;}
+  else if(pose==='moonwalk'){
+    // glide backwards and forwards while facing the crowd
+    if(sl._poseX==null)sl._poseX=sl.x;
+    var tri=Math.abs(((t*0.7)%140)-70);
+    sl.x=Math.max(SR,Math.min(GW-SR,sl._poseX-dirToCentre*tri));sl.vx=0;
+  }
+  else if(pose==='tornado'){
+    if(sl._poseX==null)sl._poseX=sl.x;
+    sl.x=sl._poseX;sl.vx=0;sl.isSpinning=false;sl.spinAngle=0;sl.spinDipY=0;
+    if(onGround&&t%46===0)sl.vy=JUMP*0.6;
+    sl._poseRot=onGround?0:dirToCentre*((t*0.45)%(Math.PI*2));
   }
 }
 function emitLand(P,x,y,vy){var it=Math.min(1,(vy-5)/10);if(it<=0)return;for(var i=0;i<Math.floor(3+it*5);i++){var s=(Math.random()<0.5?-1:1),sp=1+Math.random()*2.5*it;P.push(mkP(x+s*SR*0.5*Math.random(),y,s*sp,-Math.random()*1.6,'rgba(255,255,255,0.55)',12+Math.random()*8,1.6+Math.random()*1.4));}}
@@ -578,7 +659,7 @@ function cloudErrorText(e){
   return'Something went wrong ('+(code||'unknown error')+').';
 }
 // Everything that gets synced. AI learning data stays on the device (it is large and per-device).
-function readLocalSave(){return{achievements:loadAchievementProgress(),players:dbLoad(),account:loadAccountProfile(),stickers:loadOnlineStickerSlots(),settings:loadGameSettings(),friends:loadFriends(),daily:loadDaily()};}
+function readLocalSave(){return{achievements:loadAchievementProgress(),players:dbLoad(),account:loadAccountProfile(),stickers:loadOnlineStickerSlots(),settings:loadGameSettings(),friends:loadFriends(),daily:loadDaily(),shop:loadShop()};}
 // Never lose progress: keep the higher achievement counts, and the longer history for each local player.
 function mergeSaves(local,cloud){
   if(!cloud)return local;
@@ -596,7 +677,8 @@ function mergeSaves(local,cloud){
     stickers:cloud.stickers||local.stickers,
     settings:cloud.settings||local.settings,
     friends:(function(){var seen={},out=[];(cloud.friends||[]).concat(local.friends||[]).forEach(function(f){if(f&&f.uid&&!seen[f.uid]){seen[f.uid]=1;out.push(f);}});return out.slice(0,50);})(),
-    daily:cloud.daily&&(cloud.daily.lastDone||'')>((local.daily&&local.daily.lastDone)||'')?cloud.daily:(local.daily||{lastDone:'',streak:0})
+    daily:cloud.daily&&(cloud.daily.lastDone||'')>((local.daily&&local.daily.lastDone)||'')?cloud.daily:(local.daily||{lastDone:'',streak:0}),
+    shop:(function(){var a=cleanShop(local.shop),b=cleanShop(cloud.shop),o=a.owned.slice();b.owned.forEach(function(k){if(o.indexOf(k)<0)o.push(k);});return{earned:Math.max(a.earned,b.earned),owned:o};})()
   };
 }
 function writeLocalSave(save){
@@ -608,6 +690,7 @@ function writeLocalSave(save){
     window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(save.settings));
     window.localStorage.setItem('slime_friends',JSON.stringify(save.friends||[]));
     if(save.daily)window.localStorage.setItem('slime_daily',JSON.stringify(save.daily));
+    if(save.shop){window.localStorage.setItem('slime_shop',JSON.stringify(cleanShop(save.shop)));SHOP_STATE=null;}
   }catch(e){console.warn('Could not store the cloud save on this device.',e);}
 }
 function cloudDoc(){return CLOUD.db.collection('saves').doc(CLOUD.user.uid);}
@@ -784,6 +867,15 @@ function paintSlimePattern(ctx,R,skin,dir,t){
     ctx.fillStyle=d;
     for(var b=0;b<B.length;b++){ctx.globalAlpha=0.72;ctx.beginPath();ctx.ellipse(-dir*B[b][0]*R,B[b][1]*R,B[b][2]*R,B[b][3]*R,b,0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=0.45;ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(-dir*B[b][0]*R-B[b][2]*R*0.3,B[b][1]*R-B[b][3]*R*0.35,B[b][2]*R*0.3,B[b][3]*R*0.22,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=d;}
+  }else if(p==='checker'){
+    // racing checks along the base
+    var cs=R*0.16;ctx.fillStyle=d;ctx.globalAlpha=0.85;
+    for(var cy=0;cy<2;cy++)for(var cx=-7;cx<7;cx++)if(((cx+cy)%2+2)%2===0)ctx.fillRect(cx*cs,-cs*(cy+1)-R*0.02,cs,cs);
+    ctx.globalAlpha=0.7;ctx.fillRect(-R,-cs*2-R*0.1,R*2,R*0.05);
+  }else if(p==='bands'){
+    // bold horizontal bands (bumblebee)
+    ctx.fillStyle=d;ctx.globalAlpha=0.88;
+    for(var bk=0;bk<3;bk++)ctx.fillRect(-R,-R*(0.2+bk*0.24),R*2,R*0.11);
   }else if(p==='crown'){
     // royal sash
     ctx.rotate(dir*0.5);ctx.fillStyle=d;ctx.globalAlpha=0.8;ctx.fillRect(-R*1.4,-R*0.36,R*2.8,R*0.16);
@@ -978,6 +1070,67 @@ function paintSlime(ctx,R,col,acc,isR,skin,ix,iy,isJapan,glowCol,glowBlur,noBlin
     ctx.fillStyle='#fff';[-cw*1.05,0,cw*1.05].forEach(function(px2,i){ctx.beginPath();ctx.arc(px2,i===1?-chh:-chh*0.85,R*0.04,0,Math.PI*2);ctx.fill();});
     ctx.restore();
   }
+  if(paintSlime.accessory)drawAccessory(ctx,R,dir,paintSlime.accessory,t,ex,ey);
+}
+// Shop accessories, drawn in the slime's local space (origin = centre of the flat base, head top at y=-R).
+function drawAccessory(ctx,R,dir,id,t,ex,ey){
+  var lw=Math.max(1,R*0.045);
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  if(id==='tophat'){
+    ctx.translate(-dir*R*0.06,-R*0.93);ctx.rotate(-dir*0.12);
+    ctx.fillStyle='#111827';ctx.strokeStyle='#000';ctx.lineWidth=lw;
+    ctx.beginPath();ctx.ellipse(0,0,R*0.55,R*0.09,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.rect(-R*0.33,-R*0.6,R*0.66,R*0.6);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#dc2626';ctx.fillRect(-R*0.33,-R*0.19,R*0.66,R*0.11);
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.fillRect(-R*0.26,-R*0.55,R*0.07,R*0.32);
+  }else if(id==='party'){
+    ctx.translate(-dir*R*0.18,-R*0.92);ctx.rotate(-dir*0.28);
+    ctx.beginPath();ctx.moveTo(-R*0.26,0);ctx.lineTo(0,-R*0.78);ctx.lineTo(R*0.26,0);ctx.closePath();
+    ctx.fillStyle='#a855f7';ctx.fill();
+    ctx.save();ctx.clip();ctx.fillStyle='#facc15';for(var ps=0;ps<4;ps++){ctx.save();ctx.translate(0,-R*(0.1+ps*0.2));ctx.rotate(-0.5);ctx.fillRect(-R*0.5,-R*0.04,R,R*0.07);ctx.restore();}ctx.restore();
+    ctx.strokeStyle='#4c1d95';ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(-R*0.26,0);ctx.lineTo(0,-R*0.78);ctx.lineTo(R*0.26,0);ctx.closePath();ctx.stroke();
+    ctx.fillStyle='#f472b6';ctx.beginPath();ctx.arc(0,-R*0.8,R*0.1,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-R*0.03,-R*0.83,R*0.03,0,Math.PI*2);ctx.fill();
+  }else if(id==='shades'){
+    var lx0=ex-dir*R*0.29,lx1=ex+dir*R*0.31,top=ey-R*0.16,bot=ey+R*0.19;
+    ctx.strokeStyle='#111827';ctx.lineWidth=R*0.06;ctx.beginPath();ctx.moveTo(lx0,top+R*0.04);ctx.lineTo(-dir*R*0.92,ey-R*0.08);ctx.stroke();
+    ctx.fillStyle='rgba(10,10,20,0.95)';ctx.beginPath();ctx.moveTo(lx0,top);ctx.lineTo(lx1,top);ctx.quadraticCurveTo(lx1,bot,ex,bot);ctx.quadraticCurveTo(lx0,bot,lx0,top);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#000';ctx.lineWidth=lw;ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=R*0.035;ctx.beginPath();ctx.moveTo(ex-dir*R*0.12,top+R*0.07);ctx.lineTo(ex+dir*R*0.02,top+R*0.2);ctx.stroke();
+  }else if(id==='halo'){
+    var hy=-R*1.3+Math.sin(t*0.004)*R*0.04;
+    ctx.strokeStyle='#fde047';ctx.lineWidth=R*0.08;if(!PERF_LOW){ctx.shadowColor='#fde047';ctx.shadowBlur=R*0.35;}
+    ctx.beginPath();ctx.ellipse(-dir*R*0.05,hy,R*0.4,R*0.1,0,0,Math.PI*2);ctx.stroke();
+    ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=R*0.025;ctx.beginPath();ctx.ellipse(-dir*R*0.05,hy,R*0.4,R*0.1,0,Math.PI*1.1,Math.PI*1.6);ctx.stroke();
+  }else if(id==='horns'){
+    [[dir*R*0.32,dir],[-dir*R*0.36,-dir]].forEach(function(h){
+      var hx=h[0],lean=h[1],hb=-Math.sqrt(Math.max(0,R*R-hx*hx))+R*0.06;
+      var g=ctx.createLinearGradient(0,hb,0,hb-R*0.45);g.addColorStop(0,'#7f1d1d');g.addColorStop(1,'#ef4444');
+      ctx.fillStyle=g;ctx.strokeStyle='#450a0a';ctx.lineWidth=lw*0.8;
+      ctx.beginPath();ctx.moveTo(hx-R*0.12,hb);ctx.quadraticCurveTo(hx-R*0.08,hb-R*0.3,hx+lean*R*0.2,hb-R*0.44);ctx.quadraticCurveTo(hx+R*0.06,hb-R*0.2,hx+R*0.12,hb);ctx.closePath();ctx.fill();ctx.stroke();
+    });
+  }else if(id==='headphones'){
+    var cxp=-dir*R*0.12,cyp=-R*0.5;
+    // band arching over the top of the head, then a big ear cup on the side
+    ctx.strokeStyle='#111827';ctx.lineWidth=R*0.13;
+    ctx.beginPath();ctx.arc(0,-R*0.02,R*1.06,Math.PI+0.55,-0.55);ctx.stroke();
+    ctx.strokeStyle='#9ca3af';ctx.lineWidth=R*0.035;
+    ctx.beginPath();ctx.arc(0,-R*0.02,R*1.06,Math.PI+0.7,-0.7);ctx.stroke();
+    ctx.strokeStyle='#111827';ctx.lineWidth=R*0.1;ctx.beginPath();ctx.moveTo(cxp,cyp-R*0.2);ctx.lineTo(cxp+dir*R*0.03,-R*1.05);ctx.stroke();
+    ctx.fillStyle='#ef4444';ctx.strokeStyle='#111827';ctx.lineWidth=lw;
+    ctx.beginPath();ctx.ellipse(cxp,cyp,R*0.22,R*0.29,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#7f1d1d';ctx.beginPath();ctx.ellipse(cxp,cyp,R*0.11,R*0.16,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.beginPath();ctx.ellipse(cxp-R*0.07,cyp-R*0.12,R*0.05,R*0.08,-0.4,0,Math.PI*2);ctx.fill();
+  }else if(id==='cap'){
+    ctx.save();slimeDome(ctx,R);ctx.clip();
+    var cg=ctx.createLinearGradient(0,-R,0,-R*0.62);cg.addColorStop(0,'#3b82f6');cg.addColorStop(1,'#1d4ed8');
+    ctx.fillStyle=cg;ctx.beginPath();ctx.moveTo(-R,-R*0.66);ctx.quadraticCurveTo(0,-R*0.74,R,-R*0.66);ctx.lineTo(R,-R*1.1);ctx.lineTo(-R,-R*1.1);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=R*0.025;ctx.beginPath();ctx.moveTo(0,-R);ctx.quadraticCurveTo(-dir*R*0.25,-R*0.85,-dir*R*0.32,-R*0.7);ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle='#1e3a8a';ctx.strokeStyle='#172554';ctx.lineWidth=lw*0.8;
+    ctx.beginPath();ctx.ellipse(dir*R*0.78,-R*0.66,R*0.4,R*0.075,dir*0.12,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#93c5fd';ctx.beginPath();ctx.arc(0,-R*0.99,R*0.06,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawSlimeAt(ctx, x, y, col, acc, isR, spinAngle, spinDipY, isSpinning, isNight, isJapan, ballRefreshJump, ballRefreshTimer, _ballX, _ballY, skin) {
@@ -1032,7 +1185,7 @@ function drawSlimeAt(ctx, x, y, col, acc, isR, spinAngle, spinDipY, isSpinning, 
   ctx.restore();
 }
 
-function drawSlime(ctx,sl,isR,col,acc,isNight,isJapan,skin){
+function drawSlime(ctx,sl,isR,col,acc,isNight,isJapan,skin,accessory){
   var dY=sl.spinDipY||0,vy=sl.vy||0,sq=sl.squash||0,sx=1,sy=1,air=sl.y<GH-GRND-2;
   if(air&&vy<-6){var st=Math.min(1,(-vy-6)/8);sx=1-0.13*st;sy=1+0.2*st;}
   else if(air&&vy>6){var fl=Math.min(1,(vy-6)/8);sx=1+0.1*fl;sy=1-0.1*fl;}
@@ -1041,7 +1194,9 @@ function drawSlime(ctx,sl,isR,col,acc,isNight,isJapan,skin){
   if(rot||scaled){var gY=GH-GRND,hA=Math.max(0,gY-py),aF=Math.min(1,hA/((GH-GRND-CEILING_Y)*0.6)),shs=Math.max(0.15,1-aF*0.82);ctx.save();ctx.globalAlpha=Math.max(0.04,0.3-aF*0.24);ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(px,gY+4,SR*shs,SR*0.16*shs,0,0,Math.PI*2);ctx.fill();ctx.restore();drawSlimeAt.noShadow=true;}
   if(rot){ctx.save();ctx.translate(px,py-SR*0.45);ctx.rotate(rot);ctx.translate(-px,-(py-SR*0.45));}
   if(scaled){ctx.save();ctx.translate(px,py);ctx.scale(sx,sy);ctx.translate(-px,-py);}
+  paintSlime.accessory=accessory&&accessory!=='none'?accessory:null;
   drawSlimeAt(ctx,sl.x,sl.y,skin?skin.color:col,skin?skin.accent:acc,isR,sl.spinAngle,sl.spinDipY,sl.isSpinning,isNight,isJapan,sl.ballRefreshJump,sl.ballRefreshTimer,sl._ballX,sl._ballY,skin);
+  paintSlime.accessory=null;
   if(scaled)ctx.restore();
   if(rot)ctx.restore();
   drawSlimeAt.noShadow=false;
@@ -1359,10 +1514,10 @@ function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNig
   if(glt){for(var gli=0;gli<2;gli++){var gv=glt[gli];if(gv<=0)continue;ctx.strokeStyle=gv<0.7?'#FFFF00':'#FF0000';ctx.lineWidth=5;var glx=gli===0?0:GW-GOALW;ctx.beginPath();ctx.moveTo(glx,GH-GRND+10);ctx.lineTo(glx+GOALW*(1-gv),GH-GRND+10);ctx.stroke();}}
   drawGoal(ctx,false,isNight,isJapan);drawGoal(ctx,true,isNight,isJapan);
   ls._ballX=ball.x; ls._ballY=ball.y; rs._ballX=ball.x; rs._ballY=ball.y;
-  if(mode==='multi'||mode==='single'||mode==='online'){drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left);drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right);}
+  if(mode==='multi'||mode==='single'||mode==='online'){drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left,skins&&skins.acc&&skins.acc.left);drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right,skins&&skins.acc&&skins.acc.right);}
   else if(mode==='practice'||mode==='training'){
-    if(mode==='training'&&showTrainingKeeper){drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left);drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right);}
-    else if(side==='right')drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right);else drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left);
+    if(mode==='training'&&showTrainingKeeper){drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left,skins&&skins.acc&&skins.acc.left);drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right,skins&&skins.acc&&skins.acc.right);}
+    else if(side==='right')drawSlime(ctx,rs,true,cols.right.body,cols.right.accent,isNight,isJapan,skins&&skins.right,skins&&skins.acc&&skins.acc.right);else drawSlime(ctx,ls,false,cols.left.body,cols.left.accent,isNight,isJapan,skins&&skins.left,skins&&skins.acc&&skins.acc.left);
   }
   drawBall(ctx,ball,isNight,isJapan);
 }
@@ -1408,6 +1563,7 @@ function drawParticles(ctx,pts){
     if(pt.isLine){ctx.strokeStyle=pt.color;ctx.lineWidth=pt.size;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pt.x+pt.dir*pt.lineLen*(pt.life/pt.maxLife),pt.y);ctx.stroke();}
     else if(pt.shape==='star'){var sr=psz*1.6;ctx.fillStyle=pt.color;ctx.beginPath();ctx.moveTo(pt.x,pt.y-sr);ctx.lineTo(pt.x+sr*0.3,pt.y-sr*0.3);ctx.lineTo(pt.x+sr,pt.y);ctx.lineTo(pt.x+sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x,pt.y+sr);ctx.lineTo(pt.x-sr*0.3,pt.y+sr*0.3);ctx.lineTo(pt.x-sr,pt.y);ctx.lineTo(pt.x-sr*0.3,pt.y-sr*0.3);ctx.closePath();ctx.fill();}
     else if(pt.shape==='flake'){ctx.strokeStyle=pt.color;ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();for(var fk=0;fk<3;fk++){var fa=fk*Math.PI/3+pt.life*0.05;ctx.moveTo(pt.x-Math.cos(fa)*psz*1.5,pt.y-Math.sin(fa)*psz*1.5);ctx.lineTo(pt.x+Math.cos(fa)*psz*1.5,pt.y+Math.sin(fa)*psz*1.5);}ctx.stroke();}
+    else if(pt.shape==='coin'){var cw2=Math.max(0.5,psz*Math.abs(Math.cos(pt.life*0.18+(pt.spin||0))));ctx.fillStyle='#b45309';ctx.beginPath();ctx.ellipse(pt.x,pt.y,cw2+0.7,psz+0.7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=pt.color;ctx.beginPath();ctx.ellipse(pt.x,pt.y,cw2,psz,0,0,Math.PI*2);ctx.fill();}
     else if(pt.shape==='pixel'){var px=Math.max(1.5,psz*1.4);ctx.fillStyle=pt.color;ctx.fillRect(Math.round(pt.x-px/2),Math.round(pt.y-px/2),px,px);}
     else if(pt.shape==='goat'){pt.rot=(pt.rot||0)+(pt.spin||0);var gs=goatSprite(),gw=pt.size*3.4;ctx.translate(pt.x,pt.y);ctx.rotate(pt.rot);ctx.drawImage(gs,-gw/2,-gw/2,gw,gw);}
     else if(pt.shape==='flash'){var fr=pt.size*(1.5-pal*0.5),fgr=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,fr);fgr.addColorStop(0,pt.color);fgr.addColorStop(0.3,pt.color);fgr.addColorStop(1,'rgba(255,255,255,0)');ctx.globalAlpha=pal*pal;ctx.globalCompositeOperation='lighter';ctx.fillStyle=fgr;ctx.beginPath();ctx.arc(pt.x,pt.y,fr,0,Math.PI*2);ctx.fill();}
@@ -2930,7 +3086,7 @@ function unlockedAchievementFrames(progress){
   return unlocked;
 }
 function unlockedAchievementSkins(progress){
-  var unlocked=ACHIEVEMENT_SKINS.filter(function(sk){return sk.free;}).map(function(sk){return sk.id;});
+  var unlocked=ACHIEVEMENT_SKINS.filter(function(sk){return sk.free;}).map(function(sk){return sk.id;}).concat(shopOwned('skin'));
   for(var i=0;i<ACHIEVEMENTS.length;i++)if(ACHIEVEMENTS[i].skin&&isAchievementUnlocked(progress,ACHIEVEMENTS[i])&&unlocked.indexOf(ACHIEVEMENTS[i].skin)<0)unlocked.push(ACHIEVEMENTS[i].skin);
   return unlocked;
 }
@@ -2970,12 +3126,79 @@ var COSMETICS={
   pose:{label:'Victory pose',items:[{id:'hop',name:'Victory Hop',icon:'🦘'},{id:'spin',name:'Spin',icon:'🌀'},{id:'shimmy',name:'Shimmy',icon:'💃'}]}
 };
 var COSMETIC_KINDS=['celebration','trail','pose'];
+// ─── Slime Bucks shop ──────────────────────────────────────────────────────
+// Earn Slime Bucks in matches vs the AI (1 per goal you score, plus a win bonus of BUCKS_WIN_BASE x the AI level:
+// Super Easy 1x ... Chaos 5x). Spend them on the items below. Shop skins join ACHIEVEMENT_SKINS and the rest join
+// COSMETICS, so they use the same rendering paths as achievement rewards.
+var BUCKS_WIN_BASE=5,BUCKS_MULTI_CAP=5;
+function bucksWinMult(diff){return Math.max(1,DIFF_ORDER.indexOf(diff)+1);}
+COSMETICS.accessory={label:'Accessory',items:[]};COSMETICS.title={label:'Title',items:[]};
+COSMETIC_KINDS.push('accessory','title');
+var SHOP_CATS=[
+  {kind:'skin',label:'Skins',icon:'🎨'},{kind:'accessory',label:'Accessories',icon:'🎩'},{kind:'celebration',label:'Goal Explosions',icon:'💥'},
+  {kind:'pose',label:'Celebrations',icon:'🎉'},{kind:'trail',label:'Ball Trails',icon:'☄️'},{kind:'title',label:'Titles',icon:'🏷️'},{kind:'frame',label:'Frames',icon:'🖼️'}
+];
+var SHOP_STOCK=[
+  {kind:'skin',id:'mintchip',name:'Mint Chip',price:70,color:'#6ee7b7',accent:'#3f2a1d',detail:'#4b2e1a',pattern:'spots'},
+  {kind:'skin',id:'lavalamp',name:'Lava Lamp',price:90,color:'#c2410c',accent:'#facc15',detail:'#fde047',pattern:'spots'},
+  {kind:'skin',id:'ghostly',name:'Ghostly',price:100,color:'#cbd5e1',accent:'#a78bfa',detail:'#f8fafc',pattern:'waves'},
+  {kind:'skin',id:'bumblebee',name:'Bumblebee',price:110,color:'#facc15',accent:'#111827',detail:'#111827',pattern:'bands'},
+  {kind:'skin',id:'racer',name:'Racer',price:140,color:'#dc2626',accent:'#111827',detail:'#ffffff',pattern:'checker'},
+  {kind:'skin',id:'midas',name:'Midas',price:300,color:'#ca8a04',accent:'#fef08a',detail:'#fffbeb',pattern:'stars'},
+  {kind:'accessory',id:'party',name:'Party Hat',icon:'🥳',price:35},
+  {kind:'accessory',id:'shades',name:'Cool Shades',icon:'🕶️',price:50},
+  {kind:'accessory',id:'cap',name:'Ball Cap',icon:'🧢',price:60},
+  {kind:'accessory',id:'headphones',name:'Headphones',icon:'🎧',price:80},
+  {kind:'accessory',id:'horns',name:'Devil Horns',icon:'😈',price:110},
+  {kind:'accessory',id:'tophat',name:'Top Hat',icon:'🎩',price:130},
+  {kind:'accessory',id:'halo',name:'Halo',icon:'😇',price:200},
+  {kind:'celebration',id:'confetti',name:'Confetti Cannon',icon:'🎊',price:60},
+  {kind:'celebration',id:'slimesplash',name:'Slime Splash',icon:'🟢',price:80},
+  {kind:'celebration',id:'coinshower',name:'Jackpot',icon:'🪙',price:150},
+  {kind:'celebration',id:'lightning',name:'Thunderstrike',icon:'⚡',price:180},
+  {kind:'celebration',id:'blackhole',name:'Black Hole',icon:'🕳️',price:250},
+  {kind:'pose',id:'pogo',name:'Pogo',icon:'🦘',price:40},
+  {kind:'pose',id:'wobble',name:'Jelly Wobble',icon:'🍮',price:50},
+  {kind:'pose',id:'moonwalk',name:'Moonwalk',icon:'🕺',price:90},
+  {kind:'pose',id:'backflip',name:'Backflip',icon:'🤸',price:110},
+  {kind:'pose',id:'tornado',name:'Tornado',icon:'🌪️',price:160},
+  {kind:'trail',id:'candy',name:'Candy',icon:'🍬',price:30},
+  {kind:'trail',id:'toxic',name:'Toxic',icon:'☢️',price:40},
+  {kind:'trail',id:'sakura',name:'Sakura',icon:'🌸',price:50},
+  {kind:'trail',id:'shadow',name:'Shadow',icon:'🌑',price:60},
+  {kind:'trail',id:'electric',name:'Electric',icon:'⚡',price:90},
+  {kind:'trail',id:'galaxy',name:'Galaxy',icon:'🌌',price:120},
+  {kind:'title',id:'rookie',name:'Rookie',color:'#94a3b8',price:15},
+  {kind:'title',id:'baller',name:'Big Baller',color:'#f97316',price:40},
+  {kind:'title',id:'wall',name:'The Wall',color:'#38bdf8',price:60},
+  {kind:'title',id:'sniper',name:'Sharpshooter',color:'#22c55e',price:80},
+  {kind:'title',id:'goalmachine',name:'Goal Machine',color:'#ef4444',price:100},
+  {kind:'title',id:'slimelord',name:'Slime Lord',color:'#a855f7',price:180},
+  {kind:'title',id:'chaostamer',name:'Chaos Tamer',color:'#f43f5e',price:250},
+  {kind:'title',id:'tycoon',name:'Bucks Tycoon',color:'#fbbf24',price:400}
+];
+SHOP_STOCK.forEach(function(it){var item=Object.assign({shop:true},it);if(it.kind==='skin')ACHIEVEMENT_SKINS.push(item);else COSMETICS[it.kind].items.push(item);});
+function shopKey(kind,id){return kind+':'+id;}
+function shopItem(key){for(var j=0;j<SHOP_STOCK.length;j++)if(shopKey(SHOP_STOCK[j].kind,SHOP_STOCK[j].id)===key)return SHOP_STOCK[j];return null;}
+// Saved as {earned, owned:['kind:id',...]}; the balance is what you earned minus the price of what you own,
+// so merging two devices (max earned, union of owned) can never mint extra Bucks.
+function cleanShop(v){
+  var owned=[];(v&&Array.isArray(v.owned)?v.owned:[]).forEach(function(k){k=String(k);if(shopItem(k)&&owned.indexOf(k)<0)owned.push(k);});
+  var e=Number(v&&v.earned);return{earned:isFinite(e)?Math.max(0,Math.floor(e)):0,owned:owned};
+}
+function loadShop(){try{return cleanShop(JSON.parse(window.localStorage.getItem('slime_shop')||'null'));}catch(e){return cleanShop(null);}}
+var SHOP_STATE=null;
+function shopNow(){if(!SHOP_STATE)SHOP_STATE=loadShop();return SHOP_STATE;}
+function saveShop(v){SHOP_STATE=cleanShop(v);try{window.localStorage.setItem('slime_shop',JSON.stringify(SHOP_STATE));}catch(e){return false;}cloudQueueSave();return true;}
+function shopSpent(v){return v.owned.reduce(function(t,k){var it=shopItem(k);return t+(it?it.price:0);},0);}
+function shopBalance(v){v=v||shopNow();return Math.max(0,v.earned-shopSpent(v));}
+function shopOwned(kind){return shopNow().owned.filter(function(k){return k.indexOf(kind+':')===0;}).map(function(k){return k.slice(kind.length+1);});}
 function cosmeticDetails(kind,id){var list=COSMETICS[kind]?COSMETICS[kind].items:[];for(var i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
 function achievementCosmetic(a){for(var i=0;i<COSMETIC_KINDS.length;i++){var k=COSMETIC_KINDS[i];if(a[k])return{kind:k,item:cosmeticDetails(k,a[k])};}return null;}
 function unlockedCosmetics(progress,kind){
-  var out=[];for(var i=0;i<ACHIEVEMENTS.length;i++){var a=ACHIEVEMENTS[i];if(a[kind]&&isAchievementUnlocked(progress,a)&&out.indexOf(a[kind])<0)out.push(a[kind]);}return out;
+  var out=shopOwned(kind);for(var i=0;i<ACHIEVEMENTS.length;i++){var a=ACHIEVEMENTS[i];if(a[kind]&&isAchievementUnlocked(progress,a)&&out.indexOf(a[kind])<0)out.push(a[kind]);}return out;
 }
-function defaultAccountAvatar(){return{kind:'slime',color:'#e8192c',theme:'night',frame:'none',skin:'none',celebration:'none',trail:'none',pose:'none'};}
+function defaultAccountAvatar(){return{kind:'slime',color:'#e8192c',theme:'night',frame:'none',skin:'none',celebration:'none',trail:'none',pose:'none',accessory:'none',title:'none'};}
 function cleanAccountAvatar(value){
   var theme=value&&['day','night','japan'].indexOf(value.theme)>=0?value.theme:'night';
   var frame=value&&value.frame==='none'?'none':achievementFrameDetails(value&&value.frame)?value.frame:'none';
@@ -3006,9 +3229,11 @@ function ProfileAvatar(props){
     ctx.fillStyle='rgba(49,126,69,0.95)';ctx.fillRect(0,size*0.79,size,size*0.21);
     ctx.fillStyle='rgba(255,255,255,0.78)';ctx.fillRect(0,size*0.78,size,Math.max(1,size*0.025));
     ctx.fillStyle='rgba(255,255,255,0.08)';ctx.fillRect(size*0.18,size*0.82,size*0.16,size*0.18);ctx.fillRect(size*0.66,size*0.82,size*0.16,size*0.18);
+    paintSlime.accessory=profile.accessory&&profile.accessory!=='none'?profile.accessory:null;
     miniSlime(ctx,size/2,size*0.79,size*0.4,profile.color,accent,true,false,skin);
+    paintSlime.accessory=null;
     ctx.restore();
-  },[profile.kind,profile.color,pSkinId,size]);
+  },[profile.kind,profile.color,pSkinId,size,profile.accessory]);
   return React.createElement('div',{role:'img','aria-label':(profile.kind==='photo'?'Player avatar photo':'Player slime avatar')+(frame?' with '+frame.name+' frame':''),style:{position:'relative',width:size,height:size,flex:'0 0 auto',borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',background:THEME_BG[profile.theme],border:(frame?3:2)+'px solid '+(frame?frame.color:'rgba(255,255,255,0.82)'),boxShadow:frame?'0 0 11px '+frame.color+',0 2px 9px rgba(0,0,0,0.35)':'0 2px 9px rgba(0,0,0,0.35)',boxSizing:'border-box'}},
     profile.kind==='photo'?React.createElement('img',{src:profile.image,alt:'',style:{width:'100%',height:'100%',objectFit:'cover',display:'block'}}):
       React.createElement('canvas',{ref:canvasRef,'aria-hidden':'true',style:{display:'block',width:'100%',height:'100%'}}));
@@ -3047,14 +3272,14 @@ function CosmeticPreview(props){
       for(var i=0;i<trail.length;i++){var f=(i+1)/trail.length;ctx.globalAlpha=f*0.75;ctx.fillStyle=trailColor(tst,theme==='japan',now+i*40);ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,BR*(0.35+0.6*f),0,Math.PI*2);ctx.fill();}
       ctx.globalAlpha=1;
       if(ball)drawBall(ctx,ball,theme==='night',theme==='japan');
-      drawSlime(ctx,sl,false,color,accent,theme==='night',theme==='japan',skin);
+      drawSlime(ctx,sl,false,color,accent,theme==='night',theme==='japan',skin,props.accessory);
       drawParticles(ctx,parts);
     }
     var reduce=false;try{reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
     if(reduce){for(var q=0;q<75;q++)step();draw();return;}
     function loop(now){if(!last)last=now;acc+=Math.min(100,now-last);last=now;while(acc>=1000/60){step();acc-=1000/60;}draw();raf=requestAnimationFrame(loop);}
     raf=requestAnimationFrame(loop);return function(){cancelAnimationFrame(raf);};
-  },[color,theme,props.skin,props.celebration,props.trail,props.pose,props.width]);
+  },[color,theme,props.skin,props.celebration,props.trail,props.pose,props.width,props.accessory]);
   return React.createElement('canvas',{ref:canvasRef,role:'img','aria-label':'Preview of your goal celebration, ball trail and victory pose',style:{width:props.width||300,maxWidth:'100%',borderRadius:14,border:'1px solid rgba(255,255,255,0.18)',display:'block'}});
 }
 function SkinMotionPreview(props){
@@ -3095,7 +3320,7 @@ function SkinMotionPreview(props){
       var shadowW=SR*Math.max(0.35,1-(GH-GRND-sl.y)/160);
       ctx.fillStyle='rgba(0,0,0,0.22)';ctx.beginPath();ctx.ellipse(sl.x,GH-GRND+4,shadowW,5,0,0,Math.PI*2);ctx.fill();
       drawParticles(ctx,parts);
-      drawSlime(ctx,sl,false,color,accent,theme==='night',theme==='japan',skin);
+      drawSlime(ctx,sl,false,color,accent,theme==='night',theme==='japan',skin,props.accessory);
     }
     if(reduce){draw();return;}
     var raf=0,last=0,acc=0;
@@ -3106,7 +3331,7 @@ function SkinMotionPreview(props){
     }
     raf=requestAnimationFrame(loop);
     return function(){cancelAnimationFrame(raf);};
-  },[color,theme,props.skin,props.width]);
+  },[color,theme,props.skin,props.width,props.accessory]);
   var w=props.width||176;
   return React.createElement('canvas',{ref:canvasRef,role:'img','aria-label':'Preview of the '+(skin?skin.name:'Classic')+' slime jumping and dashing',style:{display:'block',width:w,height:Math.round(w*225/220),borderRadius:14,border:'1px solid rgba(255,255,255,0.22)',boxShadow:'0 4px 14px rgba(0,0,0,0.35)'}});
 }
@@ -3279,50 +3504,9 @@ function AccountScreen(props){
             React.createElement('option',{value:''},'No linked player'),
             localPlayers.map(function(p){return React.createElement('option',{key:p.id,value:p.id},p.name);})),
           React.createElement('button',{type:'button',disabled:localPlayers.length>=20,onClick:function(){var id=props.onCreatePlayer&&props.onCreatePlayer(String(name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12)||'Me');if(id){setLinkedPlayerId(id);setError('');setNotice('Local player created and linked. Save account to keep the link.');}},style:{padding:'9px 14px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.13)',color:'#fff',fontWeight:900,fontSize:12,cursor:localPlayers.length>=20?'not-allowed':'pointer',opacity:localPlayers.length>=20?0.5:1}},'Create local player from account'))),
-      React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)'}},
-        React.createElement('div',{style:{fontSize:12,fontWeight:800,marginBottom:8}},'Avatar frame'),
-        React.createElement('div',{style:{display:'flex',justifyContent:'center',gap:8,flexWrap:'wrap'}},
-          [{id:'none',name:'None'}].concat(ACHIEVEMENT_FRAMES.filter(function(frame){return unlockedFrames.indexOf(frame.id)>=0;})).map(function(frame){
-            var selected=(avatar.frame||'none')===frame.id;
-            return React.createElement('button',{key:frame.id,type:'button',title:frame.name,onClick:function(){updateAvatar({frame:frame.id});},'aria-pressed':selected,style:{display:'flex',alignItems:'center',gap:6,padding:'6px 9px',borderRadius:20,border:selected?'2px solid #fff':'1px solid rgba(255,255,255,0.22)',background:selected?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer'}},
-              React.createElement('span',{style:{width:14,height:14,borderRadius:'50%',border:'3px solid '+(frame.color||'rgba(255,255,255,0.8)'),boxShadow:frame.color?'0 0 7px '+frame.color:'none',boxSizing:'border-box'}}),frame.name);
-          })),
-        unlockedFrames.length===0&&React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.64)',textAlign:'center',marginTop:6}},'Earn frames by completing achievements.')),
-      React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)'}},
-        React.createElement('div',{style:{fontSize:12,fontWeight:800,marginBottom:8}},'Achievement slime skins'),
-        React.createElement('div',{style:{display:'flex',justifyContent:'center',marginBottom:10}},
-          React.createElement(SkinMotionPreview,{color:avatar.color||'#e8192c',theme:avatar.theme||'night',skin:avatar.skin||'none'})),
-        React.createElement('div',{style:{display:'flex',justifyContent:'center',gap:8,flexWrap:'wrap'}},
-          [{id:'none',name:'Classic',color:'#94a3b8'}].concat(ACHIEVEMENT_SKINS.filter(function(skin){return unlockedSkins.indexOf(skin.id)>=0;})).map(function(skin){
-            var selected=(avatar.skin||'none')===skin.id;
-            return React.createElement('button',{key:skin.id,type:'button',onClick:function(){updateAvatar({skin:skin.id});},'aria-pressed':selected,style:{display:'flex',alignItems:'center',gap:6,padding:'6px 9px',borderRadius:20,border:selected?'2px solid #fff':'1px solid rgba(255,255,255,0.22)',background:selected?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer'}},
-              React.createElement(ProfileAvatar,{profile:{kind:'slime',color:avatar.color||'#e8192c',theme:avatar.theme||'night',frame:'none',skin:skin.id},size:30}),skin.name);
-          })),
-        unlockedSkins.length===0&&React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.64)',textAlign:'center',marginTop:6}},'Earn long-term achievements to unlock in-game slime designs.')),
-      avatar.kind!=='photo'&&React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)'}},
-        React.createElement('div',{style:{fontSize:12,fontWeight:800,marginBottom:8}},'Profile picture skin'),
-        React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.64)',textAlign:'center',marginBottom:8}},'Show a different skin on your profile picture than the one you play with.'),
-        React.createElement('div',{style:{display:'flex',justifyContent:'center',gap:8,flexWrap:'wrap'}},
-          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(skin){return unlockedSkins.indexOf(skin.id)>=0;})).map(function(skin){
-            var selected=(avatar.pfpSkin||'same')===skin.id,shown=skin.id==='same'?(avatar.skin||'none'):skin.id;
-            return React.createElement('button',{key:'pfp-'+skin.id,type:'button',onClick:function(){updateAvatar({pfpSkin:skin.id});},'aria-pressed':selected,style:{display:'flex',alignItems:'center',gap:6,padding:'6px 9px',borderRadius:20,border:selected?'2px solid #fff':'1px solid rgba(255,255,255,0.24)',background:selected?'rgba(56,189,248,0.25)':'rgba(255,255,255,0.08)',color:'#fff',fontSize:12,fontWeight:800,cursor:'pointer'}},
-              React.createElement(ProfileAvatar,{profile:{kind:'slime',color:avatar.color||'#e8192c',theme:avatar.theme||'night',frame:'none',skin:shown},size:30}),skin.name);
-          }))),
-      React.createElement('div',{style:{width:'100%',padding:'10px 0',borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',gap:10}},
-        React.createElement('div',{style:{fontSize:12,fontWeight:800}},'Celebrations, trails & poses'),
-        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4}},
-          React.createElement(CosmeticPreview,{color:avatar.color||'#e8192c',theme:avatar.theme||'night',skin:avatar.skin||'none',
-            celebration:peek&&peek.kind==='celebration'?peek.id:(avatar.celebration||'none'),trail:peek&&peek.kind==='trail'?peek.id:(avatar.trail||'none'),pose:peek&&peek.kind==='pose'?peek.id:(avatar.pose||'none'),width:300}),
-          peek&&React.createElement('div',{role:'status',style:{fontSize:11,fontWeight:800,color:'#fde68a'}},'\uD83D\uDD12 Previewing '+(cosmeticDetails(peek.kind,peek.id)||{}).name+' \u00B7 unlock it with achievements or daily challenges')),
-        COSMETIC_KINDS.map(function(kind){
-          var owned=(props.unlockedCosmetics&&props.unlockedCosmetics[kind])||[],current=avatar[kind]||'none';
-          var options=[{id:'none',name:'Classic',icon:'○'}].concat(COSMETICS[kind].items.map(function(it){return owned.indexOf(it.id)>=0?it:Object.assign({},it,{locked:true});}));
-          return React.createElement('div',{key:kind,style:{display:'flex',alignItems:'flex-start',gap:8}},
-            React.createElement('span',{style:{fontSize:11,fontWeight:800,color:'rgba(255,255,255,0.7)',width:110,flex:'0 0 110px',paddingTop:8}},COSMETICS[kind].label),
-            React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:8,flex:1,minWidth:0}},
-            options.map(function(it){var on=!it.locked&&current===it.id,pk=!!(peek&&peek.kind===kind&&peek.id===it.id);return React.createElement('button',{key:it.id,type:'button','aria-pressed':on,'aria-label':it.locked?it.name+' (locked, tap to preview)':undefined,onClick:function(){if(it.locked){setPeek(pk?null:{kind:kind,id:it.id});return;}setPeek(null);var p={};p[kind]=it.id;updateAvatar(p);},style:{display:'flex',alignItems:'center',gap:5,padding:'6px 10px',borderRadius:20,border:on?'2px solid #fff':pk?'2px dashed #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:11,fontWeight:800,cursor:'pointer',opacity:it.locked&&!pk?0.55:1}},it.locked&&React.createElement('span',{'aria-hidden':'true'},'\uD83D\uDD12'),React.createElement('span',{'aria-hidden':'true'},it.icon),it.name);}),
-            null));
-        })),
+      React.createElement('div',{style:{width:'100%',padding:'12px 0',borderTop:'1px solid rgba(255,255,255,0.12)',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}},
+        React.createElement('div',{style:{flex:'1 1 220px',fontSize:12,color:'rgba(255,255,255,0.78)',lineHeight:1.45}},React.createElement('strong',{style:{display:'block',fontSize:15,color:'#fff',marginBottom:3}},'Skins, frames & celebrations'),'Skins, accessories, titles, frames, ball trails and celebrations are bought and equipped in the Shop.'),
+        props.onOpenShop&&React.createElement('button',{type:'button',onClick:function(){var clean=String(name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12);var r=props.onSave({name:clean,avatar:cleanAccountAvatar(avatar),linkedPlayerId:linkedPlayerId});if(r){setError(r);return;}props.onOpenShop();},style:{display:'flex',alignItems:'center',gap:7,padding:'9px 18px',borderRadius:50,border:'1px solid rgba(253,230,138,0.7)',background:'linear-gradient(135deg,#ca8a04,#854d0e)',color:'#fff',fontWeight:900,cursor:'pointer',flex:'0 0 auto'}},React.createElement(SlimeBuck,{size:18}),'Open Shop')),
       React.createElement('input',{ref:fileRef,type:'file',accept:'image/jpeg,image/png,image/webp,image/gif,image/svg+xml',onChange:selectPhoto,style:{display:'none'}}),
       photo&&React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:12,borderRadius:14,background:'rgba(0,0,0,0.2)'}},
         React.createElement('div',{style:{fontSize:12,fontWeight:900}},'Frame your photo'),
@@ -3336,6 +3520,119 @@ function AccountScreen(props){
         React.createElement('button',{onClick:save,style:{padding:'11px 26px',borderRadius:50,border:'1px solid rgba(255,255,255,0.6)',background:'linear-gradient(135deg,#059669,#047857)',color:'#fff',fontWeight:900,fontSize:14,letterSpacing:'0.05em',cursor:'pointer',boxShadow:'0 5px 18px rgba(5,150,105,0.38)'}},'Done'),
         React.createElement('div',{style:{width:'100%',textAlign:'center',fontSize:11,color:'rgba(255,255,255,0.55)'}},'Changes save automatically'))));
 }
+// ─── Slime Bucks coin: a gold coin with a slime engraved on it ───
+var SLIME_BUCK_N=0;
+function SlimeBuck(props){
+  var s=props.size||18,uid=useRef(null);if(!uid.current)uid.current='sbk'+(++SLIME_BUCK_N);var g=uid.current;
+  return React.createElement('svg',{width:s,height:s,viewBox:'0 0 32 32',role:props.label?'img':undefined,'aria-label':props.label||undefined,'aria-hidden':props.label?undefined:'true',focusable:'false',style:Object.assign({display:'inline-block',verticalAlign:'middle',flex:'0 0 auto'},props.style)},
+    React.createElement('defs',null,
+      React.createElement('radialGradient',{id:g,cx:'38%',cy:'30%',r:'78%'},React.createElement('stop',{offset:'0',stopColor:'#fff6c2'}),React.createElement('stop',{offset:'0.45',stopColor:'#fbbf24'}),React.createElement('stop',{offset:'1',stopColor:'#b45309'})),
+      React.createElement('linearGradient',{id:g+'e',x1:'0',y1:'0',x2:'0',y2:'1'},React.createElement('stop',{offset:'0',stopColor:'#a16207'}),React.createElement('stop',{offset:'1',stopColor:'#f59e0b'}))),
+    React.createElement('circle',{cx:16,cy:16,r:15,fill:'url(#'+g+')',stroke:'#92400e',strokeWidth:1.4}),
+    React.createElement('circle',{cx:16,cy:16,r:12.3,fill:'none',stroke:'#92400e',strokeWidth:0.9,strokeDasharray:'1.1 1.5',opacity:0.7}),
+    React.createElement('path',{d:'M8.6 21.3 A7.4 7.4 0 0 1 23.4 21.3 Z',fill:'url(#'+g+'e)',stroke:'#92400e',strokeWidth:1,strokeLinejoin:'round'}),
+    React.createElement('path',{d:'M9.3 22.2 H22.7',stroke:'#fde68a',strokeWidth:0.9,strokeLinecap:'round'}),
+    React.createElement('path',{d:'M9.4 16.6 Q16 14.6 22.6 16.6',stroke:'#92400e',strokeWidth:0.9,fill:'none',opacity:0.65}),
+    React.createElement('ellipse',{cx:18.7,cy:18.3,rx:1.6,ry:1.8,fill:'#fef3c7',stroke:'#92400e',strokeWidth:0.7}),
+    React.createElement('circle',{cx:19.1,cy:18.5,r:0.8,fill:'#78350f'}),
+    React.createElement('ellipse',{cx:11,cy:9,rx:4.2,ry:1.7,fill:'#fff',opacity:0.45,transform:'rotate(-30 11 9)'}));
+}
+function BucksAmount(props){return React.createElement('span',{style:Object.assign({display:'inline-flex',alignItems:'center',gap:5,fontWeight:900,fontVariantNumeric:'tabular-nums'},props.style)},React.createElement(SlimeBuck,{size:props.size||16}),props.value);}
+// A title is the little label shown with a player's name.
+function TitleBadge(props){
+  var t=props.id&&props.id!=='none'?cosmeticDetails('title',props.id):null;if(!t)return null;var c=t.color||'#fbbf24';
+  return React.createElement('span',{title:'Title: '+t.name,style:Object.assign({display:'inline-block',padding:props.small?'0 6px':'2px 9px',borderRadius:20,fontSize:props.small?9:11,fontWeight:900,letterSpacing:'0.06em',textTransform:'uppercase',color:c,background:'rgba(0,0,0,0.38)',border:'1px solid '+c,whiteSpace:'nowrap',lineHeight:1.5,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis'},props.style)},t.name);
+}
+var SHOP_TAB='skin';
+function ShopScreen(props){
+  var s_tab=useState(SHOP_TAB),tab=s_tab[0],setTab=s_tab[1];SHOP_TAB=tab;
+  var s_peek=useState(null),peek=s_peek[0],setPeek=s_peek[1];
+  var s_msg=useState(null),msg=s_msg[0],setMsg=s_msg[1];
+  var rootRef=useRef(null);
+  var account=props.profile,avatar=cleanAccountAvatar(account.avatar),progress=props.progress,bal=shopBalance(props.shop);
+  var color=avatar.kind==='slime'?avatar.color:'#e8192c',theme=avatar.theme||'night';
+  useEffect(function(){var el=rootRef.current&&rootRef.current.querySelector('[data-shop-tab="'+tab+'"]');if(el)el.focus();},[]);
+  function owned(kind){return kind==='skin'?unlockedAchievementSkins(progress):kind==='frame'?unlockedAchievementFrames(progress):unlockedCosmetics(progress,kind);}
+  function itemsOf(kind){return kind==='skin'?ACHIEVEMENT_SKINS:kind==='frame'?ACHIEVEMENT_FRAMES:COSMETICS[kind].items;}
+  function current(kind){return avatar[kind]||'none';}
+  function shown(kind){return peek&&peek.kind===kind?peek.id:current(kind);}
+  function achFor(kind,id){for(var i=0;i<ACHIEVEMENTS.length;i++)if(ACHIEVEMENTS[i][kind]===id)return ACHIEVEMENTS[i];return null;}
+  function equip(kind,id){var p={};p[kind]=id;var r=props.onEquip(p);if(r)setMsg({err:true,text:r});}
+  function buy(kind,it){
+    var r=props.onBuy(kind,it.id);
+    if(r){setMsg({err:true,text:r});return;}
+    equip(kind,it.id);setPeek(null);setMsg({err:false,text:'Bought '+it.name+'! It\u2019s equipped.'});
+  }
+  function handleKey(e){
+    var k=e.key;
+    if(k==='Escape'){e.preventDefault();e.stopPropagation();props.onBack();return;}
+    var dx=k==='ArrowRight'?1:k==='ArrowLeft'?-1:0,dy=k==='ArrowDown'?1:k==='ArrowUp'?-1:0;
+    if(!dx&&!dy||e.target.tagName==='SELECT')return;
+    var all=Array.prototype.slice.call(rootRef.current.querySelectorAll('button:not([disabled]),select')),cur=document.activeElement;
+    if(!all.length)return;e.preventDefault();e.stopPropagation();
+    if(all.indexOf(cur)<0){all[0].focus();return;}
+    var r=cur.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,best=null,bs=1e9;
+    all.forEach(function(el){if(el===cur)return;var q=el.getBoundingClientRect(),qx=q.left+q.width/2,qy=q.top+q.height/2,ddx=qx-cx,ddy=qy-cy;
+      if(dx&&(ddx*dx<=4||Math.abs(ddy)>Math.max(r.height,q.height)*0.6))return;if(dy&&ddy*dy<=4)return;
+      var sc=dx?Math.abs(ddx)+Math.abs(ddy)*3:Math.abs(ddy)+Math.abs(ddx)*0.5;if(sc<bs){bs=sc;best=el;}});
+    if(best){best.focus();if(best.scrollIntoView)best.scrollIntoView({block:'nearest'});}
+  }
+  var cat=SHOP_CATS.filter(function(c){return c.kind===tab;})[0]||SHOP_CATS[0];
+  var mine=owned(tab),list=itemsOf(tab);
+  var forSale=list.filter(function(it){return it.shop;}).slice().sort(function(x,y){return x.price-y.price;});
+  var rewards=list.filter(function(it){return !it.shop;});
+  function swatch(it){
+    var id=it.id;
+    if(tab==='skin')return React.createElement(ProfileAvatar,{profile:{kind:'slime',color:color,theme:theme,frame:'none',skin:id,accessory:current('accessory')},size:46});
+    if(tab==='accessory')return React.createElement(ProfileAvatar,{profile:{kind:'slime',color:color,theme:theme,frame:'none',skin:current('skin'),accessory:id},size:46});
+    if(tab==='frame')return React.createElement('span',{style:{width:40,height:40,borderRadius:'50%',border:'4px solid '+(it.color||'rgba(255,255,255,0.7)'),boxShadow:it.color?'0 0 10px '+it.color:'none',boxSizing:'border-box',display:'block'}});
+    if(tab==='title')return id==='none'?React.createElement('span',{style:{fontSize:12,color:'rgba(255,255,255,0.6)',fontWeight:800,height:46,display:'flex',alignItems:'center'}},'No title'):React.createElement('span',{style:{height:46,display:'flex',alignItems:'center',maxWidth:'100%'}},React.createElement(TitleBadge,{id:id}));
+    return React.createElement('span',{'aria-hidden':'true',style:{fontSize:30,lineHeight:'46px',height:46}},it.icon||'\u25CB');
+  }
+  function card(it){
+    var id=it.id,isNone=id==='none',have=isNone||mine.indexOf(id)>=0,on=current(tab)===id,pk=!!(peek&&peek.kind===tab&&peek.id===id),afford=it.shop&&bal>=it.price,ach=!have&&!it.shop?achFor(tab,id):null,action;
+    var btnBase={width:'100%',padding:'6px 8px',borderRadius:20,fontSize:11,fontWeight:900,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:5,fontFamily:'inherit'};
+    if(have)action=React.createElement('button',{type:'button','aria-pressed':on,'aria-label':(on?'Unequip ':'Equip ')+it.name,onClick:function(){setPeek(null);setMsg(null);if(on){if(!isNone)equip(tab,'none');}else equip(tab,id);},style:Object.assign({},btnBase,{border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:on?'linear-gradient(135deg,#059669,#047857)':'rgba(255,255,255,0.1)',color:'#fff'})},on?(isNone?'Selected':'Equipped \u2713'):'Equip');
+    else if(it.shop)action=React.createElement('button',{type:'button',disabled:!afford,'aria-label':'Buy '+it.name+' for '+it.price+' Slime Bucks'+(afford?'':' (not enough Slime Bucks)'),onClick:function(){if(afford)buy(tab,it);},style:Object.assign({},btnBase,{border:'1px solid '+(afford?'rgba(253,230,138,0.85)':'rgba(255,255,255,0.18)'),background:afford?'linear-gradient(135deg,#ca8a04,#854d0e)':'rgba(255,255,255,0.05)',color:afford?'#fff':'rgba(255,255,255,0.5)',cursor:afford?'pointer':'not-allowed'})},afford?'Buy':'Need '+(it.price-bal)+' more');
+    else action=React.createElement('div',{title:ach?ach.description:'',style:{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.6)',textAlign:'center',lineHeight:1.3}},'\uD83D\uDD12 '+(ach?ach.title:'Achievement'));
+    return React.createElement('div',{key:id,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6,padding:'10px 8px',borderRadius:14,background:pk?'rgba(253,230,138,0.12)':on?'rgba(16,185,129,0.14)':'rgba(255,255,255,0.05)',border:pk?'2px dashed #fde68a':on?'2px solid rgba(110,231,183,0.8)':'1px solid rgba(255,255,255,0.14)',minWidth:0}},
+      React.createElement('button',{type:'button','aria-label':'Preview '+it.name,onClick:function(){setPeek(pk||isNone?null:{kind:tab,id:id});},style:{display:'flex',flexDirection:'column',alignItems:'center',gap:5,background:'none',border:'none',color:'#fff',cursor:'pointer',padding:0,width:'100%',fontFamily:'inherit'}},
+        swatch(it),
+        React.createElement('span',{style:{fontSize:12,fontWeight:900,textAlign:'center',lineHeight:1.2}},isNone?(tab==='skin'?'Classic':'None'):it.name),
+        it.shop&&!have?React.createElement(BucksAmount,{value:it.price,size:15,style:{fontSize:12,color:'#fde68a'}}):React.createElement('span',{style:{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.5)'}},isNone?'Default':it.shop?'Owned':'Achievement reward')),
+      action);
+  }
+  function grid(items){return React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(122px,1fr))',gap:10,width:'100%'}},items.map(card));}
+  function section(title,items){return items.length?React.createElement('div',{key:title,style:{width:'100%',display:'flex',flexDirection:'column',gap:8}},React.createElement('div',{style:{fontSize:11,fontWeight:900,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)'}},title),grid(items)):null;}
+  var noneItem={id:'none',name:tab==='skin'?'Classic':'None',icon:'\u25CB'};
+  var preview;
+  if(tab==='skin'||tab==='accessory')preview=React.createElement(SkinMotionPreview,{color:color,theme:theme,skin:shown('skin'),accessory:shown('accessory'),width:190});
+  else if(tab==='frame')preview=React.createElement(ProfileAvatar,{profile:Object.assign({},avatar,{frame:shown('frame')}),size:110});
+  else if(tab==='title')preview=React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',borderRadius:14,background:'rgba(0,0,0,0.3)'}},React.createElement(ProfileAvatar,{profile:avatar,size:56}),React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4}},React.createElement('span',{style:{fontSize:16,fontWeight:900,textTransform:'uppercase',letterSpacing:'0.05em'}},account.name||'Player'),shown('title')!=='none'?React.createElement(TitleBadge,{id:shown('title')}):React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'No title')));
+  else preview=React.createElement(CosmeticPreview,{color:color,theme:theme,skin:current('skin'),accessory:current('accessory'),celebration:shown('celebration'),trail:shown('trail'),pose:shown('pose'),width:300});
+  var peekItem=peek?(peek.kind==='skin'?achievementSkinDetails(peek.id):peek.kind==='frame'?achievementFrameDetails(peek.id):cosmeticDetails(peek.kind,peek.id)):null;
+  var panel={width:'min(780px,94vw)',maxHeight:'calc(100dvh - 32px)',overflowY:'auto',overscrollBehavior:'contain',boxSizing:'border-box',padding:'20px 20px 22px',borderRadius:22,background:'rgba(5,12,35,0.86)',border:'1px solid rgba(253,230,138,0.35)',boxShadow:'0 20px 60px rgba(0,0,0,0.45)',display:'flex',flexDirection:'column',alignItems:'center',gap:14,color:'#fff'};
+  return React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'shop-title',onKeyDown:handleKey,style:{width:'100%',minHeight:'100%',display:'flex',alignItems:'center',justifyContent:'center',padding:16,boxSizing:'border-box'}},
+    React.createElement('div',{ref:rootRef,style:panel},
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,width:'100%',flexWrap:'wrap'}},
+        React.createElement('button',{type:'button',onClick:props.onBack,style:{padding:'8px 16px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},'\u2190 Back'),
+        React.createElement('h1',{id:'shop-title',style:{fontFamily:'var(--font-display)',fontSize:32,margin:0,flex:1,textShadow:'0 0 20px rgba(251,191,36,0.55)'}},'Shop'),
+        React.createElement('div',{role:'status','aria-label':'Balance: '+bal+' Slime Bucks',style:{display:'flex',alignItems:'center',gap:8,padding:'7px 14px',borderRadius:50,background:'rgba(0,0,0,0.4)',border:'1px solid rgba(253,230,138,0.6)'}},React.createElement(SlimeBuck,{size:26}),React.createElement('span',{style:{fontSize:20,fontWeight:900,color:'#fde68a',fontVariantNumeric:'tabular-nums'}},bal),React.createElement('span',{style:{fontSize:10,fontWeight:800,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)'}},'Slime Bucks'))),
+      React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.7)',textAlign:'center',lineHeight:1.45}},'Earn Slime Bucks against the AI: 1 per goal you score, plus a win bonus from 5 (Super Easy) up to 25 (Chaos). Online, practice and training don\u2019t pay out.'),
+      React.createElement('div',{role:'tablist','aria-label':'Shop categories',style:{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center'}},
+        SHOP_CATS.map(function(c){var on=c.kind===tab;return React.createElement('button',{key:c.kind,type:'button',role:'tab','aria-selected':on,'data-shop-tab':c.kind,onClick:function(){setTab(c.kind);setPeek(null);setMsg(null);},style:{display:'flex',alignItems:'center',gap:5,padding:'7px 12px',borderRadius:50,border:on?'2px solid #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},React.createElement('span',{'aria-hidden':'true'},c.icon),c.label);})),
+      React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6}},
+        preview,
+        peekItem&&React.createElement('div',{role:'status',style:{fontSize:11,fontWeight:800,color:'#fde68a'}},'Previewing '+peekItem.name+' \u00B7 tap it again to stop')),
+      msg&&React.createElement('div',{role:msg.err?'alert':'status',style:{width:'100%',boxSizing:'border-box',textAlign:'center',padding:'7px 10px',borderRadius:10,fontSize:12,fontWeight:800,color:msg.err?'#fecaca':'#bbf7d0',background:msg.err?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.16)'}},msg.text),
+      tab==='skin'&&avatar.kind!=='photo'&&React.createElement('label',{style:{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800,flexWrap:'wrap',justifyContent:'center'}},'Profile picture skin',
+        React.createElement('select',{value:avatar.pfpSkin||'same',onChange:function(e){equip('pfpSkin',e.target.value);},style:{padding:'7px 10px',borderRadius:10,background:'#18243c',border:'1px solid rgba(255,255,255,0.26)',color:'#fff',fontFamily:'inherit'}},
+          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(sk){return mine.indexOf(sk.id)>=0;})).map(function(sk){return React.createElement('option',{key:sk.id,value:sk.id},sk.name);}))),
+      React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',gap:14}},
+        grid([noneItem]),
+        section('For sale',forSale),
+        section(tab==='frame'?'Earned with achievements':'Achievement rewards',rewards))));
+}
 // First-visit walkthrough of the main menu: a spotlight on each part with a short explanation.
 var MENU_TOUR=[
   {t:null,title:'Welcome to Soccer Slime!',body:'Here\u2019s a quick look around. Use Next (or \u2192 / Enter), Back (\u2190), or Skip (Esc) at any time.'},
@@ -3348,7 +3645,8 @@ var MENU_TOUR=[
   {t:'playerdata',title:'Stats',body:'Your players, head-to-head records, achievements, the leaderboard and saved replays.'},
   {t:'social',title:'Social',body:'Friends, chats, news from the dev and the suggestions box.'},
   {t:'social',title:'Suggestions',body:'Got an idea for the game? Open Social, then the Suggestions tab, to send it straight to the dev.'},
-  {t:'accounts',title:'Your Account',body:'Set your name, colour, skin, frame and celebrations. Sign in to save your progress to the cloud.'},
+  {t:'shop',title:'Shop',body:'Spend Slime Bucks (1 per goal against the AI, plus a bonus for every win) on skins, hats, titles, trails and celebrations, and equip all your cosmetics here.'},
+  {t:'accounts',title:'Your Account',body:'Set your name, colour and avatar. Sign in to save your progress to the cloud.'},
   {t:'settings',title:'Settings',body:'Change keybinds, sound, performance mode, interface size and the rare-event chances.'},
   {t:'theme',title:'Theme',body:'Switch the arena between Day, Night and Sakura.'},
   {t:null,title:'You\u2019re all set!',body:'Have fun, and good luck against Chaos.'}
@@ -3666,6 +3964,8 @@ function App(){
   var onlineNameInputRef=useRef(null);
   var s_my=useState(function(){try{return window.localStorage.getItem('slime_myname')||'';}catch(e){return '';}}),myName=s_my[0],setMyName=s_my[1];
   var s_account=useState(loadAccountProfile),account=s_account[0],setAccount=s_account[1];
+  var s_shop=useState(shopNow),shop=s_shop[0],setShop=s_shop[1];
+  var s_bucksRes=useState(null),bucksResult=s_bucksRes[0],setBucksResult=s_bucksRes[1],bucksDoneRef=useRef(false);
   function cleanName(v){return String(v||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,12);}
   function onlinePlayerName(){return cleanName(account.name)||cleanName(myName)||cleanName(CLOUD.user?cloudUsernameOf(CLOUD.user):'');}
   function saveAccountProfile(profile){
@@ -3676,6 +3976,29 @@ function App(){
     if(next.name){setMyName(next.name);try{window.localStorage.setItem('slime_myname',next.name);}catch(e){}}
     else{setMyName('');try{window.localStorage.removeItem('slime_myname');}catch(e){}}
     return'';
+  }
+  // ── Slime Bucks ──
+  function equipCosmetic(patch){return saveAccountProfile({name:account.name,avatar:Object.assign({},account.avatar,patch),linkedPlayerId:account.linkedPlayerId});}
+  function buyShopItem(kind,id){
+    var key=shopKey(kind,id),it=shopItem(key),cur=shopNow();
+    if(!it)return'That item isn\u2019t for sale.';
+    if(cur.owned.indexOf(key)>=0)return'';
+    if(shopBalance(cur)<it.price)return'Not enough Slime Bucks yet. Score goals and beat the AI to earn more.';
+    if(!saveShop({earned:cur.earned,owned:cur.owned.concat([key])}))return'Could not save your purchase in this browser. Check available site storage.';
+    setShop(shopNow());return'';
+  }
+  // Pays out once per finished match. vs AI: 1 per goal + BUCKS_WIN_BASE x difficulty level for a win.
+  // Local multiplayer: only the player linked to this account, goals only (max BUCKS_MULTI_CAP). Online, practice, training: nothing.
+  function awardSlimeBucks(matchWinner){
+    if(bucksDoneRef.current)return;bucksDoneRef.current=true;
+    var mode=pmRef.current,me=achievementSideRef.current;
+    if(practRef.current||(mode!=='single'&&mode!=='multi')||(me!=='left'&&me!=='right'))return;
+    var st=statsRef.current,goals=(me==='left'?st.lG:st.rG)||0,r={mode:mode,diff:diffRef.current,goals:0,win:0,mult:0,capped:false};
+    if(mode==='single'){r.goals=goals;if(matchWinner===me){r.mult=bucksWinMult(diffRef.current);r.win=BUCKS_WIN_BASE*r.mult;}}
+    else{r.goals=Math.min(goals,BUCKS_MULTI_CAP);r.capped=goals>BUCKS_MULTI_CAP;}
+    r.total=r.goals+r.win;
+    if(r.total>0){var cur=shopNow();saveShop({earned:cur.earned+r.total,owned:cur.owned});setShop(shopNow());}
+    setBucksResult(r);
   }
   function chooseOnlineSticker(id){
     if(!findOnlineSticker(id))return;
@@ -4420,10 +4743,10 @@ function makePeerRoom(peer,role,code){
   // Who has which celebration / trail / victory pose this match (only things the owner has unlocked).
   var remoteCosRef=useRef(null),lastTouchRef=useRef(null),impMemRef=useRef({land:null,prevOurs:null,retreat:0}),rareMsgRef=useRef(null),practGoalRef=useRef(null);
   function getGameCosmetics(mode){
-    var none={celebration:'none',trail:'none',pose:'none'},mine={};
+    var none={celebration:'none',trail:'none',pose:'none',accessory:'none',title:'none'},mine={};
     COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&unlockedCosmetics(achievementProgress,k).indexOf(id)>=0?id:'none';});
     var out={left:none,right:none};
-    if(mode==='online'){var them=remoteCosRef.current?cleanAccountAvatar(remoteCosRef.current):none,theirs={celebration:them.celebration,trail:them.trail,pose:them.pose};if(onRoleRef.current==='host'){out.left=mine;out.right=theirs;}else{out.left=theirs;out.right=mine;}}
+    if(mode==='online'){var them=remoteCosRef.current?cleanAccountAvatar(remoteCosRef.current):none,theirs={celebration:them.celebration,trail:them.trail,pose:them.pose,accessory:them.accessory,title:them.title};if(onRoleRef.current==='host'){out.left=mine;out.right=theirs;}else{out.left=theirs;out.right=mine;}}
     else if(achievementSideRef.current==='left'||achievementSideRef.current==='right')out[achievementSideRef.current]=mine;
     if(mode==='single'&&(achievementSideRef.current==='left'||achievementSideRef.current==='right'))out[achievementSideRef.current==='left'?'right':'left']={celebration:'ai:'+(DIFF_COLOR[diffRef.current]||'#38bdf8'),trail:'none',pose:'none'};
     return out;
@@ -4444,12 +4767,15 @@ function makePeerRoom(peer,role,code){
       var unlocked=unlockedAchievementSkins(achievementProgress);
       ['left','right'].forEach(function(s){var sk=achievementSkinDetails(multiSkinsRef.current[s]);skins[s]=sk&&unlocked.indexOf(sk.id)>=0?sk:null;});
     }
+    // shop accessories and titles ride along with the skins (drawScene and the HUD read them)
+    var cos=getGameCosmetics(mode);skins.acc={left:null,right:null};skins.title={left:null,right:null};
+    ['left','right'].forEach(function(sd){var c=cos[sd];if(!c)return;if(c.accessory&&c.accessory!=='none')skins.acc[sd]=c.accessory;if(c.title&&c.title!=='none')skins.title[sd]=c.title;});
     return skins;
   }
   var s_hov=useState(null),hovCard=s_hov[0],setHovCard=s_hov[1];
   var s_th=useState('night'),themeMode=s_th[0],setThemeMode=s_th[1];
   var s_tdd=useState(false),themeOpen=s_tdd[0],setThemeOpen=s_tdd[1];
-  useEffect(function(){if(!themeOpen)return;function away(e){if(!(e.target.closest&&e.target.closest('[data-theme-dd]'))){setThemeOpen(false);setFocusIdx(8);}}document.addEventListener('mousedown',away);return function(){document.removeEventListener('mousedown',away);};},[themeOpen]);
+  useEffect(function(){if(!themeOpen)return;function away(e){if(!(e.target.closest&&e.target.closest('[data-theme-dd]'))){setThemeOpen(false);setFocusIdx(10);}}document.addEventListener('mousedown',away);return function(){document.removeEventListener('mousedown',away);};},[themeOpen]);
   var s_foc=useState(0),focusIdx=s_foc[0],setFocusIdx=s_foc[1];
 
   useEffect(function(){tlRef.current=tl;},[tl]);
@@ -4508,7 +4834,7 @@ function makePeerRoom(peer,role,code){
   :Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=(touchUI?Math.max(0.9,Math.min(1.2,window.innerWidth/400,window.innerHeight/420)):Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720)))*gameSettings.uiScale;z=Math.round(z*20)/20;setFit(f);setRs(Math.min(PERF_LOW?2:3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(PERF_LOW?2:4,Math.max(1,Math.ceil(z*d),Math.ceil(d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale,touchUI]);
   useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad(); var perfTimer=setInterval(function(){updatePerf(gameSettings.perfMode);},5000);},[]);
 
-  function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(8);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
+  function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(10);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(themeMode));}}
   function updateGameSettings(patch){
     var next=cleanGameSettings(Object.assign({},gameSettings,patch));
     setGameSettings(next);GAME_AUDIO_VOLUME=next.sfxVolume;
@@ -4553,6 +4879,7 @@ function makePeerRoom(peer,role,code){
     var acct=loadAccountProfile();setAccount(acct);setMyName(acct.name||'');
     setStickerSlots(loadOnlineStickerSlots());
     setFriends(loadFriends());setDailyState(loadDaily());
+    SHOP_STATE=null;setShop(shopNow());
     var gs=loadGameSettings();setGameSettings(gs);GAME_AUDIO_VOLUME=gs.sfxVolume;setSoundEnabled(gs.soundEnabled);soundEnabledRef.current=gs.soundEnabled;
     setCloudVer(function(v){return v+1;});
   }
@@ -4699,7 +5026,7 @@ function makePeerRoom(peer,role,code){
     attempt.resetAt=performance.now()+420;
   }
   function getNavGrid(){
-    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social'],['theme']].concat(dailyDoneToday(dailyState)?[]:[['daily_play']]);
+    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social','shop'],['theme']].concat(dailyDoneToday(dailyState)?[]:[['daily_play']]);
     if(screen==='online'){
       if(onl.view==='choose')return cleanName(account.name)?[['online_create'],['online_join'],['online_stickers'],['online_back']]:[['online_create'],['online_join'],['online_name'],['online_stickers'],['online_back']];
       if(onl.view==='stickers'){
@@ -4739,9 +5066,9 @@ function makePeerRoom(peer,role,code){
       settings:function(){setSettingsSaveError('');setShowSettings(true);},
       online:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');},
       guide:function(){setScreen('guide');},
-      playerdata:function(){setShowPD('stats');},social:function(){setShowPD('social');},
+      playerdata:function(){setShowPD('stats');},social:function(){setShowPD('social');},shop:function(){setScreen('shop');},
       theme:toggleTheme,
-      theme_day:function(){setThemeMode('day');setThemeOpen(false);setFocusIdx(8);},theme_night:function(){setThemeMode('night');setThemeOpen(false);setFocusIdx(8);},theme_japan:function(){setThemeMode('japan');setThemeOpen(false);setFocusIdx(8);},
+      theme_day:function(){setThemeMode('day');setThemeOpen(false);setFocusIdx(10);},theme_night:function(){setThemeMode('night');setThemeOpen(false);setFocusIdx(10);},theme_japan:function(){setThemeMode('japan');setThemeOpen(false);setFocusIdx(10);},
       dur_up:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.min(i+1,opts.length-1)]);},
       dur_down:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.max(i-1,0)]);},
       score_none:function(){setScoreLimit(0);},score_3:function(){setScoreLimit(3);},score_5:function(){setScoreLimit(5);},score_10:function(){setScoreLimit(10);},
@@ -4813,7 +5140,7 @@ function makePeerRoom(peer,role,code){
       }
       if(key==='enter'||key===' '){e.preventDefault();var b=btns[focusIdx];if(b)b.act();return;}
       if(themeOpen&&key!=='enter'&&key!==' '&&key!=='escape'){e.preventDefault();var td=(key==='arrowright'||key==='d'||key==='arrowdown'||key==='s')?1:(key==='arrowleft'||key==='a'||key==='arrowup'||key==='w')?-1:0;if(td)setFocusIdx((focusIdx+td+3)%3);return;}
-      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(8);return;}if(screen==='accounts'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
+      if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(10);return;}if(screen==='accounts'||screen==='shop'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
       if(btns[focusIdx]&&btns[focusIdx].id==='diff_bar'){var dstep=(key==='arrowright'||key==='d')?1:(key==='arrowleft'||key==='a')?-1:0;var dcur=DIFF_ORDER.indexOf(diffRef.current);if(dstep&&!(dstep<0&&dcur<=0)){e.preventDefault();var di=Math.max(0,Math.min(DIFF_ORDER.length-1,dcur+dstep));setDiff(DIFF_ORDER[di]);diffRef.current=DIFF_ORDER[di];return;}}
       var pos=getFocusPos(grid,focusIdx),r=pos[0],c=pos[1],nr=r,nc=c;
       if(key==='arrowdown'||key==='s'){nr=(r+1)%grid.length;}
@@ -4846,7 +5173,7 @@ function makePeerRoom(peer,role,code){
   resetPosRef.current=resetPos;
 
   function endReplay(){replayActiveRef.current=false;replayFrRef.current=[];replayIdxRef.current=0;goalFlashRef.current=false;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;flashRef.current=false;setReplayActive(false);setGoalFlash(false);resetPosRef.current(pmRef.current!=='online');kRef.current['w']=false;kRef.current['arrowup']=false;jrRef.current['w']=true;jrRef.current['arrowup']=true;clearTimeout(postRpRef.current);var pendingWinner=pendingWinRef.current;pendingWinRef.current=null;if(pendingWinner)triggerWin(pendingWinner);else if(pmRef.current==='multi')startReady();else if(!pausedRef.current)frozenRef.current=false;}
-  function triggerWin(ws){frozenRef.current=false;/* keep physics running on the end screen so the winner's victory pose plays */var finalStats=statsRef.current;finalStats.longestRally=Math.max(finalStats.longestRally||0,(finalStats.rallyFrames||0)/60);recordAchievementMatch(ws);winRef.current=ws;setWinner(ws);goRef.current=true;flashRef.current=true;var ls=gsRef.current.left,rs=gsRef.current.right;ls.vx=0;ls.vy=0;ls.isSpinning=false;rs.vx=0;rs.vy=0;matchRecActiveRef.current=false;setMatchFrames(matchRecRef.current.slice());setMatchGoals(matchGoalsRef.current.slice());setMatchColors(Object.assign({},colRef.current));setMatchNames((function(){var nm=Object.assign({},lastNm.current);if(pmRef.current==='single'){var me=sideRef.current;nm[me]='YOU';nm[me==='left'?'right':'left']='AI';}return nm;})());setTimeout(function(){flashRef.current=false;},4000);var es=Object.assign({},finalStats);setEndStats(es);if(pmRef.current==='multi'&&p1IdRef.current&&p2IdRef.current){var upd=dbPlayers.slice();dbRecord(upd,p1IdRef.current,p2IdRef.current,es.lG,es.rG);setDbPlayers(upd);dbSave(upd);}}
+  function triggerWin(ws){frozenRef.current=false;/* keep physics running on the end screen so the winner's victory pose plays */var finalStats=statsRef.current;finalStats.longestRally=Math.max(finalStats.longestRally||0,(finalStats.rallyFrames||0)/60);recordAchievementMatch(ws);awardSlimeBucks(ws);winRef.current=ws;setWinner(ws);goRef.current=true;flashRef.current=true;var ls=gsRef.current.left,rs=gsRef.current.right;ls.vx=0;ls.vy=0;ls.isSpinning=false;rs.vx=0;rs.vy=0;matchRecActiveRef.current=false;setMatchFrames(matchRecRef.current.slice());setMatchGoals(matchGoalsRef.current.slice());setMatchColors(Object.assign({},colRef.current));setMatchNames((function(){var nm=Object.assign({},lastNm.current);if(pmRef.current==='single'){var me=sideRef.current;nm[me]='YOU';nm[me==='left'?'right':'left']='AI';}return nm;})());setTimeout(function(){flashRef.current=false;},4000);var es=Object.assign({},finalStats);setEndStats(es);if(pmRef.current==='multi'&&p1IdRef.current&&p2IdRef.current){var upd=dbPlayers.slice();dbRecord(upd,p1IdRef.current,p2IdRef.current,es.lG,es.rG);setDbPlayers(upd);dbSave(upd);}}
   function finishTraining(){
     if(goRef.current)return;
     var challenge=trainingChallengeRef.current||'aim',score=trainingScoreRef.current;
@@ -4858,7 +5185,7 @@ function makePeerRoom(peer,role,code){
     shakeRef.current=Math.max(shakeRef.current,10);
     frozenRef.current=true;goalFlashRef.current=true;goalFlashFrRef.current=0;goalFlashDoneRef.current=false;flashRef.current=true;setGoalFlash(true);
     for(var fani=0;fani<CROWD_N;fani++)fanRef.current[fani]=Math.random();
-    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;var celeb=getGameCosmetics(pmRef.current)[scoring].celebration;if(!celeb||celeb==='none'){var gSkin=getGameSlimeSkins(pmRef.current)[scoring];emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,gSkin&&gSkin.color?gSkin.color:(scoring==='left'?colRef.current.left.body:colRef.current.right.body));skinFx(particlesRef.current,gp0,gSkin,true);}else emitCelebration(particlesRef.current,celeb,gx,GH-GRND-GOALH/2);if(celeb==='explosion')shakeRef.current=Math.max(shakeRef.current,16);else if(celeb==='sonicboom')shakeRef.current=Math.max(shakeRef.current,9);
+    var gx=goalSide==='left'?BR:GW-BR,gp0=particlesRef.current.length;var celeb=getGameCosmetics(pmRef.current)[scoring].celebration;if(!celeb||celeb==='none'){var gSkin=getGameSlimeSkins(pmRef.current)[scoring];emitGoal(particlesRef.current,gx,GH-GRND-GOALH/2,gSkin&&gSkin.color?gSkin.color:(scoring==='left'?colRef.current.left.body:colRef.current.right.body));skinFx(particlesRef.current,gp0,gSkin,true);}else emitCelebration(particlesRef.current,celeb,gx,GH-GRND-GOALH/2);if(celeb==='explosion')shakeRef.current=Math.max(shakeRef.current,16);else if(celeb==='sonicboom')shakeRef.current=Math.max(shakeRef.current,9);else if(celeb==='lightning'||celeb==='blackhole')shakeRef.current=Math.max(shakeRef.current,11);
     var frames=replayBufRef.current.slice();replayBufRef.current=[];replayScorerRef.current=scoring;otReadyRef.current=false;setOtLive(false);
     if(pmRef.current==='online'&&onRoleRef.current==='host'&&frames.length){
       var packed=frames.map(packReplayFrame),chunks=[];
@@ -4958,7 +5285,7 @@ function makePeerRoom(peer,role,code){
     if(mode==='training')tlRef.current=trainingChallengeRef.current==='dash'?-1:45;else if(!prac)tlRef.current=matchDurationSeconds(duration);else tlRef.current=0;
     lastGM.current=duration;lastPM.current=mode;lastCol.current=c;lastNm.current=n;lastSide.current=ps;
     lastGameOptionsRef.current={scoreLimit:scoreLimitRef.current,overtime:overtimeEnabledRef.current,skins:Object.assign({},multiSkinsRef.current)};
-    setColors(c);setNames(n);setSc({left:0,right:0});setWinner(null);setLCD(0);setRCD(0);setEndStats(null);
+    setColors(c);setNames(n);setSc({left:0,right:0});setWinner(null);setLCD(0);setRCD(0);setEndStats(null);bucksDoneRef.current=false;setBucksResult(null);
     setOt(false);setGoalFlash(false);setReplayActive(false);setMatchFrames([]);setShowMatchReplay(false);
     setPaused(false);setIsPractice(prac);setGmode(mode);setActiveSide(ps);
     if(mode==='training')setTl(trainingChallengeRef.current==='dash'?-1:45);else if(!prac)setTl(matchDurationSeconds(duration));else setTl(0);
@@ -4995,8 +5322,20 @@ function makePeerRoom(peer,role,code){
   function saveMeta(kind,extra){var nm=lastNm.current||{left:'P1',right:'P2'};return Object.assign({kind:kind,left:nm.left,right:nm.right,colors:JSON.parse(JSON.stringify(colRef.current)),theme:themeMode,skins:(function(k){return{left:k.left&&k.left.id||null,right:k.right&&k.right.id||null};})(getGameSlimeSkins(lastPM.current)),aiDiff:lastPM.current==='single'?diffRef.current:null},extra||{});}
   function saveReplayRange(kind,start,end,ev){
     var fr=matchFrames.slice(start,end+1),gl=matchGoals.filter(function(g){return g.f>=start&&g.f<=end;}).map(function(g){return{f:g.f-start,side:g.side,own:g.own};});
-    var who=ev?(ev.own?((ev.side==='left'?matchNames.right:matchNames.left)+' (own goal)'):(ev.side==='left'?matchNames.left:matchNames.right)):'';
-    return rpSave(saveMeta(kind,{left:matchNames.left,right:matchNames.right,score:kind==='match'&&endStats?[endStats.lG,endStats.rG]:null,title:kind==='goal'?'Goal · '+who:(matchNames.left+' vs '+matchNames.right)}),fr,gl);
+    // Titles that say who did what, so saved/shared replays are easy to tell apart, e.g.
+    //   "Alex scores (2–1 vs Hard AI) · 0:43 · 15 Nov"   or   "Alex beat Sam 3–2 · 15 Nov"
+    function rpName(n){if(n==='YOU')return onlinePlayerName()||'You';if(n==='AI'&&lastPM.current==='single')return (DIFF_LABEL[diffRef.current]||'')+' AI';return n||'Player';}
+    var nL=rpName(matchNames.left),nR=rpName(matchNames.right),day=new Date().toLocaleDateString(undefined,{day:'numeric',month:'short'}),title;
+    if(kind==='goal'&&ev){
+      var sl=0,sr=0;matchGoals.forEach(function(g){if(g.f<=ev.f){if(g.side==='left')sl++;else sr++;}});
+      var scorer=ev.side==='left'?nL:nR,other=ev.side==='left'?nR:nL,mine=ev.side==='left'?sl:sr,theirs=ev.side==='left'?sr:sl,secs=Math.round(ev.f/60),clock=Math.floor(secs/60)+':'+('0'+secs%60).slice(-2);
+      title=scorer+' scores ('+(ev.own?other+' own goal, ':'')+mine+'–'+theirs+' vs '+other+') · '+clock+' · '+day;
+    }else{
+      var gL=endStats?endStats.lG:null,gR=endStats?endStats.rG:null;
+      title=gL===null?nL+' vs '+nR:gL===gR?nL+' and '+nR+' drew '+gL+'–'+gR:(gL>gR?nL+' beat '+nR+' '+gL+'–'+gR:nR+' beat '+nL+' '+gR+'–'+gL);
+      title+=' · '+day;
+    }
+    return rpSave(saveMeta(kind,{left:matchNames.left,right:matchNames.right,score:kind==='match'&&endStats?[endStats.lG,endStats.rG]:null,title:title}),fr,gl);
   }
   function savePracticeGoal(){var c=practClipRef.current;if(!c||practClip!=='ready')return;setPractClip('saving');rpSave(saveMeta('practice',{title:'Practice goal · '+c.kmh+' km/h, '+c.m+' m',left:lastNm.current&&lastNm.current.left,right:lastNm.current&&lastNm.current.right}),c.frames,[c.goal]).then(function(){setPractClip('saved');},function(){setPractClip('ready');});}
   function playSavedReplay(id){return rpGet(id).then(function(rec){if(!rec)throw new Error('missing');var m=rec.meta||{},frs=rpUnpack(rec.data);m.__kind=m.kind;
@@ -5548,7 +5887,8 @@ function makePeerRoom(peer,role,code){
   if(viewReplay&&introDone)return React.createElement('div',{key:'saved-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{onClip:viewReplay.kind==='match'?function(a,b){var vr=viewReplay,fr=vr.frames.slice(a,b+1),gl=(vr.goals||[]).filter(function(g){return g.f>=a&&g.f<=b;}).map(function(g){return{f:g.f-a,side:g.side,own:g.own};}),m=Object.assign({},vr.meta||{});delete m.id;delete m.at;delete m.secs;delete m.__kind;m.kind='clip';m.score=null;m.title='Clip \u00B7 '+(vr.meta&&vr.meta.title||'Replay');return rpSave(m,fr,gl);}:null,frames:viewReplay.frames,colors:viewReplay.colors,names:viewReplay.names,theme:viewReplay.theme,skins:viewReplay.skins,goalEvents:viewReplay.goals,title:viewReplay.title,onBack:function(){setViewReplay(null);}})));
   if(!introDone)return React.createElement(IntroScreen,{onDone:function(){setIntroDone(true);}});
   if(showSettings)return React.createElement('div',{key:'settings',className:'screen-in',style:lockedScreen()},bgLayer(),React.createElement(SettingsScreen,{settings:gameSettings,onChange:updateGameSettings,onResetImpossibleAI:resetImpossibleAI,saveError:settingsSaveError,onClose:function(){setShowSettings(false);setFocusIdx(4);}}));
-  if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress),unlockedCosmetics:{celebration:unlockedCosmetics(achievementProgress,'celebration'),trail:unlockedCosmetics(achievementProgress,'trail'),pose:unlockedCosmetics(achievementProgress,'pose')}})));
+  if(screen==='shop')return React.createElement('div',{key:'shop',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(ShopScreen,{profile:account,shop:shop,progress:achievementProgress,onEquip:equipCosmetic,onBuy:buyShopItem,onBack:function(){setScreen('menu');}})));
+  if(screen==='accounts')return React.createElement('div',{key:'accounts',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{className:'rise',style:{position:'relative',zIndex:1,width:'100%'}},React.createElement(AccountScreen,{key:'account-'+cloudVer,cloud:cloud,onCloudLogIn:cloudLogIn,onCloudLogOut:cloudLogOut,onCloudSync:cloudPushNow,profile:account,onSave:saveAccountProfile,onBack:function(){setScreen('menu');},onOpenShop:function(){setScreen('shop');},players:dbPlayers,onCreatePlayer:createLocalPlayerForAccount,unlockedFrames:unlockedAchievementFrames(achievementProgress),unlockedSkins:unlockedAchievementSkins(achievementProgress),unlockedCosmetics:{celebration:unlockedCosmetics(achievementProgress,'celebration'),trail:unlockedCosmetics(achievementProgress,'trail'),pose:unlockedCosmetics(achievementProgress,'pose')}})));
   if(showPD)return React.createElement('div',{key:'player-data',className:'screen-in',style:{position:'relative',minHeight:'100%',background:bgGrad}},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1}},React.createElement(PlayerDataScreen,{section:showPD==='social'?'social':'stats',chats:chats,chatRead:chatRead,onReadChat:readChat,chatDot:chatDot,sugDot:sugDot,onSugSeen:markSugSeen,onFriendsGuide:function(){setShowPD(false);setFrTour(true);},accountName:account.name,onPlayReplay:playSavedReplay,avatar:account.avatar,cloudUser:cloud.user,friends:friends,onAddFriend:addFriend,friendReqs:friendReqs,onAcceptFriend:acceptFriend,onDeclineFriend:declineFriend,onRemoveFriend:removeFriend,onInviteFriend:inviteFriend,onChange:syncPlayers,achievementProgress:achievementProgress,onUnlockAll:unlockAllAchievements,saveError:achievementSaveError,onBack:function(){syncPlayers(dbLoad());setScreen('menu');setShowPD(false);}})));
   showReplayRef.current=!!(showMatchReplay&&matchFrames.length>0)||!!viewReplay;
   if(showMatchReplay&&matchFrames.length>0)return React.createElement('div',{key:'match-replay',className:'screen-in',style:Object.assign({},baseStyle)},bgLayer(),React.createElement('div',{style:{position:'relative',zIndex:1,maxWidth:'100%',overflowX:'auto'}},React.createElement(MatchReplayScreen,{frames:matchFrames,colors:matchColors,names:matchNames,theme:themeMode,skins:getGameSlimeSkins(lastPM.current),goalEvents:matchGoals,onSave:saveReplayRange,onBack:function(){setShowMatchReplay(false);}})));
@@ -5567,7 +5907,8 @@ function makePeerRoom(peer,role,code){
       {key:'online',label:'Play Online',bg:'linear-gradient(135deg,#059669,#047857)',act:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');}},
       {key:'guide',label:'How to Play',bg:'linear-gradient(135deg,#475569,#1e293b)',act:function(){setScreen('guide');}},
       {key:'playerdata',label:'Stats',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD('stats');}},
-      {key:'social',label:'Social',dot:chatDot||sugDot,bg:'linear-gradient(135deg,#db2777,#9d174d)',act:function(){setShowPD('social');}}
+      {key:'social',label:'Social',dot:chatDot||sugDot,bg:'linear-gradient(135deg,#db2777,#9d174d)',act:function(){setShowPD('social');}},
+      {key:'shop',label:React.createElement('span',{style:{display:'inline-flex',alignItems:'center',gap:7}},'Shop',React.createElement(BucksAmount,{value:shopBalance(shop),size:18,style:{fontSize:13,padding:'1px 8px 1px 3px',borderRadius:20,background:'rgba(0,0,0,0.3)'}})),bg:'linear-gradient(135deg,#ca8a04,#854d0e)',act:function(){setScreen('shop');}}
     ];
     return React.createElement('div',{key:'menu',className:'screen-in',style:lockedScreen()},bgLayer(),
       tour&&React.createElement(MenuTour,{onDone:finishTour}),
@@ -5625,7 +5966,7 @@ function makePeerRoom(peer,role,code){
             React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:touchUI?'center':'flex-start',gap:8,width:themeOpen?(touchUI?'100%':240):0,height:touchUI&&!themeOpen?0:undefined,opacity:themeOpen?1:0,overflow:touchUI&&!themeOpen?'hidden':'visible',flexShrink:0,transition:'width 0.22s ease,opacity 0.16s ease',zIndex:20,pointerEvents:themeOpen?'auto':'none'}},
               [['day','Day'],['night','Night'],['japan','Sakura']].map(function(o){
                 var id='theme_'+o[0],cur=themeMode===o[0];
-                return React.createElement('button',{key:id,onClick:function(){setThemeMode(o[0]);setThemeOpen(false);setFocusIdx(8);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign(hovPill(id,THEME_BG[o[0]],{fontSize:14,padding:'10px 12px',whiteSpace:'nowrap',flex:'0 0 auto',boxShadow:cur?'0 0 0 3px rgba(255,255,255,0.85),0 6px 18px rgba(0,0,0,0.4)':undefined}),{transition:'transform 0.13s,box-shadow 0.13s'})},o[1]);
+                return React.createElement('button',{key:id,onClick:function(){setThemeMode(o[0]);setThemeOpen(false);setFocusIdx(10);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign(hovPill(id,THEME_BG[o[0]],{fontSize:14,padding:'10px 12px',whiteSpace:'nowrap',flex:'0 0 auto',boxShadow:cur?'0 0 0 3px rgba(255,255,255,0.85),0 6px 18px rgba(0,0,0,0.4)':undefined}),{transition:'transform 0.13s,box-shadow 0.13s'})},o[1]);
               })))
           ),
         React.createElement('p',{style:{margin:0,fontSize:13,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
@@ -5644,9 +5985,9 @@ function makePeerRoom(peer,role,code){
     if(oV==='host'||oV==='guest'){
       var remoteProfile=netFind(onRoleRef.current==='host'?'g':'h');
       oBody.push(React.createElement('div',{key:'profiles',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:12,width:'100%'}},
-        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:74}},React.createElement(ProfileAvatar,{profile:account.avatar,size:52}),React.createElement('span',{style:{fontSize:11,fontWeight:800,maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},onlinePlayerName()|| (onRoleRef.current==='host'?'Host':'Guest'))),
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:74}},React.createElement(ProfileAvatar,{profile:account.avatar,size:52}),React.createElement('span',{style:{fontSize:11,fontWeight:800,maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},onlinePlayerName()|| (onRoleRef.current==='host'?'Host':'Guest')),React.createElement(TitleBadge,{id:account.avatar.title,small:true})),
         React.createElement('span',{style:{fontSize:12,fontWeight:900,color:'rgba(255,255,255,0.55)'}},'VS'),
-        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:74,opacity:remoteProfile?1:0.55}},React.createElement(ProfileAvatar,{profile:remoteProfile&&remoteProfile.a||defaultAccountAvatar(),size:52}),React.createElement('span',{style:{fontSize:11,fontWeight:800,maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},remoteProfile&&cleanName(remoteProfile.n)||'Opponent'))));
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:74,opacity:remoteProfile?1:0.55}},React.createElement(ProfileAvatar,{profile:remoteProfile&&remoteProfile.a||defaultAccountAvatar(),size:52}),React.createElement('span',{style:{fontSize:11,fontWeight:800,maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},remoteProfile&&cleanName(remoteProfile.n)||'Opponent'),React.createElement(TitleBadge,{id:remoteProfile&&remoteProfile.a&&remoteProfile.a.title,small:true}))));
     }
     if(oV==='choose'){
       oBody.push(React.createElement('div',{key:'t',style:oTxt},'Play a friend on a different computer. One of you creates a room, the other types in the code.'));
@@ -5881,6 +6222,7 @@ function makePeerRoom(peer,role,code){
     var memCount=0;if(isImpG){var hpo=hPatternsRef.current;for(var hk in hpo){if(hpo.hasOwnProperty(hk))memCount+=hpo[hk].length;}}
     var lLeft=gmode==='multi'||isOnG||activeSide==='left',rRight=!isOnG&&(gmode==='multi'||activeSide==='right');
     var onlineOpponent= isOnG?netFind(onRoleRef.current==='host'?'g':'h'):null;
+    var hudTitles=(function(){try{return getGameSlimeSkins(pmRef.current).title||{};}catch(e){return {};}})();
     var leftAvatar=isOnG?(onRoleRef.current==='host'?account.avatar:onlineOpponent&&onlineOpponent.a||defaultAccountAvatar()):null;
     var rightAvatar=isOnG?(onRoleRef.current==='host'?onlineOpponent&&onlineOpponent.a||defaultAccountAvatar():account.avatar):null;
     function keys(list){return list.map(function(k,i){return React.createElement('span',{key:i,className:'kbd'},k);});}
@@ -6022,6 +6364,14 @@ function makePeerRoom(peer,role,code){
                 gmode!=='training'&&React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:14}},
                   [['Saves',endStats.saves||0],['Longest rally',(endStats.longestRally||0).toFixed(1)+' s']].map(function(item){return React.createElement('div',{key:item[0],style:{padding:'7px 8px',borderRadius:9,background:'rgba(255,255,255,0.07)',textAlign:'center'}},React.createElement('div',{style:{fontSize:9,color:'rgba(255,255,255,0.55)',textTransform:'uppercase',letterSpacing:'0.06em',fontWeight:800}},item[0]),React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff',marginTop:2}},item[1]));})),
                 gmode==='training'&&trainingResult&&React.createElement('div',{style:{textAlign:'center',fontSize:13,color:'rgba(255,255,255,0.76)',marginBottom:14}},'Bronze, silver, and gold each require a higher score. Try again to improve your medal.'),
+                bucksResult&&(function(){var br=bucksResult,parts=[];
+                  if(br.goals)parts.push(br.goals+(br.goals===1?' goal':' goals')+' +'+br.goals+(br.capped?' (max '+BUCKS_MULTI_CAP+' in multiplayer)':''));
+                  if(br.win)parts.push('Win vs '+(DIFF_LABEL[br.diff]||'AI')+' ('+br.mult+'\u00D7'+BUCKS_WIN_BASE+') +'+br.win);
+                  if(!parts.length)parts.push(br.mode==='multi'?'Score goals to earn Slime Bucks':'Score or win to earn Slime Bucks');
+                  return React.createElement('div',{role:'status',style:{margin:'0 0 12px',padding:'9px 12px',borderRadius:12,background:'rgba(251,191,36,0.12)',border:'1px solid rgba(251,191,36,0.55)',textAlign:'center'}},
+                    React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontSize:18,fontWeight:900,color:'#fde68a'}},React.createElement(SlimeBuck,{size:24}),'+'+br.total+' Slime Bucks'),
+                    React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.75)',marginTop:3,lineHeight:1.4}},parts.join(' \u00B7 ')+' \u00B7 Balance '+shopBalance(shop)));
+                })(),
                 dailyResult&&(function(){var dch=todaysChallenge(),dr=dailyResult;
                   return React.createElement('div',{style:{margin:'0 0 12px',padding:'10px 12px',borderRadius:12,background:dr.done?'rgba(34,197,94,0.15)':dr.passed?'rgba(56,189,248,0.12)':'rgba(239,68,68,0.12)',border:'1px solid '+(dr.done?'rgba(74,222,128,0.6)':dr.passed?'rgba(56,189,248,0.5)':'rgba(248,113,113,0.5)'),textAlign:'center'}},
                     React.createElement('div',{style:{fontSize:10,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:'#fde68a'}},'Daily challenge · '+dch.title),
@@ -6097,7 +6447,7 @@ function makePeerRoom(peer,role,code){
               :React.createElement('div',{style:{display:'flex',alignItems:'center',width:'100%',height:hudH}},
                   React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,borderLeft:'4px solid '+(colors.left?colors.left.body:'#1a6bcc'),paddingLeft:8}},
                     isOnG&&React.createElement(ProfileAvatar,{profile:leftAvatar,size:28}),
-                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),
+                    React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:2,minWidth:0}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),hudTitles.left&&React.createElement(TitleBadge,{id:hudTitles.left,small:true})),
                     React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.left)),
                   React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:2}},
                     React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot&&otLive&&!winner?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot&&otLive?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot&&otLive&&!winner?'pulse 1s ease-in-out infinite':'none'}},ot&&otLive&&!winner?'OVERTIME':gmode==='training'&&trainingChallengeRef.current==='dash'?Math.max(0,10-trainingAttemptRef.current.tries)+' LEFT':fmt(tl)),
@@ -6107,7 +6457,7 @@ function makePeerRoom(peer,role,code){
                       React.createElement('button',{onClick:function(){var next=!soundEnabledRef.current;soundEnabledRef.current=next;setSoundEnabled(next);},'aria-pressed':soundEnabled,style:hudChip(false,{padding:'2px 8px',fontSize:10})},soundEnabled?'Sound on':'Muted'))),
                   React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',borderRight:'4px solid '+(colors.right?colors.right.body:'#e8192c'),paddingRight:8}},
                     React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.right),
-                    React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names.right),
+                    React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2,minWidth:0}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names.right),hudTitles.right&&React.createElement(TitleBadge,{id:hudTitles.right,small:true})),
                     isOnG&&React.createElement(ProfileAvatar,{profile:rightAvatar,size:28})))
           ),
           React.createElement('div',{style:{position:'relative',width:GW,height:GH}},
