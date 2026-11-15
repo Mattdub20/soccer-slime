@@ -20,6 +20,8 @@ html.lock-scroll,html.lock-scroll body{overflow:hidden!important;overscroll-beha
 @keyframes introShake{0%,100%{transform:none}15%{transform:translate(-9px,6px)}30%{transform:translate(8px,-7px)}45%{transform:translate(-6px,-4px)}60%{transform:translate(5px,5px)}80%{transform:translate(-2px,2px)}}
 @keyframes introGlow{0%,100%{text-shadow:0 0 30px rgba(56,189,248,.8),0 5px 0 rgba(0,40,100,.45)}50%{text-shadow:0 0 60px rgba(125,211,252,1),0 0 110px rgba(56,189,248,.6),0 5px 0 rgba(0,40,100,.45)}}
 @keyframes introOut{to{opacity:0;transform:scale(1.04)}}
+@keyframes cardShine{0%{transform:translateX(-120%) skewX(-18deg)}100%{transform:translateX(260%) skewX(-18deg)}}
+@keyframes cardRing{0%,100%{box-shadow:0 0 0 3px var(--ring),0 0 26px 2px var(--glow),0 18px 40px rgba(0,0,0,0.55)}50%{box-shadow:0 0 0 3px var(--ring),0 0 40px 8px var(--glow),0 18px 40px rgba(0,0,0,0.55)}}
 .intro-logo{display:inline-block;font-family:var(--font-title);font-weight:700;text-transform:uppercase;line-height:1;white-space:nowrap;font-size:clamp(50px,11.5vw,150px);letter-spacing:.04em;color:transparent;
 background:linear-gradient(100deg,rgba(255,255,255,0) 42%,rgba(255,255,255,.95) 50%,rgba(255,255,255,0) 58%) no-repeat,linear-gradient(180deg,#ffffff 0%,#eaf4ff 46%,#8fc4f5 54%,#dff0ff 100%);
 background-size:300% 100%,100% 100%;background-position:150% 0,0 0;-webkit-background-clip:text;background-clip:text;
@@ -106,7 +108,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.5.6';
+var GAME_VERSION='v25.5.7';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -1788,13 +1790,13 @@ function bgSilhouette(kind,night){
       "<path d='M110 80 L78 124 L98 112 L112 130 L128 110 L146 122Z M330 60 L292 112 L316 98 L332 120 L350 96 L372 110Z M600 40 L560 96 L586 80 L602 104 L622 78 L646 94Z M860 90 L828 132 L848 120 L862 138 L878 118 L896 130Z M1100 110 L1072 146 L1090 136 L1102 152 L1116 134 L1130 144Z' fill='"+snow+"'/>"+
       "<path d='M0 300 L0 230 L160 150 L300 240 L450 140 L610 245 L760 150 L920 240 L1060 160 L1200 235 L1200 300Z' fill='"+near+"'/></svg>";
   }else{
-    var b1=night?'#0d1730':'#9fbfe0',b2=night?'#131f3f':'#86abd2',win=night?'#ffd766':'rgba(255,255,255,0.55)',rects='',wins='',x=0,i=0,H=[150,210,120,250,170,90,230,140,200,110,260,160,130,220,100,190,240,150];
+    var b1=night?'#0a1228':'#9fbfe0',b2=night?'#0e1833':'#86abd2',win=night?'rgba(255,205,110,0.42)':'rgba(255,255,255,0.55)',rects='',wins='',x=0,i=0,H=[150,210,120,250,170,90,230,140,200,110,260,160,130,220,100,190,240,150];
     while(x<1200){var bw=46+((i*37)%5)*10,bh=H[i%H.length],col=i%2?b1:b2;rects+="<rect x='"+x+"' y='"+(300-bh)+"' width='"+bw+"' height='"+bh+"' fill='"+col+"'/>";
-      for(var wy=300-bh+14;wy<286;wy+=22)for(var wx=x+8;wx<x+bw-10;wx+=14){if(((wx*7+wy*13+i)%5)<(night?2:3))wins+="<rect x='"+wx+"' y='"+wy+"' width='6' height='9' fill='"+win+"'/>";}
+      for(var wy=300-bh+14;wy<286;wy+=22)for(var wx=x+8;wx<x+bw-10;wx+=14){if(((wx*7+wy*13+i)%(night?7:5))<(night?2:3))wins+="<rect x='"+wx+"' y='"+wy+"' width='6' height='9' fill='"+win+"'/>";}
       x+=bw+4;i++;}
     svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 300' preserveAspectRatio='none'>"+rects+wins+"</svg>";
   }
-  return React.createElement('div',{key:'sil-'+kind,style:{position:'absolute',left:0,right:0,bottom:0,height:kind==='mountains'?'40vh':'34vh',minHeight:kind==='mountains'?190:170,opacity:kind==='mountains'?1:(night?0.95:0.8),backgroundImage:'url("data:image/svg+xml;utf8,'+svg.replace(/#/g,'%23').replace(/"/g,'%22')+'")',backgroundSize:'100% 100%',backgroundRepeat:'no-repeat'}});
+  return React.createElement('div',{key:'sil-'+kind,style:{position:'absolute',left:0,right:0,bottom:0,height:kind==='mountains'?'40vh':(night?'28vh':'34vh'),minHeight:kind==='mountains'?190:(night?140:170),opacity:kind==='mountains'?1:(night?0.8:0.8),backgroundImage:'url("data:image/svg+xml;utf8,'+svg.replace(/#/g,'%23').replace(/"/g,'%22')+'")',backgroundSize:'100% 100%',backgroundRepeat:'no-repeat'}});
 }
 var BG_SEED=7;
 function bgRand(){BG_SEED=(BG_SEED*16807)%2147483647;return (BG_SEED-1)/2147483646;}
@@ -1816,6 +1818,8 @@ function ThemeBg(props){
   }else if(loc==='night'){
     if(!night){if(!props.noSun)kids.push(React.createElement('div',{key:'sun',className:'sun'}));clouds();}
     kids.push(bgSilhouette('city',night));
+    // keep the buttons and text along the bottom of the menus readable over the lit windows
+    if(night)kids.push(React.createElement('div',{key:'cityfade',style:{position:'absolute',left:0,right:0,bottom:0,height:'34vh',background:'linear-gradient(to bottom,rgba(6,10,28,0) 0%,rgba(6,10,28,0.45) 55%,rgba(6,10,28,0.7) 100%)'}}));
   }else{
     if(!night){if(!props.noSun)kids.push(React.createElement('div',{key:'sun',className:'sun'}));clouds();}
     kids.push(bgSilhouette('mountains',night));
@@ -6093,6 +6097,8 @@ function makePeerRoom(peer,role,code){
     var cardCols=isDay?[['#D94A3A','rgba(45,12,10,0.82)','rgba(217,74,58,0.45)'],['#E47B20','rgba(48,24,6,0.82)','rgba(228,123,32,0.45)'],['#A9435F','rgba(40,10,20,0.82)','rgba(169,67,95,0.45)']]
       :isJapanT?[['#D95F7A','rgba(50,14,26,0.82)','rgba(217,95,122,0.45)'],['#C84F78','rgba(46,12,28,0.82)','rgba(200,79,120,0.45)'],['#B44472','rgba(40,10,30,0.82)','rgba(180,68,114,0.45)']]:null;
     if(cardCols)menuCards.forEach(function(c,i){c.hdr=cardCols[i][0];c.bg=cardCols[i][1];c.glow=cardCols[i][2];});
+    menuCards.forEach(function(c,i){c.ring=cardCols?cardCols[i][0]:(c.key==='practice'?'#a78bfa':'#60a5fa');});
+    var anyCardHot=menuCards.some(function(c){return hovCard===c.key||isFocused(c.key);});
     var menuPills=[
       {key:'online',label:'Play Online',bg:'linear-gradient(135deg,#059669,#047857)',act:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');}},
       {key:'guide',label:'How to Play',bg:'linear-gradient(135deg,#475569,#1e293b)',act:function(){setScreen('guide');}},
@@ -6133,8 +6139,9 @@ function makePeerRoom(peer,role,code){
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
-            return React.createElement('button',{key:card.key,'data-tour':card.key,'aria-label':card.label+'. '+card.sub,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid rgba(255,255,255,0.12)',boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 16px 45px rgba(0,0,0,0.55),0 0 30px '+card.glow:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',transform:hov?'translateY(-7px)':'translateY(0)',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',cursor:'pointer'},focusSty(card.key),{transform:hov?'translateY(-7px)':'none'})},
-              React.createElement('div',{style:{width:'100%',height:208,background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode,hot:hov,h:208,label:card.label,sub:card.sub})));
+            return React.createElement('button',{key:card.key,'data-tour':card.key,'aria-label':card.label+'. '+card.sub,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:{'--ring':card.ring,'--glow':card.glow,position:'relative',display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',outline:'none',border:'2px solid '+(hov?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.12)'),boxShadow:hov?undefined:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',animation:hov?'cardRing 1.6s ease-in-out infinite':'none',transform:hov?'translateY(-8px) scale(1.045)':'none',filter:anyCardHot&&!hov?'brightness(0.78) saturate(0.85)':'none',zIndex:hov?2:1,transition:'transform 0.22s cubic-bezier(0.34,1.56,0.64,1),filter 0.2s,border-color 0.2s',cursor:'pointer'}},
+              React.createElement('div',{style:{width:'100%',height:208,background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode,hot:hov,h:208,label:card.label,sub:card.sub})),
+              hov&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',top:0,bottom:0,left:0,width:'45%',pointerEvents:'none',background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.22),rgba(255,255,255,0))',animation:'cardShine 0.7s ease-out 1 both'}}));
           })
         ),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:8,flexWrap:'wrap',justifyContent:'center',alignItems:'center'}},
