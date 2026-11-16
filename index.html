@@ -20,6 +20,9 @@ html.lock-scroll,html.lock-scroll body{overflow:hidden!important;overscroll-beha
 @keyframes introShake{0%,100%{transform:none}15%{transform:translate(-9px,6px)}30%{transform:translate(8px,-7px)}45%{transform:translate(-6px,-4px)}60%{transform:translate(5px,5px)}80%{transform:translate(-2px,2px)}}
 @keyframes introGlow{0%,100%{text-shadow:0 0 30px rgba(56,189,248,.8),0 5px 0 rgba(0,40,100,.45)}50%{text-shadow:0 0 60px rgba(125,211,252,1),0 0 110px rgba(56,189,248,.6),0 5px 0 rgba(0,40,100,.45)}}
 @keyframes introOut{to{opacity:0;transform:scale(1.04)}}
+/* Performance mode: buttons and cards don't animate (no hover glow, shine, lift or transitions) */
+.perf-low button,.perf-low button *,.perf-low button::before,.perf-low button::after{animation:none!important;transition:none!important}
+.perf-low button[data-tour]{transform:none!important}
 @keyframes cardShine{0%{transform:translateX(-120%) skewX(-18deg)}100%{transform:translateX(260%) skewX(-18deg)}}
 @keyframes cardRing{0%,100%{box-shadow:0 0 0 3px var(--ring),0 0 26px 2px var(--glow),0 18px 40px rgba(0,0,0,0.55)}50%{box-shadow:0 0 0 3px var(--ring),0 0 40px 8px var(--glow),0 18px 40px rgba(0,0,0,0.55)}}
 .intro-logo{display:inline-block;font-family:var(--font-title);font-weight:700;text-transform:uppercase;line-height:1;white-space:nowrap;font-size:clamp(50px,11.5vw,150px);letter-spacing:.04em;color:transparent;
@@ -108,7 +111,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.5.8';
+var GAME_VERSION='v25.6.0';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -221,10 +224,10 @@ function keyLabel(k){
   var names={' ':'Space',arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓',shift:'Shift',control:'Ctrl',alt:'Alt',meta:'Cmd',backspace:'Bksp',capslock:'Caps'};
   return names[k]||(k.length===1?k.toUpperCase():k.charAt(0).toUpperCase()+k.slice(1));
 }
-// Rare-event chances can only be 0%–1%. Anything higher (older saves, edited saves, cloud saves) is reset to the default,
-// so nobody can make the sound-barrier goal fire on every hard hit to farm Slime Bucks.
+// Rare-event chances can be anything from 0% to 100%, but Slime Bucks are only paid out while both are at 1% or lower,
+// so nobody can make the sound-barrier goal fire on every hard hit to farm coins.
 var RARE_MAX=0.01;
-function cleanRareChance(v,def){return typeof v==='number'&&isFinite(v)&&v>=0&&v<=RARE_MAX?v:def;}
+function cleanRareChance(v,def){return typeof v==='number'&&isFinite(v)?Math.max(0,Math.min(1,v)):def;}
 function cleanGameSettings(value){
   value=value&&typeof value==='object'?value:{};
   return{
@@ -274,6 +277,7 @@ function updatePerf(mode){
   initBatteryWatch();
   PERF_LOW=mode==='on'?true:mode==='off'?false:(PERF_BATT||deviceIsWeak());
   FPS_MENU30=PERF_LOW;
+  try{document.documentElement.classList.toggle('perf-low',PERF_LOW);}catch(e){}
 }
 var GAME_AUDIO=null,GAME_AUDIO_WARNED=false,GAMEPAD_WARNED=false;
 function playGameSound(kind){
@@ -362,7 +366,10 @@ function simPhysics(s,inL,inR,cfg,hk){
     if(!cfg.pract&&!over){var inOwn=(isL&&sl.x<GOALW)||(!isL&&sl.x>GW-GOALW);if(inOwn){sl.goalLineTime+=1/60;if(sl.goalLineTime>=1&&hk.goal)hk.goal(isL?'left':'right',true);}else sl.goalLineTime=0;}
     if(sl.isSpinning&&sl.spinPhase!==1&&hk.spin)hk.spin(sl,isL);
   }
-  if(!cfg.pract){var sdx=rs.x-ls.x,sdy=rs.y-ls.y,sdd=Math.sqrt(sdx*sdx+sdy*sdy);if(sdd<SR*2&&sdd>0){var mY=(ls.y+rs.y)/2;if(mY<=ls.y||Math.abs(sdy)<SR){var ov=(SR*2-sdd)/2,snx=sdx/sdd,sny=sdy/sdd;ls.x-=snx*ov;rs.x+=snx*ov;if(ls.x<SR)ls.x=SR;if(rs.x>GW-SR)rs.x=GW-SR;var dot=(ls.vx-rs.vx)*snx+(ls.vy-rs.vy)*sny;if(dot>0){var imp=dot*0.9;ls.vx-=imp*snx;rs.vx+=imp*snx;if(ls.y<GH-GRND-2&&rs.y<GH-GRND-2){ls.vy-=imp*sny*0.5;rs.vy+=imp*sny*0.5;}}}}}
+  // A slime that is shoved into its own goal box can always escape: while it is in the air in there it passes through the
+  // other slime (jump, steer over them, land outside). The own-goal clock keeps running, there is just a way out now.
+  var escL=ls.y<GH-GRND-6&&ls.x<GOALW+SR&&rs.x>ls.x,escR=rs.y<GH-GRND-6&&rs.x>GW-GOALW-SR&&ls.x<rs.x;
+  if(!cfg.pract){var sdx=rs.x-ls.x,sdy=rs.y-ls.y,sdd=Math.sqrt(sdx*sdx+sdy*sdy);if(sdd<SR*2&&sdd>0&&!escL&&!escR){var mY=(ls.y+rs.y)/2;if(mY<=ls.y||Math.abs(sdy)<SR){var ov=(SR*2-sdd)/2,snx=sdx/sdd,sny=sdy/sdd;ls.x-=snx*ov;rs.x+=snx*ov;if(ls.x<SR)ls.x=SR;if(rs.x>GW-SR)rs.x=GW-SR;var dot=(ls.vx-rs.vx)*snx+(ls.vy-rs.vy)*sny;if(dot>0){var imp=dot*0.9;ls.vx-=imp*snx;rs.vx+=imp*snx;if(ls.y<GH-GRND-2&&rs.y<GH-GRND-2){ls.vy-=imp*sny*0.5;rs.vy+=imp*sny*0.5;}}}}}
   var SNC=s._sonic;
   if(SNC){var ndx=SNC.tx-ball.x,ndy=SNC.ty-ball.y,ndd=Math.hypot(ndx,ndy)||1,nst=Math.min(ndd,42);ball.vx=ndx/ndd*42;ball.vy=ndy/ndd*42;ball.x+=ndx/ndd*nst;ball.y+=ndy/ndd*nst;ball.spin=0.6;
     if(hk.sonic)hk.sonic(ball,ndx,ndy,ndd);
@@ -1728,7 +1735,7 @@ function SlimePreviewCanvas(props){
       if(gone){star(tx,ty,14+th2*14,th2);ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,236,170,'+(0.8*th2)+')';ctx.lineWidth=2;ctx.beginPath();ctx.arc(tx,ty,14+(1-th2)*22,0,Math.PI*2);ctx.stroke();ctx.restore();}
     }
     function title(){
-      if(!props.label)return;
+      if(!props.label||props.noTitle)return;
       var sc=ctx.createLinearGradient(0,0,0,HEAD+26);sc.addColorStop(0,'rgba(3,8,28,0.62)');sc.addColorStop(0.6,'rgba(3,8,28,0.3)');sc.addColorStop(1,'rgba(3,8,28,0)');ctx.fillStyle=sc;ctx.fillRect(0,0,w,HEAD+26);
       ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
       var fs=23;ctx.font='400 '+fs+'px "Lilita One",sans-serif';while(fs>15&&ctx.measureText(props.label).width>w-20){fs--;ctx.font='400 '+fs+'px "Lilita One",sans-serif';}
@@ -3869,29 +3876,42 @@ function MenuTour(props){
 function RareChanceInput(props){
   var s_t=useState(String(props.pct)),text=s_t[0],setText=s_t[1];
   useEffect(function(){if(parseFloat(text)!==props.pct)setText(String(props.pct));},[props.pct]);
-  return React.createElement('input',{type:'number','data-nav-row':props.row,min:0,max:1,step:'any',value:text,'aria-label':props.label+' chance in percent (0 to 1)',
+  return React.createElement('input',{type:'number','data-nav-row':props.row,min:0,max:100,step:'any',value:text,'aria-label':props.label+' chance in percent',
     onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')e.target.blur();},
-    onChange:function(e){var t=e.target.value;setText(t);var v=parseFloat(t);if(isFinite(v)){var cv=Math.max(0,Math.min(1,v));props.onSave(cv);if(cv!==v)setText(String(cv));}},
-    onBlur:function(){var v=parseFloat(text);if(!isFinite(v)||v<0||v>1)setText(String(props.pct));},
+    onChange:function(e){var t=e.target.value;setText(t);var v=parseFloat(t);if(isFinite(v))props.onSave(Math.max(0,Math.min(100,v)));},
+    onBlur:function(){var v=parseFloat(text);if(!isFinite(v)||v<0||v>100)setText(String(props.pct));},
     style:props.style});
 }
 // Settings: a little picture of this screen with the main menu drawn at the chosen interface size,
 // so the size can be judged before closing the settings.
+var MENU_NAT=0; // natural (zoom 1) height of the real main menu, measured by the menu so the preview can mirror its fit-to-window shrink
 function UiScalePreview(props){
+  // Mirrors the real main menu: same zoom (interface scale x window factor x the shrink that makes the menu fit the window height),
+  // same widths, same rows, so what you see here is what you get on the menu.
   var w=window.innerWidth,h=window.innerHeight,touch=false;try{touch=window.matchMedia('(pointer:coarse)').matches;}catch(e){}
   var z=(touch?Math.max(0.9,Math.min(1.2,w/400,h/420)):Math.max(0.7,Math.min(2.2,w/900,h/720)))*props.scale;z=Math.round(z*100)/100;
-  var boxW=280,k=boxW/w,boxH=Math.round(h*k),zz=z*k;
-  function pill(t,bg){return React.createElement('span',{style:{padding:'9px 18px',borderRadius:50,background:bg,color:'#fff',fontWeight:900,fontSize:13,letterSpacing:'0.04em',fontFamily:'var(--font-display)'}},t);}
-  function card(t,bg){return React.createElement('div',{style:{width:200,height:196,borderRadius:16,overflow:'hidden',border:'3px solid rgba(255,255,255,0.18)',background:'linear-gradient(#1e1b4b 55%,#16a34a 55%)'}},React.createElement('div',{style:{background:bg,color:'#fff',textAlign:'center',padding:'10px 0',fontFamily:'var(--font-display)',fontSize:19}},t));}
+  var nat=MENU_NAT||760,fit=touch?1:Math.max(0.5,Math.min(1,(h-60)/(nat*z))),Z=z*fit;
+  var boxW=300,k=boxW/w,boxH=Math.round(h*k);
+  function pill(t,bg){return React.createElement('span',{style:{padding:'10px 18px',borderRadius:50,background:bg,color:'#fff',fontWeight:900,fontSize:13,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'var(--font-display)',whiteSpace:'nowrap'}},t);}
+  function round(bg){return React.createElement('span',{style:{width:44,height:44,flex:'0 0 44px',borderRadius:'50%',background:bg,border:'1px solid rgba(255,255,255,0.18)'}});}
+  function card(t,sub,bg){return React.createElement('div',{style:{width:215,maxWidth:'86vw',height:210,borderRadius:20,overflow:'hidden',border:'2px solid rgba(255,255,255,0.12)',background:'rgba(5,12,45,0.82)',display:'flex',flexDirection:'column'}},
+    React.createElement('div',{style:{background:bg,color:'#fff',textAlign:'center',height:68,boxSizing:'border-box',padding:'9px 12px',fontFamily:'var(--font-display)',fontSize:20,lineHeight:1.15}},t,React.createElement('div',{style:{fontSize:10,fontWeight:800,opacity:0.84,marginTop:4,textTransform:'uppercase'}},sub)),
+    React.createElement('div',{style:{flex:1,background:'linear-gradient(#1e1b4b 62%,#16a34a 62%)'}}));}
+  var rowW=Math.min(681,w/Z);
   return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4}},
     React.createElement('div',{'aria-label':'Preview of the menu at '+Math.round(props.scale*100)+'% interface size',role:'img',style:{position:'relative',width:boxW,height:boxH,borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,0.3)',background:'radial-gradient(ellipse at 50% 120%,#3b1d6e,#0a0f2c 70%)'}},
-      React.createElement('div',{style:{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%) scale('+zz+')',transformOrigin:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:22,width:900,pointerEvents:'none'}},
-        React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:72,color:'#fff',lineHeight:1,textShadow:'0 0 24px rgba(125,211,252,0.6)'}},'SOCCER SLIME'),
-        React.createElement('div',{style:{width:650,height:44,borderRadius:12,background:'rgba(20,83,45,0.75)',border:'1px solid rgba(74,222,128,0.5)'}}),
-        React.createElement('div',{style:{display:'flex',gap:18}},card('Player vs. AI','#1d4ed8'),card('Multiplayer','#1d4ed8')),
-        card('Practice','#7c3aed'),
-        React.createElement('div',{style:{display:'flex',gap:10}},pill('PLAY ONLINE','#047857'),pill('HOW TO PLAY','#374151'),pill('STATS','#d97706'),pill('SOCIAL','#db2777')))),
-    React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.6)'}},'Preview of the menu on this screen'));
+      React.createElement('div',{style:{position:'absolute',left:0,top:0,width:w/Z,height:h/Z,transform:'scale('+(k*Z)+')',transformOrigin:'0 0',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:22,padding:'20px 0',boxSizing:'border-box',pointerEvents:'none',overflow:'hidden'}},
+        React.createElement('div',{style:{width:150,height:70,flex:'0 0 auto'}}),
+        React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
+          React.createElement('div',{style:{fontFamily:'var(--font-title)',fontSize:Math.min(80,Math.max(44,w*0.11)),fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#fff',lineHeight:1,textShadow:'0 0 24px rgba(125,211,252,0.6)'}},'Soccer Slime'),
+          React.createElement('div',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',marginTop:10,fontWeight:800}},GAME_VERSION.toUpperCase())),
+        React.createElement('div',{style:{width:rowW,height:44,borderRadius:14,background:'rgba(20,83,45,0.75)',border:'1px solid rgba(74,222,128,0.5)',boxSizing:'border-box',marginTop:-8,marginBottom:-6}}),
+        React.createElement('div',{style:{display:'flex',width:rowW,boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},card('Player vs. AI','Take on the computer','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Multiplayer','Play on the same device','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Practice','Free play and drills','linear-gradient(135deg,#6d28d9,#7c3aed)')),
+        React.createElement('div',{style:{display:'flex',width:rowW,boxSizing:'border-box',gap:8,flexWrap:'wrap',justifyContent:'center',alignItems:'center'}},round('rgba(5,12,35,0.78)'),round('rgba(5,12,35,0.78)'),pill('Play Online','linear-gradient(135deg,#059669,#047857)'),pill('How to Play','linear-gradient(135deg,#475569,#1e293b)'),pill('Stats','linear-gradient(135deg,#d97706,#92400e)'),pill('Social','linear-gradient(135deg,#db2777,#9d174d)'),pill('Shop','linear-gradient(135deg,#ca8a04,#854d0e)')),
+        React.createElement('div',{style:{display:'flex',gap:8}},pill('Theme','#312e81'),pill('Night','#312e81')),
+        React.createElement('div',{style:{padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',fontSize:13,color:'#fff',whiteSpace:'nowrap'}},'W A S D or arrow keys to move, Enter or Space to choose'),
+        React.createElement('div',{style:{fontSize:10,color:'rgba(255,255,255,0.4)',fontWeight:800,textAlign:'center',lineHeight:1.4}},'Created by Matthew Li and like 4 different AIs',React.createElement('br'),'W Aiden for the Claude'))),
+    React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.6)',textAlign:'center'}},'Preview of the main menu at this size on this screen'));
 }
 function SettingsScreen(props){
   var panelRef=useRef(null),settings=props.settings;
@@ -4020,7 +4040,7 @@ function SettingsScreen(props){
     // Rare events: type any chance from 0% to 100% (applies to really hard hits)
     React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
       React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Rare events'),
-      React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)'}},'Chance per really hard hit. Type anything from 0 to 1%.'),
+      React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)'}},'Chance per really hard hit. Type anything from 0 to 100%. Slime Bucks are only earned while both are 1% or lower.'),
       [['rareFire','🔥 Spontaneous combustion',5.6,0.0001],['rareBoom','💥 Sound barrier goal',5.7,0.00001]].map(function(r){
         var pct=+(settings[r[0]]*100).toPrecision(6);
         return React.createElement('label',{key:r[0],style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,fontSize:13,fontWeight:800}},r[1],
@@ -4759,7 +4779,7 @@ function makePeerRoom(peer,role,code){
 
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
-  RARE_P.fire=Math.min(RARE_MAX,gameSettings.rareFire);RARE_P.boom=Math.min(RARE_MAX,gameSettings.rareBoom);
+  RARE_P.fire=gameSettings.rareFire;RARE_P.boom=gameSettings.rareBoom;
   GAME_AUDIO_VOLUME=gameSettings.sfxVolume;applyKeybinds(gameSettings.keybinds);
   updatePerf(gameSettings.perfMode);FPS_MATCH30=!!gameSettings.battery30;IN_MATCH=screen==='game';
   var s_settingsErr=useState(''),settingsSaveError=s_settingsErr[0],setSettingsSaveError=s_settingsErr[1];
@@ -4994,7 +5014,7 @@ function makePeerRoom(peer,role,code){
   var menuWrapRef=useRef(null),s_mfit=useState(1),menuFit=s_mfit[0],setMenuFit=s_mfit[1];
   React.useLayoutEffect(function(){
     var el=menuWrapRef.current;if(!el||touchUI||screen!=='menu')return;
-    var applied=uiZ*menuFit,natural=el.getBoundingClientRect().height/applied,avail=window.innerHeight-60; // screen has 20px padding top and bottom, plus a little breathing room
+    var applied=uiZ*menuFit,natural=el.getBoundingClientRect().height/applied,avail=window.innerHeight-60;MENU_NAT=natural; // screen has 20px padding top and bottom, plus a little breathing room
     var want=Math.max(0.5,Math.min(1,avail/(natural*uiZ)));
     if(Math.abs(want-menuFit)>0.01)setMenuFit(want);
   });
@@ -5958,18 +5978,14 @@ function makePeerRoom(peer,role,code){
               if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=isImp?1:s2.cd+(medium?3:0);}var dd2=ai.targetX-ai.x;if(medium){spd2*=0.86;if(Math.random()<0.3)doJump=false;if(ai.groundDash&&ai.dashFrames===DASH_F&&Math.random()<0.45){ai.dashFrames=0;ai.groundDash=false;ai.dashCooldown=Math.max(ai.dashCooldown,30);}}if(superEasy){spd2*=0.5;if(Math.random()<0.75)doJump=false;if(behind&&ai.groundDash&&ai.dashFrames===DASH_F){if(Math.random()<0.5){ai.dashFrames=0;ai.groundDash=false;}ai.dashCooldown=Math.max(ai.dashCooldown,40);}}ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*(isImp?1.18:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;if(s2.dj&&doJump&&ai.vy!==0&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
           // Players were shoving the AI into its own goal box and holding it there until the 1-second camping
-          // rule gave them a goal. While the player pins it in there, the AI's camping clock runs slower and it
-          // tries to jump out over them. Easier AIs get more protection: the clock stops completely on Super Easy
-          // and Easy, and runs at 10% / 20% / 30% speed on Medium / Hard / Chaos.
+          // rule gave them a goal. The clock still runs (no free passes), but a pinned AI now jumps out over the
+          // player (slimes pass through each other in the air inside their own goal box). Easier AIs react sooner.
           if(mode==='single'&&!gameOver){
-            var pinAi=hSide==='right'?ls:rs,pinHum=hSide==='right'?rs:ls,pinLeft=hSide==='right',PIN={supereasy:[1,0.15],easy:[1,0.2],medium:[0.9,0.25],hard:[0.8,0.3],impossible:[0.7,0.35]}[diffRef.current]||[0.8,0.3];
+            var pinAi=hSide==='right'?ls:rs,pinHum=hSide==='right'?rs:ls,pinLeft=hSide==='right',PIN={supereasy:0.12,easy:0.15,medium:0.2,hard:0.25,impossible:0.3}[diffRef.current]||0.25;
             var pdx=pinHum.x-pinAi.x,pdy=pinHum.y-pinAi.y,inBox=pinLeft?pinAi.x<GOALW+6:pinAi.x>GW-GOALW-6,pinned=inBox&&(pinLeft?pdx>0:pdx<0)&&Math.abs(pdx)<SR*2+8&&Math.abs(pdy)<SR*4;
-            if(pinned){
-              if(pinAi.goalLineTime>0)pinAi.goalLineTime=Math.max(0,pinAi.goalLineTime-PIN[0]/60);
-              if(pinAi.goalLineTime>PIN[1]&&!pinAi.isSpinning){var outDir=pinLeft?1:-1;
-                if(pinAi.y>=GH-GRND-1){pinAi.vy=JUMP;pinAi.hasDoubleJumped=false;pinAi.vx=outDir*SPD;pinAi.targetX=pinAi.x+outDir*160;pinAi.decisionCooldown=20;}
-                else if(!pinAi.hasDoubleJumped&&pinAi.vy>-2){pinAi.vy=JUMP*0.85;pinAi.hasDoubleJumped=true;pinAi.vx=outDir*SPD;}}
-            }
+            if(pinned&&pinAi.goalLineTime>PIN&&!pinAi.isSpinning){var outDir=pinLeft?1:-1;
+              if(pinAi.y>=GH-GRND-1){pinAi.vy=JUMP;pinAi.hasDoubleJumped=false;pinAi.vx=outDir*SPD;pinAi.targetX=pinAi.x+outDir*160;pinAi.decisionCooldown=20;}
+              else{pinAi.vx=outDir*SPD;if(!pinAi.hasDoubleJumped&&pinAi.vy>-2){pinAi.vy=JUMP*0.85;pinAi.hasDoubleJumped=true;}}}
           }
           simPhysics(simS,inL,inR,simCfg,simHk);
           setLCD(Math.ceil(ls.dashCooldown/60));setRCD(Math.ceil(rs.dashCooldown/60));
@@ -6146,7 +6162,11 @@ function makePeerRoom(peer,role,code){
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
             return React.createElement('button',{key:card.key,'data-tour':card.key,'aria-label':card.label+'. '+card.sub,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:{'--ring':card.ring,'--glow':card.glow,position:'relative',display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',outline:'none',border:'2px solid '+(hov?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.12)'),boxShadow:hov?undefined:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',animation:hov?'cardRing 1.6s ease-in-out infinite':'none',transform:hov?'translateY(-8px) scale(1.045)':'none',filter:anyCardHot&&!hov?'brightness(0.78) saturate(0.85)':'none',zIndex:hov?2:1,transition:'transform 0.22s cubic-bezier(0.34,1.56,0.64,1),filter 0.2s,border-color 0.2s',cursor:'pointer'}},
-              React.createElement('div',{style:{width:'100%',height:208,background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode,hot:hov,h:208,label:card.label,sub:card.sub})),
+              React.createElement('div',{style:{width:'100%',height:208,background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode,hot:hov,h:208,label:card.label,sub:card.sub,noTitle:true})),
+              // The card title is real text on top of the canvas (not painted into it), so it stays sharp when the card scales up on hover.
+              React.createElement('div',{'aria-hidden':'true',style:{position:'absolute',top:0,left:0,right:0,height:58,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,pointerEvents:'none',padding:'0 8px',boxSizing:'border-box'}},
+                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontWeight:400,fontSize:23,lineHeight:1,whiteSpace:'nowrap',color:'#fff',WebkitTextStroke:'5px rgba(4,10,34,0.92)',paintOrder:'stroke fill',textShadow:'0 2px 3px rgba(0,0,0,0.45)',letterSpacing:'0.01em'}},card.label),
+                React.createElement('div',{style:{fontSize:9.5,fontWeight:800,letterSpacing:'0.06em',textTransform:'uppercase',whiteSpace:'nowrap',color:'#fde68a',WebkitTextStroke:'3px rgba(4,10,34,0.9)',paintOrder:'stroke fill'}},card.sub)),
               hov&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',top:0,bottom:0,left:0,width:'45%',pointerEvents:'none',background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.22),rgba(255,255,255,0))',animation:'cardShine 0.7s ease-out 1 both'}}));
           })
         ),
