@@ -111,7 +111,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.6.1';
+var GAME_VERSION='v25.6.2';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -1747,7 +1747,7 @@ function SlimePreviewCanvas(props){
     function draw(){ctx.setTransform(k,0,0,k,0,0);ctx.clearRect(0,0,w,h);var hot=hotRef.current;(type==='single'?sceneSingle:type==='multi'?sceneMulti:scenePractice)(T,hot);title();}
     var reduce=false;try{reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
     if(reduce){T=type==='multi'?0.7:0.3;draw();return;}
-    function loop(now){if(!alive)return;if(!last)last=now;var dt=Math.min(0.1,(now-last)/1000);last=now;T+=dt*(hotRef.current?1.7:1);draw();raf=requestAnimationFrame(loop);}
+    function loop(now){if(!alive)return;if(PERF_LOW){last=0;raf=0;setTimeout(function(){if(alive)raf=requestAnimationFrame(loop);},500);return;}if(!last)last=now;var dt=Math.min(0.1,(now-last)/1000);last=now;T+=dt*(hotRef.current?1.7:1);draw();raf=requestAnimationFrame(loop);}
     T=type==='multi'?0.5:type==='practice'?1.1:0;draw();raf=requestAnimationFrame(loop);
     return function(){alive=false;cancelAnimationFrame(raf);};
   },[type,props.k,props.theme,props.label,props.sub,props.h]);
@@ -3889,7 +3889,7 @@ function UiScalePreview(props){
   // Mirrors the real main menu: same zoom (interface scale x window factor x the shrink that makes the menu fit the window height),
   // same widths, same rows, so what you see here is what you get on the menu.
   var w=window.innerWidth,h=window.innerHeight,touch=false;try{touch=window.matchMedia('(pointer:coarse)').matches;}catch(e){}
-  var z=(touch?Math.max(0.9,Math.min(1.2,w/400,h/420)):Math.max(0.7,Math.min(2.2,w/900,h/720)))*props.scale;z=Math.round(z*100)/100;
+  var z=(touch?Math.max(0.9,Math.min(1.2,w/400,h/420)):Math.max(0.7,Math.min(6,w/900,h/720)))*props.scale;z=Math.round(z*100)/100;
   var nat=MENU_NAT||760,fit=touch?1:Math.max(0.5,Math.min(1,(h-60)/(nat*z))),Z=z*fit;
   var boxW=300,k=boxW/w,boxH=Math.round(h*k);
   function pill(t,bg){return React.createElement('span',{style:{padding:'10px 18px',borderRadius:50,background:bg,color:'#fff',fontWeight:900,fontSize:13,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'var(--font-display)',whiteSpace:'nowrap'}},t);}
@@ -5041,6 +5041,14 @@ function makePeerRoom(peer,role,code){
     if(JSON.stringify(menuGridRef.current)!==prev)setNavTick(function(n){return n+1;});
   });
   var s_rtick=useState(0),setResizeTick=s_rtick[1];
+  // The browser's own zoom (Ctrl +/-, Ctrl + mouse wheel) is remembered per site, so a slip of the wheel makes every
+  // screen tiny or huge on each reload. Say so, with the fix. (outer/inner width = the browser zoom in Chrome/Edge.)
+  var s_bz=useState(1),browserZoom=s_bz[0],setBrowserZoom=s_bz[1],s_bzx=useState(false),bzHidden=s_bzx[0],setBzHidden=s_bzx[1];
+  useEffect(function(){function chk(){var z=window.outerWidth&&window.innerWidth?window.outerWidth/window.innerWidth:1;setBrowserZoom(Math.round(z*20)/20);}chk();window.addEventListener('resize',chk);return function(){window.removeEventListener('resize',chk);};},[]);
+  var zoomNotice=!touchUI&&!bzHidden&&(browserZoom<0.8||browserZoom>1.3)&&React.createElement('div',{role:'status',style:{position:'fixed',top:12,left:'50%',transform:'translateX(-50%)',zIndex:20000,display:'flex',alignItems:'center',gap:10,padding:'8px 10px 8px 16px',borderRadius:50,background:'rgba(5,12,35,0.95)',border:'1px solid rgba(251,191,36,0.6)',color:'#fff',fontSize:14,fontWeight:800,boxShadow:'0 8px 24px rgba(0,0,0,0.5)',zoom:Math.min(4,Math.max(0.5,1/browserZoom))}},
+    'Your browser is zoomed to '+Math.round(browserZoom*100)+'%. Press Ctrl+0 to reset it.',
+    React.createElement('button',{type:'button','aria-label':'Hide this message',onClick:function(){setBzHidden(true);},style:{width:28,height:28,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.3)',background:'transparent',color:'#fff',cursor:'pointer',fontWeight:900}},'\u2715'));
+  useEffect(function(){try{if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){menuFitRef.current={sig:'',n:0};setResizeTick(function(n){return n+1;});});}catch(e){}},[]);
   useEffect(function(){function onResize(){setLandscape(window.innerWidth>window.innerHeight);setResizeTick(function(n){return n+1;});}window.addEventListener('resize',onResize);return function(){window.removeEventListener('resize',onResize);};},[]);
   useEffect(function(){
     var mq;try{mq=window.matchMedia('(pointer:coarse)');}catch(e){return;}
@@ -5057,7 +5065,7 @@ function makePeerRoom(peer,role,code){
   // Touch: no keyboard-hint strip to make room for. Sideways = fill the height (thumb controls overlay the corners,
   // corner buttons sit in the side gutter); upright = fill the width.
   ?(window.innerWidth>window.innerHeight?Math.max(minFit,Math.min((window.innerWidth-2*(safeSide()+12+46*touchZoom()))/availableWidth,(window.innerHeight-8)/(GH+50))):Math.max(minFit,(window.innerWidth-12)/availableWidth))
-  :Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=(touchUI?Math.max(0.9,Math.min(1.2,window.innerWidth/400,window.innerHeight/420)):Math.max(0.7,Math.min(2.2,window.innerWidth/900,window.innerHeight/720)))*gameSettings.uiScale;z=Math.round(z*100)/100;setFit(f);setRs(Math.min(PERF_LOW?2:3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(PERF_LOW?2:4,Math.max(1,Math.ceil(z*d),Math.ceil(d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale,touchUI]);
+  :Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=(touchUI?Math.max(0.9,Math.min(1.2,window.innerWidth/400,window.innerHeight/420)):Math.max(0.7,Math.min(6,window.innerWidth/900,window.innerHeight/720)))*gameSettings.uiScale;z=Math.round(z*100)/100;setFit(f);setRs(Math.min(PERF_LOW?2:3,Math.max(1,Math.ceil(f*d*4)/4)));setUiZ(z);setUiK(Math.min(PERF_LOW?2:4,Math.max(1,Math.ceil(z*d),Math.ceil(d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale,touchUI]);
   useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad(); var perfTimer=setInterval(function(){updatePerf(gameSettings.perfMode);},5000);},[]);
 
   function toggleTheme(){if(themeOpen){setThemeOpen(false);setFocusIdx(10);}else{setThemeOpen(true);setFocusIdx(['day','night','japan'].indexOf(thLoc(themeMode)));}}
@@ -6095,7 +6103,7 @@ function makePeerRoom(peer,role,code){
   function lockedScreen(extra){return touchUI?Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:0,overflowY:'auto',overflowX:'hidden',justifyContent:'safe center',WebkitOverflowScrolling:'touch'}):Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'},extra);}
   var baseStyle={position:'relative',minHeight:'100%',width:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflowX:'hidden',color:'#ffffff',boxSizing:'border-box',background:bgGrad,fontFamily:'var(--font-body)',padding:'20px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px))'};
   var wrapStyle={zoom:uiZ,position:'relative',zIndex:1,display:'flex',flexDirection:'column',alignItems:'center',maxWidth:'100%'};
-  function bgLayer(){return React.createElement(ThemeBg,{theme:themeMode});}
+  function bgLayer(){return React.createElement(React.Fragment,null,React.createElement(ThemeBg,{theme:themeMode}),zoomNotice);}
 
   // Tutorial finished panel: same keyboard controls as the results screen.
   useEffect(function(){
