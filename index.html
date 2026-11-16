@@ -3895,7 +3895,7 @@ function UiScalePreview(props){
   function pill(t,bg){return React.createElement('span',{style:{padding:'10px 18px',borderRadius:50,background:bg,color:'#fff',fontWeight:900,fontSize:13,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'var(--font-display)',whiteSpace:'nowrap'}},t);}
   function round(bg){return React.createElement('span',{style:{width:44,height:44,flex:'0 0 44px',borderRadius:'50%',background:bg,border:'1px solid rgba(255,255,255,0.18)'}});}
   function card(t,sub,bg){return React.createElement('div',{style:{width:215,maxWidth:'86vw',height:210,borderRadius:20,overflow:'hidden',border:'2px solid rgba(255,255,255,0.12)',background:'rgba(5,12,45,0.82)',display:'flex',flexDirection:'column'}},
-    React.createElement('div',{style:{background:bg,color:'#fff',textAlign:'center',height:68,boxSizing:'border-box',padding:'9px 12px',fontFamily:'var(--font-display)',fontSize:20,lineHeight:1.15}},t,React.createElement('div',{style:{fontSize:10,fontWeight:800,opacity:0.84,marginTop:4,textTransform:'uppercase'}},sub)),
+    React.createElement('div',{style:{background:bg,color:'#fff',textAlign:'center',height:68,boxSizing:'border-box',padding:'9px 12px',fontFamily:'var(--font-display)',fontSize:30,lineHeight:'50px'}},t),
     React.createElement('div',{style:{flex:1,background:'linear-gradient(#1e1b4b 62%,#16a34a 62%)'}}));}
   var rowW=Math.min(681,w/Z),cardRowW=Math.min(720,w/Z);
   return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4}},
@@ -3909,7 +3909,8 @@ function UiScalePreview(props){
         React.createElement('div',{style:{display:'flex',width:cardRowW,boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},card('Player vs. AI','Take on the computer','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Multiplayer','Play on the same device','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Practice','Free play and drills','linear-gradient(135deg,#6d28d9,#7c3aed)')),
         React.createElement('div',{style:{display:'flex',width:rowW,boxSizing:'border-box',gap:8,flexWrap:'wrap',justifyContent:'center',alignItems:'center'}},round('rgba(5,12,35,0.78)'),round('rgba(5,12,35,0.78)'),pill('Play Online','linear-gradient(135deg,#059669,#047857)'),pill('How to Play','linear-gradient(135deg,#475569,#1e293b)'),pill('Stats','linear-gradient(135deg,#d97706,#92400e)'),pill('Social','linear-gradient(135deg,#db2777,#9d174d)'),pill('Shop','linear-gradient(135deg,#ca8a04,#854d0e)')),
         React.createElement('div',{style:{display:'flex',gap:8}},pill('Theme','#312e81'),pill('Night','#312e81')),
-        React.createElement('div',{style:{padding:'11px 26px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',fontSize:16,color:'#fff',whiteSpace:'nowrap'}},'W A S D or arrow keys to move, Enter or Space to choose'))),
+        React.createElement('div',{style:{padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',fontSize:13,color:'#fff',whiteSpace:'nowrap'}},'W A S D or arrow keys to move, Enter or Space to choose'),
+        React.createElement('div',{style:{fontSize:10,color:'rgba(255,255,255,0.4)',fontWeight:800,textAlign:'center',lineHeight:1.4}},'Created by Matthew Li and like 4 different AIs',React.createElement('br'),'W Aiden for the Claude'))),
     React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.6)',textAlign:'center'}},'Preview of the main menu at this size on this screen'));
 }
 function SettingsScreen(props){
@@ -6196,8 +6197,7 @@ function makePeerRoom(peer,role,code){
               React.createElement('div',{style:{width:'100%',height:208,background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode,hot:hov,h:208,label:card.label,sub:card.sub,noTitle:true})),
               // The card title is real text on top of the canvas (not painted into it), so it stays sharp when the card scales up on hover.
               React.createElement('div',{'aria-hidden':'true',style:{position:'absolute',top:0,left:0,right:0,height:58,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,pointerEvents:'none',padding:'0 8px',boxSizing:'border-box'}},
-                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontWeight:400,fontSize:23,lineHeight:1,whiteSpace:'nowrap',color:'#fff',WebkitTextStroke:'5px rgba(4,10,34,0.92)',paintOrder:'stroke fill',textShadow:'0 2px 3px rgba(0,0,0,0.45)',letterSpacing:'0.01em'}},card.label),
-                React.createElement('div',{style:{fontSize:9.5,fontWeight:800,letterSpacing:'0.06em',textTransform:'uppercase',whiteSpace:'nowrap',color:'#fde68a',WebkitTextStroke:'3px rgba(4,10,34,0.9)',paintOrder:'stroke fill'}},card.sub)),
+                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontWeight:400,fontSize:32,lineHeight:1,whiteSpace:'nowrap',color:'#fff',WebkitTextStroke:'6px rgba(4,10,34,0.92)',paintOrder:'stroke fill',textShadow:'0 2px 4px rgba(0,0,0,0.45)',letterSpacing:'0.01em'}},card.label)),
               hov&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',top:0,bottom:0,left:0,width:'45%',pointerEvents:'none',background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.22),rgba(255,255,255,0))',animation:'cardShine 0.7s ease-out 1 both'}}));
           })
         ),
@@ -6219,8 +6219,9 @@ function makePeerRoom(peer,role,code){
               })),
             React.createElement('button',{key:'time','data-tour':'time','aria-label':'Time of day: '+(thIsNight(themeMode)?'night':'day')+'. Switch to '+(thIsNight(themeMode)?'day':'night'),'aria-pressed':thIsNight(themeMode),onClick:function(){setThemeMode(thMake(thLoc(themeMode),!thIsNight(themeMode)));},onMouseEnter:function(){setHovCard('time');},onMouseLeave:function(){setHovCard(null);},style:hovPill('time',thIsNight(themeMode)?'linear-gradient(135deg,#312e81,#0f172a)':'linear-gradient(135deg,#f59e0b,#ea580c)')},thIsNight(themeMode)?'\uD83C\uDF19 Night':'\u2600\uFE0F Day'))
           ),
-        React.createElement('p',{style:{margin:0,fontSize:16,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'11px 26px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
-          React.createElement('span',{className:'kbd'},'W'),React.createElement('span',{className:'kbd'},'A'),React.createElement('span',{className:'kbd'},'S'),React.createElement('span',{className:'kbd'},'D'),' or arrow keys to move, ',React.createElement('span',{className:'kbd'},'Enter'),' or ',React.createElement('span',{className:'kbd'},'Space'),' to choose')
+        React.createElement('p',{style:{margin:0,fontSize:13,color:'#ffffff',textShadow:'none',textAlign:'center',padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',boxShadow:'0 4px 14px rgba(0,0,0,0.25)'}},
+          React.createElement('span',{className:'kbd'},'W'),React.createElement('span',{className:'kbd'},'A'),React.createElement('span',{className:'kbd'},'S'),React.createElement('span',{className:'kbd'},'D'),' or arrow keys to move, ',React.createElement('span',{className:'kbd'},'Enter'),' or ',React.createElement('span',{className:'kbd'},'Space'),' to choose'),
+        React.createElement('div',{style:{margin:'-6px 0 0',fontSize:10,letterSpacing:'0.12em',color:isDay?'rgba(11,58,110,0.55)':'rgba(255,255,255,0.4)',textAlign:'center',fontWeight:800}},React.createElement('div',null,'Created by Matthew Li and like 4 different AIs and everyone else who made suggestions'),React.createElement('div',{style:{marginTop:3}},"W Aiden for the Claude i wouldn't be going far without it"))
       )
     );
   }
