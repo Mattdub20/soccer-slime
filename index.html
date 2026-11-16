@@ -111,7 +111,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.6.2';
+var GAME_VERSION='v25.6.3';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -240,6 +240,7 @@ function cleanGameSettings(value){
     uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.6,Math.min(1.6,Math.round(value.uiScale*100)/100)):1,
     // chances (0–1) of the rare hard-hit gags; defaults are 0.0001% and 0.00001%
     defaultDiff:DIFF_ORDER.indexOf(value.defaultDiff)>=0?value.defaultDiff:'easy',
+    defaultTheme:['day','day_n','night','night_d','japan','japan_n'].indexOf(value.defaultTheme)>=0?value.defaultTheme:'night',
     rareFire:cleanRareChance(value.rareFire,0.000001),
     rareBoom:cleanRareChance(value.rareBoom,0.0000001)
   };
@@ -452,6 +453,8 @@ function skinFx(P,from,skin,isGoal){
   }
 }
 // Ball trail colour for a trail cosmetic ('none' = the classic gold, red in Sakura).
+// Ball trail dots fade out over about 1/BALL_TRAIL_DECAY frames (it used to be 0.2, i.e. 5 frames).
+var BALL_TRAIL_DECAY=0.07;
 function trailColor(style,isJapan,t){
   if(style==='rainbow')return hslToHex((t*0.25)%360,90,62);
   if(style==='fire')return ['#f97316','#facc15','#ef4444'][Math.floor(t/90)%3];
@@ -3895,7 +3898,7 @@ function UiScalePreview(props){
   function pill(t,bg){return React.createElement('span',{style:{padding:'10px 18px',borderRadius:50,background:bg,color:'#fff',fontWeight:900,fontSize:13,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'var(--font-display)',whiteSpace:'nowrap'}},t);}
   function round(bg){return React.createElement('span',{style:{width:44,height:44,flex:'0 0 44px',borderRadius:'50%',background:bg,border:'1px solid rgba(255,255,255,0.18)'}});}
   function card(t,sub,bg){return React.createElement('div',{style:{width:215,maxWidth:'86vw',height:210,borderRadius:20,overflow:'hidden',border:'2px solid rgba(255,255,255,0.12)',background:'rgba(5,12,45,0.82)',display:'flex',flexDirection:'column'}},
-    React.createElement('div',{style:{background:bg,color:'#fff',textAlign:'center',height:68,boxSizing:'border-box',padding:'9px 12px',fontFamily:'var(--font-display)',fontSize:30,lineHeight:'50px'}},t),
+    React.createElement('div',{style:{background:bg,color:'#fff',textAlign:'center',height:68,boxSizing:'border-box',padding:'9px 12px',fontFamily:'var(--font-display)',fontSize:20,lineHeight:1.15}},t,React.createElement('div',{style:{fontSize:10,fontWeight:800,opacity:0.84,marginTop:4,textTransform:'uppercase'}},sub)),
     React.createElement('div',{style:{flex:1,background:'linear-gradient(#1e1b4b 62%,#16a34a 62%)'}}));}
   var rowW=Math.min(681,w/Z),cardRowW=Math.min(720,w/Z);
   return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4}},
@@ -4035,6 +4038,11 @@ function SettingsScreen(props){
       React.createElement('div',{style:{display:'flex',gap:8}},
         DIFF_ORDER.map(function(d){return [d,DIFF_LABEL[d]];}).map(function(o){var active=settings.defaultDiff===o[0];
           return React.createElement('button',{key:o[0],type:'button','data-nav-row':4.5,'aria-pressed':active,onClick:function(){props.onChange({defaultDiff:o[0]});},style:{padding:'9px 16px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'}},o[1]);}))),
+    React.createElement('div',{key:'default-theme',style:{display:'flex',flexDirection:'column',gap:9}},
+      React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Default theme'),
+      React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap'}},
+        [['day','Mountains'],['night','City'],['japan','Sakura']].map(function(o){var on=thLoc(settings.defaultTheme)===o[0];return React.createElement('button',{key:o[0],type:'button','data-nav-row':4.7,'aria-pressed':on,onClick:function(){props.onChange({defaultTheme:thMake(o[0],thIsNight(settings.defaultTheme))});},style:{padding:'9px 16px',borderRadius:50,border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:on?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'}},o[1]);}),
+        [[false,'Day'],[true,'Night']].map(function(o){var on=thIsNight(settings.defaultTheme)===o[0];return React.createElement('button',{key:String(o[0]),type:'button','data-nav-row':4.8,'aria-pressed':on,onClick:function(){props.onChange({defaultTheme:thMake(thLoc(settings.defaultTheme),o[0])});},style:{padding:'9px 16px',borderRadius:50,border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:on?'linear-gradient(135deg,#6366f1,#3730a3)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'}},(o[0]?'🌙 ':'☀️ ')+o[1]);}))),
     slider('settings-ui-scale','Interface scale',settings.uiScale,0.6,1.6,0.01,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:Math.round(value*100)/100});},5),
     React.createElement('div',{key:'ui-scale-chips',style:{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}},
       [0.6,0.8,1,1.2,1.4,1.6].map(function(v){var on=Math.abs(settings.uiScale-v)<0.005;return React.createElement('button',{key:v,type:'button','data-nav-row':5.1,'aria-pressed':on,onClick:function(){props.onChange({uiScale:v});},style:{padding:'5px 12px',borderRadius:50,border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:on?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer'}},Math.round(v*100)+'%');})),
@@ -4568,7 +4576,7 @@ function makePeerRoom(peer,role,code){
       dash:live?function(sl,isL){var f0=fxP.length;emitDash(fxP,sl.x,sl.y,sl.dashDir,body(isL),false);skinFx(fxP,f0,skin(isL));}:null,
       land:live?function(sl,isL){var f0=fxP.length;emitLand(fxP,sl.x,GH-GRND,sl.vy);skinFx(fxP,f0,skin(isL));}:null,
       spin:live?function(sl,isL){var f0=fxP.length;emitSpin(fxP,sl.x,sl.y,body(isL));skinFx(fxP,f0,skin(isL));}:null,
-      trail:live?function(b,bspd){if(bspd>2.5){var lt=lastTouchRef.current,trailStyle=lt?getGameCosmetics('online')[lt].trail:'none';ballTrailRef.current.push({x:b.x,y:b.y,life:1.0,r:BR*(0.3+bspd/MAXBS*0.55)*(trailStyle==='none'?1:1.15),c:trailColor(trailStyle,thJ(themeModeRef.current),performance.now())});}var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=0.2;if(bt[bti].life<=0)bt.splice(bti,1);}}:null,
+      trail:live?function(b,bspd){if(bspd>2.5){var lt=lastTouchRef.current,trailStyle=lt?getGameCosmetics('online')[lt].trail:'none';ballTrailRef.current.push({x:b.x,y:b.y,life:1.0,r:BR*(0.3+bspd/MAXBS*0.55)*(trailStyle==='none'?1:1.15),c:trailColor(trailStyle,thJ(themeModeRef.current),performance.now())});}var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=BALL_TRAIL_DECAY;if(bt[bti].life<=0)bt.splice(bti,1);}}:null,
       wall:live?function(x,y,spd){emitWall(fxP,x,y,spd);}:null,
       bounce:live?function(x,y,vy){emitBounce(fxP,x,y,vy);}:null,
       kick:function(csl,isL,b){evs.push({t:'k',l:isL,x:b.x,v:Math.sqrt(b.vx*b.vx+b.vy*b.vy)});if(live){lastTouchRef.current=isL?'left':'right';var f0=fxP.length;emitKick(fxP,b.x,b.y,b.vx,b.vy,body(isL));skinFx(fxP,f0,skin(isL));if(soundEnabledRef.current&&performance.now()-lastSoundAtRef.current>100){playGameSound('kick');lastSoundAtRef.current=performance.now();}}},
@@ -4979,7 +4987,7 @@ function makePeerRoom(peer,role,code){
     return skins;
   }
   var s_hov=useState(null),hovCard=s_hov[0],setHovCard=s_hov[1];
-  var s_th=useState('night'),themeMode=s_th[0],setThemeMode=s_th[1];
+  var s_th=useState(function(){return loadGameSettings().defaultTheme;}),themeMode=s_th[0],setThemeMode=s_th[1];
   var s_tdd=useState(false),themeOpen=s_tdd[0],setThemeOpen=s_tdd[1];
   useEffect(function(){if(!themeOpen)return;function away(e){if(!(e.target.closest&&e.target.closest('[data-theme-dd]'))){setThemeOpen(false);setFocusIdx(10);}}document.addEventListener('mousedown',away);return function(){document.removeEventListener('mousedown',away);};},[themeOpen]);
   var s_foc=useState(0),focusIdx=s_foc[0],setFocusIdx=s_foc[1];
@@ -5073,6 +5081,7 @@ function makePeerRoom(peer,role,code){
     var next=cleanGameSettings(Object.assign({},gameSettings,patch));
     setGameSettings(next);GAME_AUDIO_VOLUME=next.sfxVolume;
     if(Object.prototype.hasOwnProperty.call(patch,'defaultDiff')){setDiff(next.defaultDiff);diffRef.current=next.defaultDiff;}
+    if(Object.prototype.hasOwnProperty.call(patch,'defaultTheme'))setThemeMode(next.defaultTheme);
     if(Object.prototype.hasOwnProperty.call(patch,'defaultSide')){setSide(next.defaultSide);sideRef.current=next.defaultSide;}
     if(Object.prototype.hasOwnProperty.call(patch,'soundEnabled')){setSoundEnabled(next.soundEnabled);soundEnabledRef.current=next.soundEnabled;}
     try{window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(next));setSettingsSaveError('');cloudQueueSave();}
@@ -5768,7 +5777,7 @@ function makePeerRoom(peer,role,code){
             goal:function(side){scoreGoalRef.current(side);},
             spin:function(sl,isL){fx0=fxP.length;emitSpin(fxP,sl.x,sl.y,isL?cols.left.body:cols.right.body);skinFx(fxP,fx0,fxSkins[isL?'left':'right']);},
             sonic:function(b,dx,dy,dd){for(var sti=0;sti<3;sti++)particlesRef.current.push(mkP(b.x-dx/dd*sti*14,b.y-dy/dd*sti*14,(Math.random()-0.5),(Math.random()-0.5),'rgba(224,242,254,0.85)',14,3));},
-            trail:function(b,bspd){if(bspd>2.5){var trailStyle=lastTouchRef.current?fxCos[lastTouchRef.current].trail:'none';ballTrailRef.current.push({x:b.x,y:b.y,life:1.0,r:BR*(0.3+bspd/MAXBS*0.55)*(trailStyle==='none'?1:1.15),c:trailColor(trailStyle,thJ(tm),now)});}var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=0.2;if(bt[bti].life<=0)bt.splice(bti,1);}},
+            trail:function(b,bspd){if(bspd>2.5){var trailStyle=lastTouchRef.current?fxCos[lastTouchRef.current].trail:'none';ballTrailRef.current.push({x:b.x,y:b.y,life:1.0,r:BR*(0.3+bspd/MAXBS*0.55)*(trailStyle==='none'?1:1.15),c:trailColor(trailStyle,thJ(tm),now)});}var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=BALL_TRAIL_DECAY;if(bt[bti].life<=0)bt.splice(bti,1);}},
             wall:function(x,y,spd){emitWall(particlesRef.current,x,y,spd);},
             bounce:function(x,y,vy){emitBounce(particlesRef.current,x,y,vy);},
             ground:function(){if(mode==='training'&&trainingChallengeRef.current!=='aim')completeTrainingAttempt(false);if(otRef.current&&!otReadyRef.current&&!goalFlashRef.current&&!frozenRef.current){otReadyRef.current=true;setOtLive(true);var curL=statsRef.current.lG,curR=statsRef.current.rG;if(curL!==curR){triggerWin(curL>curR?'left':'right');}else{resetPosRef.current(pmRef.current!=='online');if(pmRef.current==='multi'||pmRef.current==='online'||pmRef.current==='single')startReady(true);}}},
@@ -6049,7 +6058,7 @@ function makePeerRoom(peer,role,code){
           ctx.setTransform(RSn,0,0,RSn,0,0);ctx.save();var shk=shakeRef.current;if(shk>0.4){ctx.translate((Math.random()-0.5)*shk,(Math.random()-0.5)*shk);shakeRef.current=shk*0.84;}else shakeRef.current=0;
           drawScene(ctx,ls2,rs2,ball2,cols2,mode2,sideRef.current,practRef.current,fanRef.current,flashRef.current,[ls2.goalLineTime,rs2.goalLineTime],thN(tm2),thJ(tm2),getGameSlimeSkins(mode2),mode2==='training'&&trainingChallengeRef.current==='aim');
           var tr=ballTrailRef.current;
-          for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.4;ctx.fillStyle=tr[tri].c||'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
+          for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.45;ctx.fillStyle=tr[tri].c||'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
           drawParticles(ctx,particlesRef.current);
           var rd=readyRef.current;if(rd&&!goRef.current){if(!pausedRef.current)rd.fr++;if(rd.fr===30){shakeRef.current=Math.max(shakeRef.current,6);if(!pausedRef.current&&!goRef.current)frozenRef.current=false;}if(rd.fr>=62)readyRef.current=null;else drawReady(ctx,rd.fr,statsRef.current.lG,statsRef.current.rG,cols2);}
           // charred slimes + rare-event banner
@@ -6197,7 +6206,8 @@ function makePeerRoom(peer,role,code){
               React.createElement('div',{style:{width:'100%',height:208,background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode,hot:hov,h:208,label:card.label,sub:card.sub,noTitle:true})),
               // The card title is real text on top of the canvas (not painted into it), so it stays sharp when the card scales up on hover.
               React.createElement('div',{'aria-hidden':'true',style:{position:'absolute',top:0,left:0,right:0,height:58,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,pointerEvents:'none',padding:'0 8px',boxSizing:'border-box'}},
-                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontWeight:400,fontSize:32,lineHeight:1,whiteSpace:'nowrap',color:'#fff',WebkitTextStroke:'6px rgba(4,10,34,0.92)',paintOrder:'stroke fill',textShadow:'0 2px 4px rgba(0,0,0,0.45)',letterSpacing:'0.01em'}},card.label)),
+                React.createElement('div',{style:{fontFamily:'var(--font-display)',fontWeight:400,fontSize:23,lineHeight:1,whiteSpace:'nowrap',color:'#fff',WebkitTextStroke:'5px rgba(4,10,34,0.92)',paintOrder:'stroke fill',textShadow:'0 2px 3px rgba(0,0,0,0.45)',letterSpacing:'0.01em'}},card.label),
+                React.createElement('div',{style:{fontSize:9.5,fontWeight:800,letterSpacing:'0.06em',textTransform:'uppercase',whiteSpace:'nowrap',color:'#fde68a',WebkitTextStroke:'3px rgba(4,10,34,0.9)',paintOrder:'stroke fill'}},card.sub)),
               hov&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',top:0,bottom:0,left:0,width:'45%',pointerEvents:'none',background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.22),rgba(255,255,255,0))',animation:'cardShine 0.7s ease-out 1 both'}}));
           })
         ),
