@@ -111,7 +111,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.6.0';
+var GAME_VERSION='v25.6.1';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -237,7 +237,7 @@ function cleanGameSettings(value){
     perfMode:['auto','on','off'].indexOf(value.perfMode)>=0?value.perfMode:'auto',
     battery30:value.battery30===true,
     sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
-    uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,Math.round(value.uiScale*100)/100)):1,
+    uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.6,Math.min(1.6,Math.round(value.uiScale*100)/100)):1,
     // chances (0–1) of the rare hard-hit gags; defaults are 0.0001% and 0.00001%
     defaultDiff:DIFF_ORDER.indexOf(value.defaultDiff)>=0?value.defaultDiff:'easy',
     rareFire:cleanRareChance(value.rareFire,0.000001),
@@ -3897,7 +3897,7 @@ function UiScalePreview(props){
   function card(t,sub,bg){return React.createElement('div',{style:{width:215,maxWidth:'86vw',height:210,borderRadius:20,overflow:'hidden',border:'2px solid rgba(255,255,255,0.12)',background:'rgba(5,12,45,0.82)',display:'flex',flexDirection:'column'}},
     React.createElement('div',{style:{background:bg,color:'#fff',textAlign:'center',height:68,boxSizing:'border-box',padding:'9px 12px',fontFamily:'var(--font-display)',fontSize:20,lineHeight:1.15}},t,React.createElement('div',{style:{fontSize:10,fontWeight:800,opacity:0.84,marginTop:4,textTransform:'uppercase'}},sub)),
     React.createElement('div',{style:{flex:1,background:'linear-gradient(#1e1b4b 62%,#16a34a 62%)'}}));}
-  var rowW=Math.min(681,w/Z);
+  var rowW=Math.min(681,w/Z),cardRowW=Math.min(720,w/Z);
   return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:4}},
     React.createElement('div',{'aria-label':'Preview of the menu at '+Math.round(props.scale*100)+'% interface size',role:'img',style:{position:'relative',width:boxW,height:boxH,borderRadius:10,overflow:'hidden',border:'1px solid rgba(255,255,255,0.3)',background:'radial-gradient(ellipse at 50% 120%,#3b1d6e,#0a0f2c 70%)'}},
       React.createElement('div',{style:{position:'absolute',left:0,top:0,width:w/Z,height:h/Z,transform:'scale('+(k*Z)+')',transformOrigin:'0 0',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:22,padding:'20px 0',boxSizing:'border-box',pointerEvents:'none',overflow:'hidden'}},
@@ -3906,7 +3906,7 @@ function UiScalePreview(props){
           React.createElement('div',{style:{fontFamily:'var(--font-title)',fontSize:Math.min(80,Math.max(44,w*0.11)),fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#fff',lineHeight:1,textShadow:'0 0 24px rgba(125,211,252,0.6)'}},'Soccer Slime'),
           React.createElement('div',{style:{color:'rgba(255,255,255,0.85)',fontSize:13,letterSpacing:'0.2em',marginTop:10,fontWeight:800}},GAME_VERSION.toUpperCase())),
         React.createElement('div',{style:{width:rowW,height:44,borderRadius:14,background:'rgba(20,83,45,0.75)',border:'1px solid rgba(74,222,128,0.5)',boxSizing:'border-box',marginTop:-8,marginBottom:-6}}),
-        React.createElement('div',{style:{display:'flex',width:rowW,boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},card('Player vs. AI','Take on the computer','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Multiplayer','Play on the same device','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Practice','Free play and drills','linear-gradient(135deg,#6d28d9,#7c3aed)')),
+        React.createElement('div',{style:{display:'flex',width:cardRowW,boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},card('Player vs. AI','Take on the computer','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Multiplayer','Play on the same device','linear-gradient(135deg,#1e40af,#1d4ed8)'),card('Practice','Free play and drills','linear-gradient(135deg,#6d28d9,#7c3aed)')),
         React.createElement('div',{style:{display:'flex',width:rowW,boxSizing:'border-box',gap:8,flexWrap:'wrap',justifyContent:'center',alignItems:'center'}},round('rgba(5,12,35,0.78)'),round('rgba(5,12,35,0.78)'),pill('Play Online','linear-gradient(135deg,#059669,#047857)'),pill('How to Play','linear-gradient(135deg,#475569,#1e293b)'),pill('Stats','linear-gradient(135deg,#d97706,#92400e)'),pill('Social','linear-gradient(135deg,#db2777,#9d174d)'),pill('Shop','linear-gradient(135deg,#ca8a04,#854d0e)')),
         React.createElement('div',{style:{display:'flex',gap:8}},pill('Theme','#312e81'),pill('Night','#312e81')),
         React.createElement('div',{style:{padding:'8px 18px',borderRadius:50,background:'rgba(5,12,35,0.66)',border:'1px solid rgba(255,255,255,0.16)',fontSize:13,color:'#fff',whiteSpace:'nowrap'}},'W A S D or arrow keys to move, Enter or Space to choose'),
@@ -4035,7 +4035,9 @@ function SettingsScreen(props){
       React.createElement('div',{style:{display:'flex',gap:8}},
         DIFF_ORDER.map(function(d){return [d,DIFF_LABEL[d]];}).map(function(o){var active=settings.defaultDiff===o[0];
           return React.createElement('button',{key:o[0],type:'button','data-nav-row':4.5,'aria-pressed':active,onClick:function(){props.onChange({defaultDiff:o[0]});},style:{padding:'9px 16px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:13,cursor:'pointer'}},o[1]);}))),
-    slider('settings-ui-scale','Interface scale',settings.uiScale,0.8,1.2,0.01,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:Math.round(value*100)/100});},5),
+    slider('settings-ui-scale','Interface scale',settings.uiScale,0.6,1.6,0.01,Math.round(settings.uiScale*100)+'%',function(value){props.onChange({uiScale:Math.round(value*100)/100});},5),
+    React.createElement('div',{key:'ui-scale-chips',style:{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}},
+      [0.6,0.8,1,1.2,1.4,1.6].map(function(v){var on=Math.abs(settings.uiScale-v)<0.005;return React.createElement('button',{key:v,type:'button','data-nav-row':5.1,'aria-pressed':on,onClick:function(){props.onChange({uiScale:v});},style:{padding:'5px 12px',borderRadius:50,border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:on?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.08)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer'}},Math.round(v*100)+'%');})),
     React.createElement(UiScalePreview,{key:'ui-scale-preview',scale:settings.uiScale}),
     // Rare events: type any chance from 0% to 100% (applies to really hard hits)
     React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
@@ -5011,12 +5013,32 @@ function makePeerRoom(peer,role,code){
   var showReplayRef=useRef(false);
   var s_land=useState(function(){return window.innerWidth>window.innerHeight;}),landscape=s_land[0],setLandscape=s_land[1];
   // Desktop menu is locked to the window, so shrink it a little if its content is taller than the window.
-  var menuWrapRef=useRef(null),s_mfit=useState(1),menuFit=s_mfit[0],setMenuFit=s_mfit[1];
+  var menuWrapRef=useRef(null),menuFitRef=useRef({sig:'',n:0}),menuGridRef=useRef(null),menuXRef=useRef({}),s_mfit=useState(1),menuFit=s_mfit[0],setMenuFit=s_mfit[1],s_ntick=useState(0),setNavTick=s_ntick[1];
   React.useLayoutEffect(function(){
     var el=menuWrapRef.current;if(!el||touchUI||screen!=='menu')return;
     var applied=uiZ*menuFit,natural=el.getBoundingClientRect().height/applied,avail=window.innerHeight-60;MENU_NAT=natural; // screen has 20px padding top and bottom, plus a little breathing room
     var want=Math.max(0.5,Math.min(1,avail/(natural*uiZ)));
-    if(Math.abs(want-menuFit)>0.01)setMenuFit(want);
+    // Changing the fit can re-wrap the menu and change its height, which changes the fit again. Stop after a few
+    // corrections (and keep the smaller value, which always fits) so it can never loop forever.
+    var sig=Math.round(window.innerWidth)+'x'+Math.round(window.innerHeight)+'@'+uiZ;
+    if(menuFitRef.current.sig!==sig)menuFitRef.current={sig:sig,n:0};
+    if(Math.abs(want-menuFit)>0.01&&menuFitRef.current.n<6){menuFitRef.current.n++;setMenuFit(menuFitRef.current.n>=5?Math.min(want,menuFit):want);}
+  });
+  // Keyboard navigation follows what is actually on screen: the main menu's buttons are grouped into rows by where they
+  // really are, so it works the same whether the layout is 3 cards across, 2 + 1, or the pills wrap onto more lines.
+  React.useLayoutEffect(function(){
+    if(screen!=='menu')return;
+    var ids=['single','multi','practice','accounts','settings','online','guide','playerdata','social','shop','theme','time'],items=[],xs={};
+    ids.forEach(function(id){var el=document.querySelector('[data-tour="'+id+'"]');if(!el)return;var r=el.getBoundingClientRect();if(r.width<2)return;items.push({id:id,x:r.left+r.width/2,y:r.top+r.height/2,h:r.height});xs[id]=r.left+r.width/2;});
+    var dp=document.querySelector('[data-nav="daily_play"]');if(dp){var dr=dp.getBoundingClientRect();xs.daily_play=dr.left+dr.width/2;}
+    items.sort(function(a,b){return a.y-b.y||a.x-b.x;});
+    var rows=[],cur=null;
+    items.forEach(function(it){if(cur&&Math.abs(it.y-cur.y)<Math.max(14,it.h*0.5)){cur.ids.push(it);}else{cur={y:it.y,ids:[it]};rows.push(cur);}});
+    var grid=rows.map(function(r){r.ids.sort(function(a,b){return a.x-b.x;});return r.ids.map(function(i){return i.id;});});
+    menuXRef.current=xs;
+    try{var fb=getMenuButtons()[focusIdx];document.body.setAttribute('data-nav-focus',fb?fb.id:'');}catch(e){}
+    var prev=JSON.stringify(menuGridRef.current);menuGridRef.current=grid.length?grid:null;
+    if(JSON.stringify(menuGridRef.current)!==prev)setNavTick(function(n){return n+1;});
   });
   var s_rtick=useState(0),setResizeTick=s_rtick[1];
   useEffect(function(){function onResize(){setLandscape(window.innerWidth>window.innerHeight);setResizeTick(function(n){return n+1;});}window.addEventListener('resize',onResize);return function(){window.removeEventListener('resize',onResize);};},[]);
@@ -5232,7 +5254,7 @@ function makePeerRoom(peer,role,code){
     attempt.resetAt=performance.now()+420;
   }
   function getNavGrid(){
-    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social','shop'],['theme','time']].concat(dailyDoneToday(dailyState)?[]:[['daily_play']]);
+    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:(menuGridRef.current||[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social','shop'],['theme','time']]).concat(dailyDoneToday(dailyState)?[]:[['daily_play']]);
     if(screen==='online'){
       if(onl.view==='choose')return cleanName(account.name)?[['online_create'],['online_join'],['online_stickers'],['online_back']]:[['online_create'],['online_join'],['online_name'],['online_stickers'],['online_back']];
       if(onl.view==='stickers'){
@@ -5356,11 +5378,13 @@ function makePeerRoom(peer,role,code){
       else return;
       e.preventDefault();
       if(screen==='online'&&e.target.tagName==='INPUT')e.target.blur();
+      // Up/down on the main menu: land on the button in that row that is closest sideways to where you are now.
+      if(screen==='menu'&&nr!==r&&grid[r]&&menuXRef.current[grid[r][c]]!=null){var cx0=menuXRef.current[grid[r][c]],bestC=-1,bestD=1e9;grid[nr].forEach(function(id,ci){var xm=menuXRef.current[id];if(xm==null)return;var dd=Math.abs(xm-cx0);if(dd<bestD){bestD=dd;bestC=ci;}});if(bestC>=0)nc=bestC;}
       setFocusIdx(getIdxFromPos(grid,nr,nc));
     }
     window.addEventListener('keydown',onNav);
     return function(){window.removeEventListener('keydown',onNav);};
-  },[screen,introDone,focusIdx,pendDur,customMinutes,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots,showPD,showSettings,scoreLimit,overtimeEnabled,themeMode]);
+  },[screen,introDone,focusIdx,pendDur,customMinutes,diff,side,selP1,selP2,themeOpen,onl.view,onl.peerOn,onl.joinCode,onl.dur,myName,account.name,stickerSlots,showPD,showSettings,scoreLimit,overtimeEnabled,themeMode,menuGridRef.current&&JSON.stringify(menuGridRef.current)]);
 
   function resetPos(defMove){
     impMemRef.current.kickoff=true;impMemRef.current.kt=0;impMemRef.current.kplan=null;
@@ -6155,10 +6179,10 @@ function makePeerRoom(peer,role,code){
               React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff'}},
                 React.createElement('span',{style:{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:done?'#86efac':'#fdba74',marginRight:8}},done?'Daily done':'Daily challenge'),dch.title),
               React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.75)'}},done?'Nice! A new challenge unlocks tomorrow.':dch.desc+(dch.series>1&&dailyProgress(dailyState)>0?' · '+dailyProgress(dailyState)+'/'+dch.series+' done':''))),
-            !done&&React.createElement('button',{type:'button',onClick:startDaily,style:Object.assign({flex:'0 0 auto',padding:'7px 14px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#f97316,#c2410c)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap'},focusSty('daily_play'))},dailyProgress(dailyState)>0?'▶ Resume '+dailyProgress(dailyState)+'/'+dch.series:'▶ Play'),
+            !done&&React.createElement('button',{type:'button','data-nav':'daily_play',onClick:startDaily,style:Object.assign({flex:'0 0 auto',padding:'7px 14px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#f97316,#c2410c)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap'},focusSty('daily_play'))},dailyProgress(dailyState)>0?'▶ Resume '+dailyProgress(dailyState)+'/'+dch.series:'▶ Play'),
             React.createElement('div',{title:'Daily streak','aria-label':'Streak '+streak,style:{flex:'0 0 auto',fontSize:16,fontWeight:900,color:streak?'#fdba74':'rgba(255,255,255,0.45)'}},'🔥'+streak));
         })(),
-        React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
+        React.createElement('div',{style:{display:'flex',width:'min(720px, 100%)',boxSizing:'border-box',gap:18,flexWrap:'wrap',justifyContent:'center'}},
           menuCards.map(function(card){
             var hov=hovCard===card.key||isFocused(card.key);
             return React.createElement('button',{key:card.key,'data-tour':card.key,'aria-label':card.label+'. '+card.sub,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:{'--ring':card.ring,'--glow':card.glow,position:'relative',display:'flex',flexDirection:'column',alignItems:'stretch',width:215,maxWidth:'86vw',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',outline:'none',border:'2px solid '+(hov?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.12)'),boxShadow:hov?undefined:'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',animation:hov?'cardRing 1.6s ease-in-out infinite':'none',transform:hov?'translateY(-8px) scale(1.045)':'none',filter:anyCardHot&&!hov?'brightness(0.78) saturate(0.85)':'none',zIndex:hov?2:1,transition:'transform 0.22s cubic-bezier(0.34,1.56,0.64,1),filter 0.2s,border-color 0.2s',cursor:'pointer'}},
@@ -6775,7 +6799,27 @@ function UpdateBanner(){
     React.createElement('button',{type:'button',onClick:function(){location.href=location.pathname+'?v='+encodeURIComponent(newVersion);},style:{padding:'9px 16px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Reload'),
     React.createElement('button',{type:'button','aria-label':'Not now',onClick:function(){setDismissed(newVersion);},style:{padding:'9px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},'Later'));
 }
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(React.Fragment,null,React.createElement(App),React.createElement(InviteBanner),React.createElement(UpdateBanner)));
+// If anything throws while drawing, show a way back instead of a blank page. Resetting the interface size fixes the case where
+// an odd size/window combination is the cause.
+class CrashGuard extends React.Component{
+  constructor(p){super(p);this.state={err:null};}
+  static getDerivedStateFromError(e){return{err:e};}
+  componentDidCatch(e){try{console.error('Soccer Slime crashed',e);}catch(x){}}
+  render(){
+    if(!this.state.err)return this.props.children;
+    var btn={padding:'10px 22px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'linear-gradient(135deg,#0ea5e9,#0369a1)',color:'#fff',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:'inherit'};
+    function fix(){try{var raw=window.localStorage.getItem(GAME_SETTINGS_KEY),st=raw?JSON.parse(raw):{};st.uiScale=1;window.localStorage.setItem(GAME_SETTINGS_KEY,JSON.stringify(st));}catch(x){}window.location.reload();}
+    return React.createElement('div',{role:'alert',style:{position:'fixed',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'#050c23',color:'#fff',fontFamily:'var(--font-body)',padding:20,boxSizing:'border-box',zIndex:99999}},
+      React.createElement('div',{style:{maxWidth:420,textAlign:'center',display:'flex',flexDirection:'column',gap:12,alignItems:'center'}},
+        React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:30}},'Something went wrong'),
+        React.createElement('div',{style:{fontSize:13,color:'rgba(255,255,255,0.75)',lineHeight:1.5}},'The game hit a problem drawing this screen. Your saves are safe. Try again, or reset the interface size to 100% if it started after changing it.'),
+        React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.45)',wordBreak:'break-word'}},String(this.state.err&&this.state.err.message||this.state.err).slice(0,160)),
+        React.createElement('div',{style:{display:'flex',gap:10,flexWrap:'wrap',justifyContent:'center'}},
+          React.createElement('button',{type:'button',onClick:function(){window.location.reload();},style:btn},'Reload'),
+          React.createElement('button',{type:'button',onClick:fix,style:btn},'Reset size to 100% and reload'))));
+  }
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(CrashGuard,null,React.createElement(React.Fragment,null,React.createElement(App),React.createElement(InviteBanner),React.createElement(UpdateBanner))));
 
 </script>
 
