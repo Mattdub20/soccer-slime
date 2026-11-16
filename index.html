@@ -108,7 +108,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.5.7';
+var GAME_VERSION='v25.5.8';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -221,6 +221,10 @@ function keyLabel(k){
   var names={' ':'Space',arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓',shift:'Shift',control:'Ctrl',alt:'Alt',meta:'Cmd',backspace:'Bksp',capslock:'Caps'};
   return names[k]||(k.length===1?k.toUpperCase():k.charAt(0).toUpperCase()+k.slice(1));
 }
+// Rare-event chances can only be 0%–1%. Anything higher (older saves, edited saves, cloud saves) is reset to the default,
+// so nobody can make the sound-barrier goal fire on every hard hit to farm Slime Bucks.
+var RARE_MAX=0.01;
+function cleanRareChance(v,def){return typeof v==='number'&&isFinite(v)&&v>=0&&v<=RARE_MAX?v:def;}
 function cleanGameSettings(value){
   value=value&&typeof value==='object'?value:{};
   return{
@@ -233,8 +237,8 @@ function cleanGameSettings(value){
     uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.8,Math.min(1.2,Math.round(value.uiScale*100)/100)):1,
     // chances (0–1) of the rare hard-hit gags; defaults are 0.0001% and 0.00001%
     defaultDiff:DIFF_ORDER.indexOf(value.defaultDiff)>=0?value.defaultDiff:'easy',
-    rareFire:typeof value.rareFire==='number'&&isFinite(value.rareFire)?Math.max(0,Math.min(1,value.rareFire)):0.000001,
-    rareBoom:typeof value.rareBoom==='number'&&isFinite(value.rareBoom)?Math.max(0,Math.min(1,value.rareBoom)):0.0000001
+    rareFire:cleanRareChance(value.rareFire,0.000001),
+    rareBoom:cleanRareChance(value.rareBoom,0.0000001)
   };
 }
 function loadGameSettings(){
@@ -242,6 +246,7 @@ function loadGameSettings(){
   catch(error){console.warn('Game settings could not be loaded.',error);return cleanGameSettings(null);}
 }
 var RARE_TEST=(function(){try{var m=/[?&]rare=(fire|boom)/.exec(location.search);return m?m[1]:'';}catch(e){return '';}})();
+var RARE_URL_FORCED=!!RARE_TEST; // the ?rare= test switch forces the gags, so it never earns Slime Bucks
 var PERF_LOW=false,PERF_BATT=false,PERF_BATT_INIT=false;
 function initBatteryWatch(){
   if(PERF_BATT_INIT)return;PERF_BATT_INIT=true;
@@ -3864,10 +3869,10 @@ function MenuTour(props){
 function RareChanceInput(props){
   var s_t=useState(String(props.pct)),text=s_t[0],setText=s_t[1];
   useEffect(function(){if(parseFloat(text)!==props.pct)setText(String(props.pct));},[props.pct]);
-  return React.createElement('input',{type:'number','data-nav-row':props.row,min:0,max:100,step:'any',value:text,'aria-label':props.label+' chance in percent',
+  return React.createElement('input',{type:'number','data-nav-row':props.row,min:0,max:1,step:'any',value:text,'aria-label':props.label+' chance in percent (0 to 1)',
     onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')e.target.blur();},
-    onChange:function(e){var t=e.target.value;setText(t);var v=parseFloat(t);if(isFinite(v))props.onSave(Math.max(0,Math.min(100,v)));},
-    onBlur:function(){var v=parseFloat(text);if(!isFinite(v)||v<0||v>100)setText(String(props.pct));},
+    onChange:function(e){var t=e.target.value;setText(t);var v=parseFloat(t);if(isFinite(v)){var cv=Math.max(0,Math.min(1,v));props.onSave(cv);if(cv!==v)setText(String(cv));}},
+    onBlur:function(){var v=parseFloat(text);if(!isFinite(v)||v<0||v>1)setText(String(props.pct));},
     style:props.style});
 }
 // Settings: a little picture of this screen with the main menu drawn at the chosen interface size,
@@ -4015,7 +4020,7 @@ function SettingsScreen(props){
     // Rare events: type any chance from 0% to 100% (applies to really hard hits)
     React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8,paddingTop:6,borderTop:'1px solid rgba(255,255,255,0.12)'}},
       React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Rare events'),
-      React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)'}},'Chance per really hard hit. Type anything from 0 to 100%.'),
+      React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.62)'}},'Chance per really hard hit. Type anything from 0 to 1%.'),
       [['rareFire','🔥 Spontaneous combustion',5.6,0.0001],['rareBoom','💥 Sound barrier goal',5.7,0.00001]].map(function(r){
         var pct=+(settings[r[0]]*100).toPrecision(6);
         return React.createElement('label',{key:r[0],style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,fontSize:13,fontWeight:800}},r[1],
@@ -4171,6 +4176,7 @@ function App(){
     if(bucksDoneRef.current)return;bucksDoneRef.current=true;
     var mode=pmRef.current,me=achievementSideRef.current;
     if(practRef.current||(mode!=='single'&&mode!=='multi')||(me!=='left'&&me!=='right'))return;
+    if(RARE_URL_FORCED||RARE_P.boom>RARE_MAX||RARE_P.fire>RARE_MAX){setBucksResult({mode:mode,diff:diffRef.current,goals:0,win:0,mult:0,capped:false,total:0});return;}
     var st=statsRef.current,goals=(me==='left'?st.lG:st.rG)||0,r={mode:mode,diff:diffRef.current,goals:0,win:0,mult:0,capped:false};
     if(mode==='single'){r.goals=goals;if(matchWinner===me){r.mult=bucksWinMult(diffRef.current);r.win=BUCKS_WIN_BASE*r.mult;}}
     else{r.goals=Math.min(goals,BUCKS_MULTI_CAP);r.capped=goals>BUCKS_MULTI_CAP;}
@@ -4753,7 +4759,7 @@ function makePeerRoom(peer,role,code){
 
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
-  RARE_P.fire=gameSettings.rareFire;RARE_P.boom=gameSettings.rareBoom;
+  RARE_P.fire=Math.min(RARE_MAX,gameSettings.rareFire);RARE_P.boom=Math.min(RARE_MAX,gameSettings.rareBoom);
   GAME_AUDIO_VOLUME=gameSettings.sfxVolume;applyKeybinds(gameSettings.keybinds);
   updatePerf(gameSettings.perfMode);FPS_MATCH30=!!gameSettings.battery30;IN_MATCH=screen==='game';
   var s_settingsErr=useState(''),settingsSaveError=s_settingsErr[0],setSettingsSaveError=s_settingsErr[1];
