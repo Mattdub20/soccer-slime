@@ -114,7 +114,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.6.9';
+var GAME_VERSION='v25.7.1';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -169,6 +169,7 @@ function goalTextSprite(scale){
   GOAL_TEXT_CACHE[key]=cv;return cv;
 }
 function drawGoalText(ctx,size,alpha,RSn){
+  if(PERF_LOW){size=100;alpha=1;} // performance mode: plain, steady GOAL! text
   var sp=goalTextSprite(Math.min(3,RSn||1)),k=size/sp._fs,w=sp._w*k,h=sp._h*k;
   ctx.save();ctx.globalAlpha=alpha;ctx.drawImage(sp,GW/2-w/2,GH/2-30-h/2,w,h);ctx.restore();
 }
@@ -420,7 +421,8 @@ function goalDir(gx){return gx<GW/2?1:-1;}
 function coneVel(dir,sp,spread,lift){var a=(dir>0?0:Math.PI)+(Math.random()-0.5)*spread;return [Math.cos(a)*sp,Math.sin(a)*sp-(lift||0)];}
 function fxFlash(P,x,y,r,col,life){var f=mkP(x,y,0,0,col||'#ffffff',life||14,r);f.grav=0;f.shape='flash';f.keep=true;P.push(f);}
 function fxRing(P,x,y,r0,grow,col,life,w,half,delay,squash){var q=mkP(x,y,0,0,col,life,w);q.grav=0;q.shape='ring';q.r0=r0;q.grow=grow;q.half=half||0;q.delay=delay||0;q.squash=squash||0.8;q.keep=true;P.push(q);}
-function emitGoal(P,gx,gy,col){var dir=goalDir(gx),hsl=hexToHsl(col),light=hslToHex(hsl[0],Math.min(100,hsl[1]+20),Math.min(90,hsl[2]+35)),dark=hslToHex(hsl[0],hsl[1],Math.max(10,hsl[2]-15));var gc=[col,col,col,light,light,dark];
+function emitGoal(P,gx,gy,col){if(PERF_LOW)return; // performance mode: no goal explosion
+var dir=goalDir(gx),hsl=hexToHsl(col),light=hslToHex(hsl[0],Math.min(100,hsl[1]+20),Math.min(90,hsl[2]+35)),dark=hslToHex(hsl[0],hsl[1],Math.max(10,hsl[2]-15));var gc=[col,col,col,light,light,dark];
   for(var i=0;i<64;i++){var v=coneVel(dir,4+Math.random()*10,1.9,2);var gp=mkP(gx+dir*12,gy+(Math.random()-0.5)*GOALH*0.7,v[0],v[1],gc[Math.floor(Math.random()*gc.length)],40+Math.random()*30,3+Math.random()*4);gp.drag=0.965;P.push(gp);}
   for(var k=0;k<12;k++){var w=coneVel(dir,12+Math.random()*8,1.2,1),st=mkP(gx+dir*12,gy+(Math.random()-0.5)*GOALH*0.6,w[0],w[1],light,16+Math.random()*10,2.5);st.shape='streak';st.len=26;st.grav=0.05;st.drag=0.96;P.push(st);}
 }
@@ -474,7 +476,8 @@ function trailColor(style,isJapan,t){
   return isJapan?'#cc0000':'#FFD700';
 }
 // Extra goal celebration on top of the normal goal burst. Every one fires out of the goal that was scored in.
-function emitCelebration(P,style,gx,gy){
+function emitCelebration(P,style,gx,gy){if(PERF_LOW)return; // performance mode: no goal celebrations
+
   var i,v,p;gx=gx==null?GW-BR:gx;gy=gy==null?GH-GRND-GOALH/2:gy;
   var dir=goalDir(gx),ox=gx+dir*18;
   if(style&&style.indexOf('ai:')===0){
@@ -1758,7 +1761,7 @@ function SlimePreviewCanvas(props){
     var reduce=false;try{reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
     if(reduce){T=type==='multi'?0.7:0.3;draw();return;}
     // Performance mode: draw one fixed picture and leave it alone (no animation at all), check now and then if the mode was switched off.
-    var tm=0,stillDone=false,fixedT=type==='multi'?0.5:type==='practice'?1.1:0;
+    var tm=0,stillDone=false,fixedT=type==='multi'?0:type==='practice'?0.35:0.55; // performance-mode poster frames: ball up between the slimes (AI), squared up before the clash (multi), ball at the top of a juggle (practice); no hit flashes or overlaps
     function poll(){tm=setTimeout(function(){if(alive)raf=requestAnimationFrame(loop);},700);}
     function loop(now){if(!alive)return;if(PERF_LOW){last=0;raf=0;if(!stillDone){stillDone=true;T=fixedT;draw();}poll();return;}stillDone=false;if(!last)last=now;var dt=Math.min(0.1,(now-last)/1000);last=now;T+=dt*(hotRef.current?1.7:1);draw();raf=requestAnimationFrame(loop);}
     T=fixedT;draw();if(PERF_LOW){stillDone=true;poll();}else raf=requestAnimationFrame(loop);
@@ -5780,6 +5783,7 @@ function makePeerRoom(peer,role,code){
           if(controllerKeys.s&&!gamepadRef.current.s)netCtrRef.current.dc++;
           gamepadRef.current={w:!!controllerKeys.w,s:!!controllerKeys.s};
         }
+        if(PERF_LOW)shakeRef.current=0; // performance mode: no screen shake
         var tm=themeModeRef.current,RSn=rsRef.current,cvq=cvRef.current;if(cvq)cvq.getContext('2d').setTransform(RSn,0,0,RSn,0,0);
 
         if(mode==='online'){
