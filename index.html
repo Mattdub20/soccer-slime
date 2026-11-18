@@ -114,7 +114,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.7.3';
+var GAME_VERSION='v25.7.5';
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -3288,6 +3288,8 @@ function unlockedAchievementSkins(progress){
 // One challenge per calendar day (same for everyone on that date), checked when a match ends.
 // c = {mode, diff, won, goals, against, margin, behind, rally, ot}
 var DAILY_CHALLENGES=[
+  // Every challenge asks for something different. c also has fast (your fastest goal, km/h), long (your longest goal, m)
+  // and streak (most goals you scored in a row without the AI scoring).
   {id:'beat_hard',title:'Beat the Machine',desc:'Beat the Hard AI.',diff:'hard',dur:'2min',check:function(c){return c.won;}},
   {id:'win_by_3',title:'Statement Win',desc:'Beat the Hard AI by 3 or more goals.',diff:'hard',dur:'2min',check:function(c){return c.won&&c.margin>=3;}},
   {id:'shut_out',title:'Shut Out',desc:'Beat the Hard AI without conceding.',diff:'hard',dur:'1min',check:function(c){return c.won&&c.against===0;}},
@@ -3299,11 +3301,30 @@ var DAILY_CHALLENGES=[
   {id:'mission_impossible',title:'Embrace the Chaos',desc:'Beat the Chaos AI.',diff:'impossible',dur:'2min',check:function(c){return c.won;}},
   {id:'three_in_a_row',title:'Hat Trick of Wins',desc:'Beat the Hard AI 3 matches in a row.',diff:'hard',dur:'1min',series:3,check:function(c){return c.won;}},
   {id:'gauntlet',title:'The Gauntlet',desc:'Beat Easy, then Hard, then Chaos, without losing.',stages:['easy','hard','impossible'],dur:'1min',series:3,check:function(c){return c.won;}},
-  {id:'first_to_3',title:'Race to Three',desc:'Be first to 3 goals against the Hard AI.',diff:'hard',dur:'4min',limit:3,check:function(c){return c.won;}}
+  {id:'first_to_3',title:'Race to Three',desc:'Be first to 3 goals against the Hard AI.',diff:'hard',dur:'4min',limit:3,check:function(c){return c.won;}},
+  {id:'rocket',title:'Rocket Shot',desc:'Score a goal at 90 km/h or faster against the Medium AI.',diff:'medium',dur:'2min',check:function(c){return c.fast>=90;}},
+  {id:'downtown',title:'From Downtown',desc:'Score a goal from 25 m or further against the Hard AI.',diff:'hard',dur:'2min',check:function(c){return c.long>=25;}},
+  {id:'crack_chaos',title:'Crack the Chaos',desc:'Score 2 goals against the Chaos AI (you don\u2019t have to win).',diff:'impossible',dur:'2min',check:function(c){return c.goals>=2;}},
+  {id:'blitz',title:'Blitz',desc:'Score 3 goals against the Hard AI in a 1-minute match.',diff:'hard',dur:'1min',check:function(c){return c.goals>=3;}},
+  {id:'on_fire',title:'On Fire',desc:'Score 3 goals in a row (without the AI scoring in between) against the Hard AI.',diff:'hard',dur:'2min',check:function(c){return c.streak>=3;}},
+  {id:'marathon',title:'Marathon',desc:'Beat the Hard AI in a 4-minute match.',diff:'hard',dur:'4min',check:function(c){return c.won;}},
+  {id:'rally_master',title:'Rally Master',desc:'Keep a rally going for 25 seconds against the Medium AI.',diff:'medium',dur:'2min',check:function(c){return c.rally>=25;}},
+  {id:'survivor',title:'Survivor',desc:'Let in 1 goal or fewer against the Chaos AI in a 1-minute match.',diff:'impossible',dur:'1min',check:function(c){return c.against<=1;}},
+  {id:'goal_rush',title:'Goal Rush',desc:'Score 10 goals against the Easy AI in one match.',diff:'easy',dur:'2min',check:function(c){return c.goals>=10;}},
+  {id:'perfect_five',title:'Perfect Five',desc:'Be first to 5 against the Hard AI without conceding.',diff:'hard',dur:'4min',limit:5,check:function(c){return c.won&&c.against===0;}},
+  {id:'nail_biter',title:'Nail-biter',desc:'Beat the Hard AI by exactly one goal.',diff:'hard',dur:'2min',check:function(c){return c.won&&c.margin===1;}},
+  {id:'great_escape',title:'Great Escape',desc:'Come back from 2 goals down to beat the Medium AI.',diff:'medium',dur:'2min',check:function(c){return c.won&&c.behind>=2;}},
+  {id:'chaos_double',title:'Chaos Double',desc:'Beat the Chaos AI 2 matches in a row.',diff:'impossible',dur:'1min',series:2,check:function(c){return c.won;}},
+  {id:'iron_wall',title:'Iron Wall',desc:'Beat the Medium AI in a 2-minute match without conceding.',diff:'medium',dur:'2min',check:function(c){return c.won&&c.against===0;}},
+  {id:'race_to_five',title:'Race to Five',desc:'Be first to 5 goals against the Medium AI.',diff:'medium',dur:'4min',limit:5,check:function(c){return c.won;}},
+  {id:'chaos_rally',title:'Keep Up with Chaos',desc:'Keep a rally going for 10 seconds against the Chaos AI.',diff:'impossible',dur:'2min',check:function(c){return c.rally>=10;}},
+  {id:'the_ladder',title:'The Ladder',desc:'Beat Easy, then Medium, then Hard, without losing.',stages:['easy','medium','hard'],dur:'1min',series:3,check:function(c){return c.won;}},
+  {id:'sharpshooter',title:'Sharpshooter',desc:'Score a goal at 100 km/h or faster against the Hard AI.',diff:'hard',dur:'2min',check:function(c){return c.fast>=100;}}
 ];
 function dayKey(d){d=d||new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 function yesterdayKey(){var d=new Date();d.setDate(d.getDate()-1);return dayKey(d);}
-function todaysChallenge(){var k=dayKey(),h=0;for(var i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))>>>0;return DAILY_CHALLENGES[h%DAILY_CHALLENGES.length];}
+var DAILY_ORDER=(function(){var o=DAILY_CHALLENGES.map(function(_,i){return i;}),x=20261118;for(var i=o.length-1;i>0;i--){x=(x*1103515245+12345)%2147483648;var j=x%(i+1),t=o[i];o[i]=o[j];o[j]=t;}return o;})();
+function todaysChallenge(){var d=new Date(),day=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000);return DAILY_CHALLENGES[DAILY_ORDER[day%DAILY_ORDER.length]];}
 // Saved state: lastDone = date of the last completed challenge, streak = days in a row ending on lastDone.
 function loadDaily(){try{var d=JSON.parse(window.localStorage.getItem('slime_daily')||'null');if(d&&typeof d==='object')return{lastDone:typeof d.lastDone==='string'?d.lastDone:'',streak:Math.max(0,d.streak|0),prog:d.prog&&d.prog.day===dayKey()&&typeof d.prog.n==='number'?{day:d.prog.day,id:String(d.prog.id||''),n:Math.max(0,d.prog.n|0)}:null};}catch(e){}return{lastDone:'',streak:0};}
 function saveDaily(d){try{window.localStorage.setItem('slime_daily',JSON.stringify(d));}catch(e){}cloudQueueSave();}
@@ -4695,6 +4716,8 @@ function makePeerRoom(peer,role,code){
   }
   function rbOnlineTick(kk,jr,isHost){
     var S=rbRef.current,bits=simBits(simKeysIn(kk,jr,'a','d','w','s','_wPL'));jr['s']=false;
+    // The joiner sees the pitch mirrored (they're on the left on their own screen), so their left/right swap.
+    if(!isHost){var kl=bits&1,kr=bits&2;bits=(bits&~3)|(kl?2:0)|(kr?1:0);}
     if(jr.p_s){bits|=8;jr.p_s=false;}if(jr.p_w){bits|=4;jr.p_w=false;}
     if(isHost){
       var busy=goRef.current||replayActiveRef.current||goalFlashRef.current;
@@ -4997,7 +5020,7 @@ function makePeerRoom(peer,role,code){
     // Daily challenge: tick it off once per day.
     var daily=loadDaily(),challenge=todaysChallenge();
     if(dailyRunRef.current&&dailyRunRef.current.id===challenge.id&&!dailyDoneToday(daily)){
-      var passed=challenge.check({mode:mode,diff:diffRef.current,won:!!localWon,goals:localGoals,against:opponentGoals,margin:localGoals-opponentGoals,behind:localSide?(localSide==='left'?stats.lBehind:stats.rBehind)||0:0,rally:stats.longestRally||0,ot:!!otRef.current});
+      var passed=challenge.check({mode:mode,diff:diffRef.current,won:!!localWon,goals:localGoals,against:opponentGoals,margin:localGoals-opponentGoals,behind:localSide?(localSide==='left'?stats.lBehind:stats.rBehind)||0:0,rally:stats.longestRally||0,ot:!!otRef.current,fast:localSide?Math.round((stats[(localSide==='left'?'l':'r')+'Fast']||0)*KMH_PER_SPEED):0,long:localSide?Math.round((stats[(localSide==='left'?'l':'r')+'Long']||0)*METRES_PER_UNIT):0,streak:localSide?(localSide==='left'?stats.lMax:stats.rMax)||0:0});
       var need=dailySeries(challenge),had=dailyProgress(daily),n=passed?had+1:0;
       if(passed&&n>=need){
         var streak=daily.lastDone===yesterdayKey()?daily.streak+1:1;
@@ -5805,13 +5828,16 @@ function makePeerRoom(peer,role,code){
             var orv=isHostO?(otRef.current?(otReadyRef.current?2:1):0):netOrRef.current;
             var gcv=cvRef.current;
             if(gcv){var gctx=gcv.getContext('2d');gctx.setTransform(RSn,0,0,RSn,0,0);gctx.save();var gshk=shakeRef.current;if(gshk>0.4){gctx.translate((Math.random()-0.5)*gshk,(Math.random()-0.5)*gshk);shakeRef.current=gshk*0.86;}else shakeRef.current=0;
-              if(replayActiveRef.current){gctx.restore();gctx.save();replayCamera(gctx,RSn,ball,replayIdxRef.current,replayFrRef.current.length);}
+              var mirO=!isHostO;
+              if(replayActiveRef.current){gctx.restore();gctx.save();replayCamera(gctx,RSn,mirO?{x:GW-ball.x,y:ball.y}:ball,replayIdxRef.current,replayFrRef.current.length);}
+              gctx.save();if(mirO){gctx.translate(GW,0);gctx.scale(-1,1);}
               drawScene(gctx,ls,rs,ball,cols,'online',isHostO?'left':'right',false,fanRef.current,replayActiveRef.current?false:goalFlashRef.current,[ls.goalLineTime||0,rs.goalLineTime||0],thN(tm),thJ(tm),getGameSlimeSkins('online'));
               if(!replayActiveRef.current){var otr=ballTrailRef.current;for(var otri=0;otri<otr.length;otri++){gctx.save();gctx.globalAlpha=otr[otri].life*0.4;gctx.fillStyle=otr[otri].c||'#FFD700';gctx.beginPath();gctx.arc(otr[otri].x,otr[otri].y,otr[otri].r,0,Math.PI*2);gctx.fill();gctx.restore();}drawParticles(gctx,particlesRef.current);}
+              gctx.restore();
               if(replayActiveRef.current){gctx.setTransform(RSn,0,0,RSn,0,0);if(replaySpeedAt(replayIdxRef.current,replayFrRef.current.length)<1){gctx.save();gctx.font='18px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,255,255,'+(0.6+0.3*Math.sin(now*0.008))+')';gctx.fillText('SLOW-MO',GW/2,40);gctx.restore();}}
               if(goalFlashRef.current){var gfn=netGfRef.current,gfa2=Math.max(0,0.5*(1-gfn/55));gctx.fillStyle='rgba(0,0,0,'+gfa2+')';gctx.fillRect(0,0,GW,GH);var gfs2=Math.min(112,72+gfn*3),gfp2=0.88+0.12*Math.sin(gfn*0.35);drawGoalText(gctx,gfs2*gfp2,1,RSn);}
               if(replayActiveRef.current){var grt=replayFrRef.current.length,grp=grt?replayIdxRef.current/grt:0;gctx.fillStyle='rgba(0,0,0,0.55)';gctx.fillRect(0,0,GW,32);gctx.save();gctx.font='16px "Lilita One",sans-serif';gctx.textAlign='left';gctx.textBaseline='middle';gctx.fillStyle='#fbbf24';gctx.shadowColor='#fbbf24';gctx.shadowBlur=8;gctx.fillText('INSTANT REPLAY',10,16);gctx.restore();gctx.fillStyle='rgba(255,255,255,0.15)';gctx.fillRect(0,28,GW,4);gctx.fillStyle='#38bdf8';gctx.fillRect(0,28,GW*grp,4);}
-              if(!replayActiveRef.current&&netRfRef.current>-999&&netRfRef.current<62&&!goRef.current)drawReady(gctx,netRfRef.current,statsRef.current.lG,statsRef.current.rG,cols);
+              if(!replayActiveRef.current&&netRfRef.current>-999&&netRfRef.current<62&&!goRef.current)drawReady(gctx,netRfRef.current,mirO?statsRef.current.rG:statsRef.current.lG,mirO?statsRef.current.lG:statsRef.current.rG,mirO?{left:cols.right,right:cols.left}:cols);
               var gtl=tlRef.current;if(!replayActiveRef.current&&((gtl>0&&gtl<=10)||(gtl===0&&orv!==2))&&!goRef.current){gctx.save();gctx.font='88px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='middle';gctx.fillStyle='rgba(255,255,255,0.95)';gctx.shadowColor='rgba(0,0,0,0.6)';gctx.shadowBlur=12;gctx.fillText(String(gtl),GW/2,GH/2-80);gctx.restore();}
               if(!replayActiveRef.current&&otRef.current&&orv===2&&!goRef.current){gctx.save();gctx.font='22px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,100,100,0.9)';gctx.shadowColor='#ff4444';gctx.shadowBlur=10;gctx.fillText('OVERTIME',GW/2,8);gctx.restore();}
               gctx.restore();}
@@ -6129,10 +6155,12 @@ function makePeerRoom(peer,role,code){
         if(cv){
           var ctx=cv.getContext('2d'),ls2=gsRef.current.left,rs2=gsRef.current.right,ball2=gsRef.current.ball,cols2=colRef.current,mode2=pmRef.current,tm2=themeModeRef.current;
           ctx.setTransform(RSn,0,0,RSn,0,0);ctx.save();var shk=shakeRef.current;if(shk>0.4){ctx.translate((Math.random()-0.5)*shk,(Math.random()-0.5)*shk);shakeRef.current=shk*0.84;}else shakeRef.current=0;
+          var mirG=mode2==='online'&&onRoleRef.current==='guest';if(mirG){ctx.save();ctx.translate(GW,0);ctx.scale(-1,1);}
           drawScene(ctx,ls2,rs2,ball2,cols2,mode2,sideRef.current,practRef.current,fanRef.current,flashRef.current,[ls2.goalLineTime,rs2.goalLineTime],thN(tm2),thJ(tm2),getGameSlimeSkins(mode2),mode2==='training'&&trainingChallengeRef.current==='aim');
           var tr=ballTrailRef.current;
           for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.45;ctx.fillStyle=tr[tri].c||'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
           drawParticles(ctx,particlesRef.current);
+          if(mirG)ctx.restore();
           var rd=readyRef.current;if(rd&&!goRef.current){if(!pausedRef.current)rd.fr++;if(rd.fr===30){shakeRef.current=Math.max(shakeRef.current,6);if(!pausedRef.current&&!goRef.current)frozenRef.current=false;}if(rd.fr>=62)readyRef.current=null;else drawReady(ctx,rd.fr,statsRef.current.lG,statsRef.current.rG,cols2);}
           // charred slimes + rare-event banner
           [ls2,rs2].forEach(function(bs){if(bs&&bs._burnT>0){ctx.save();ctx.globalAlpha=Math.min(0.8,bs._burnT/80);ctx.fillStyle='#111';ctx.beginPath();ctx.arc(bs.x,bs.y+(bs.spinDipY||0),SR+1,Math.PI,0);ctx.closePath();ctx.fill();ctx.restore();}});
@@ -6559,6 +6587,7 @@ function makePeerRoom(peer,role,code){
     var hudTitles=(function(){try{return getGameSlimeSkins(pmRef.current).title||{};}catch(e){return {};}})();
     var leftAvatar=isOnG?(onRoleRef.current==='host'?account.avatar:onlineOpponent&&onlineOpponent.a||defaultAccountAvatar()):null;
     var rightAvatar=isOnG?(onRoleRef.current==='host'?onlineOpponent&&onlineOpponent.a||defaultAccountAvatar():account.avatar):null;
+    var flipHud=isOnG&&onRoleRef.current==='guest',hL=flipHud?'right':'left',hR=flipHud?'left':'right';if(flipHud){var swapAv=leftAvatar;leftAvatar=rightAvatar;rightAvatar=swapAv;}
     function keys(list){return list.map(function(k,i){return React.createElement('span',{key:i,className:'kbd'},k);});}
     function closeChat(){setChatOpen(false);if(chatInputRef.current)chatInputRef.current.blur();}
     // who: 'p1' / 'p2' for two players sharing one phone, otherwise the local player's side.
@@ -6779,19 +6808,19 @@ function makePeerRoom(peer,role,code){
                   !touchUI&&React.createElement('button',{onClick:toggleUnlimJump,style:hudChip(unlimJump)},'∞ Jump'),
                   !touchUI&&React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'))
               :React.createElement('div',{style:{display:'flex',alignItems:'center',width:'100%',height:hudH}},
-                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,borderLeft:'4px solid '+(colors.left?colors.left.body:'#1a6bcc'),paddingLeft:8}},
+                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,borderLeft:'4px solid '+(colors[hL]?colors[hL].body:'#1a6bcc'),paddingLeft:8}},
                     isOnG&&React.createElement(ProfileAvatar,{profile:leftAvatar,size:28}),
-                    React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:2,minWidth:0}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names.left),hudTitles.left&&React.createElement(TitleBadge,{id:hudTitles.left,small:true})),
-                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.left)),
+                    React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:2,minWidth:0}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='right'?'AI':names[hL]),hudTitles[hL]&&React.createElement(TitleBadge,{id:hudTitles[hL],small:true})),
+                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc[hL])),
                   React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',flex:1,gap:2}},
                     React.createElement('span',{style:{fontSize:20,fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums',color:ot&&otLive&&!winner?'#f87171':'#ffffff',fontWeight:900,letterSpacing:'0.05em',textShadow:ot&&otLive?'0 0 12px rgba(248,113,113,0.7)':'none',animation:ot&&otLive&&!winner?'pulse 1s ease-in-out infinite':'none'}},ot&&otLive&&!winner?'OVERTIME':gmode==='training'&&trainingChallengeRef.current==='dash'?Math.max(0,10-trainingAttemptRef.current.tries)+' LEFT':fmt(tl)),
                     !touchUI&&React.createElement('div',{style:{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'center'}},
                       (isSingleG||isOnG)&&React.createElement('button',{onClick:exitToMenu,style:hudChip(false,{padding:'2px 8px',fontSize:10,background:'rgba(239,68,68,0.22)',color:'#fca5a5'})},'Exit'),
                       !isOnG&&React.createElement('button',{onClick:togglePause,style:hudChip(false,{padding:'2px 8px',fontSize:10})},paused?'Resume':'Pause'),
                       React.createElement('button',{onClick:function(){var next=!soundEnabledRef.current;soundEnabledRef.current=next;setSoundEnabled(next);},'aria-pressed':soundEnabled,style:hudChip(false,{padding:'2px 8px',fontSize:10})},soundEnabled?'Sound on':'Muted'))),
-                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',borderRight:'4px solid '+(colors.right?colors.right.body:'#e8192c'),paddingRight:8}},
-                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc.right),
-                    React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2,minWidth:0}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names.right),hudTitles.right&&React.createElement(TitleBadge,{id:hudTitles.right,small:true})),
+                  React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',borderRight:'4px solid '+(colors[hR]?colors[hR].body:'#e8192c'),paddingRight:8}},
+                    React.createElement('span',{style:{fontFamily:DISP,fontSize:30,fontWeight:700,color:'#ffffff',lineHeight:1,minWidth:22,textAlign:'center'}},sc[hR]),
+                    React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:2,minWidth:0}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.8)',letterSpacing:'0.05em',textTransform:'uppercase',maxWidth:112,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},isSingleG&&activeSide==='left'?'AI':names[hR]),hudTitles[hR]&&React.createElement(TitleBadge,{id:hudTitles[hR],small:true})),
                     isOnG&&React.createElement(ProfileAvatar,{profile:rightAvatar,size:28})))
           ),
           React.createElement('div',{style:{position:'relative',width:GW,height:GH}},

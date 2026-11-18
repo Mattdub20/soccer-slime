@@ -5,7 +5,8 @@
       "name": "relay",
       "runtimeExecutable": "npx.cmd",
       "runtimeArgs": ["wrangler", "dev", "--port", "8788", "--local", "--cwd", "relay"],
-      "port": 8788
+      "port": 8788,
+      "autoPort": false
     },
     {
       "name": "game",
