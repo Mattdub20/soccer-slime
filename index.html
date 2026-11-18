@@ -114,7 +114,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.7.6';
+var GAME_VERSION='v25.7.7';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -4238,7 +4238,6 @@ function App(){
   var s_opponentRematch=useState(false),opponentRematchRequested=s_opponentRematch[0],setOpponentRematchRequested=s_opponentRematch[1];
   var s_onl=useState({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'}),onl=s_onl[0],setOnl=s_onl[1];
   var s_waitAi=useState(false),waitAi=s_waitAi[0],setWaitAi=s_waitAi[1];
-  useEffect(function(){if(!EMBED_AI)return;var t=setTimeout(function(){pmRef.current='single';setGmode('single');startGame('2min','single',DC,null,'left','regular',null,null,{scoreLimit:0,overtime:true});},60);return function(){clearTimeout(t);};},[]);
   var s_stickerSlots=useState(loadOnlineStickerSlots),stickerSlots=s_stickerSlots[0],setStickerSlots=s_stickerSlots[1];
   var onlineStickerButtonRefs=useRef({});
   var onlineStickerGridRef=useRef(null);
@@ -5691,7 +5690,7 @@ function makePeerRoom(peer,role,code){
     // practice clips saved before the fix still include the idle opponent: hide whichever slime stayed further from the ball
     if(m.kind==='practice'&&frs.length){var dl=0,dr=0;frs.forEach(function(f){if(f.left.x<-500||f.right.x<-500)return;dl+=Math.abs(f.left.x-f.ball.x);dr+=Math.abs(f.right.x-f.ball.x);});if(dl||dr){var hide=dl>dr?'left':'right';frs.forEach(function(f){f[hide].x=-999;f[hide].y=-999;});}}
     setViewReplay({frames:frs,goals:rec.goals||[],colors:m.colors||DC,names:{left:m.left||'Left',right:m.right||'Right'},theme:m.theme||themeMode,skins:m.skins?{left:m.skins.left==='robot'?aiRobotSkin(m.aiDiff):achievementSkinDetails(m.skins.left),right:m.skins.right==='robot'?aiRobotSkin(m.aiDiff):achievementSkinDetails(m.skins.right)}:null,title:m.title||'Replay',kind:m.kind,meta:m});});}
-  function exitToMenu(){if(EMBED_AI){restartGame();return;}dailyRunRef.current=null;setDailyResult(null);gsRef.current._combust=false;tutRef.current=null;setTut(null);clearTimeout(postRpRef.current);onlineCleanup();setNetMsg('');winRef.current=null;readyRef.current=null;setRunning(false);setWinner(null);setGmode(null);setIsPractice(false);practRef.current=false;setGoalFlash(false);goalFlashRef.current=false;frozenRef.current=false;setPaused(false);pausedRef.current=false;setOt(false);otRef.current=false;otReadyRef.current=false;setOtLive(false);goRef.current=false;flashRef.current=false;replayActiveRef.current=false;setReplayActive(false);replayBufRef.current=[];replayFrRef.current=[];matchRecRef.current=[];matchRecActiveRef.current=false;setMatchFrames([]);setShowMatchReplay(false);particlesRef.current=[];ballTrailRef.current=[];setScreen('menu');setPendDur('1min');}
+  function exitToMenu(){dailyRunRef.current=null;setDailyResult(null);gsRef.current._combust=false;tutRef.current=null;setTut(null);clearTimeout(postRpRef.current);onlineCleanup();setNetMsg('');winRef.current=null;readyRef.current=null;setRunning(false);setWinner(null);setGmode(null);setIsPractice(false);practRef.current=false;setGoalFlash(false);goalFlashRef.current=false;frozenRef.current=false;setPaused(false);pausedRef.current=false;setOt(false);otRef.current=false;otReadyRef.current=false;setOtLive(false);goRef.current=false;flashRef.current=false;replayActiveRef.current=false;setReplayActive(false);replayBufRef.current=[];replayFrRef.current=[];matchRecRef.current=[];matchRecActiveRef.current=false;setMatchFrames([]);setShowMatchReplay(false);particlesRef.current=[];ballTrailRef.current=[];setScreen('menu');setPendDur('1min');}
   function restartGame(){startGame(lastGM.current,lastPM.current,lastCol.current,lastNm.current,lastSide.current,practModeRef.current,p1IdRef.current,p2IdRef.current,lastGameOptionsRef.current);}
   function toggleUnlimJump(){if(!practRef.current)return;setUnlimJump(function(p){unlimJumpRef.current=!p;return !p;});}
   function togglePause(){if(goRef.current||onRoleRef.current)return;var np=!pausedRef.current;pausedRef.current=np;if(!goalFlashRef.current&&!replayActiveRef.current)frozenRef.current=np;setPaused(np);}
@@ -6274,7 +6273,7 @@ function makePeerRoom(peer,role,code){
     menuCards.forEach(function(c,i){c.ring=cardCols?cardCols[i][0]:(c.key==='practice'?'#a78bfa':'#60a5fa');});
     var anyCardHot=menuCards.some(function(c){return hovCard===c.key||isFocused(c.key);});
     var menuPills=[
-      {key:'online',label:'Play Online',bg:'linear-gradient(135deg,#059669,#047857)',act:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');}},
+      EMBED_AI?null:{key:'online',label:'Play Online',bg:'linear-gradient(135deg,#059669,#047857)',act:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');}},
       {key:'guide',label:'How to Play',bg:'linear-gradient(135deg,#475569,#1e293b)',act:function(){setScreen('guide');}},
       {key:'playerdata',label:'Stats',bg:'linear-gradient(135deg,#d97706,#92400e)',act:function(){setShowPD('stats');}},
       {key:'social',label:'Social',dot:chatDot||sugDot||frDot,green:friendsOnline>0,bg:'linear-gradient(135deg,#db2777,#9d174d)',act:function(){setShowPD('social');}},
@@ -6325,7 +6324,7 @@ function makePeerRoom(peer,role,code){
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',gap:8,flexWrap:'wrap',justifyContent:'center',alignItems:'center'}},
           React.createElement('button',{key:'accounts','data-tour':'accounts',type:'button',title:'Your Account','aria-label':'Your Account',onClick:function(){setScreen('accounts');},onMouseEnter:function(){setHovCard('accounts');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:2,borderRadius:'50%',border:'none',background:'rgba(5,12,35,0.78)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='accounts'||isFocused('accounts')?'translateY(-3px) scale(1.04)':'none'},focusSty('accounts'))},React.createElement(ProfileAvatar,{profile:account.avatar,size:38})),
           React.createElement('button',{key:'settings','data-tour':'settings',type:'button',title:'Settings','aria-label':'Settings',onClick:function(){setSettingsSaveError('');setShowSettings(true);},onMouseEnter:function(){setHovCard('settings');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:0,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.18)',background:'rgba(5,12,35,0.78)',color:'#fff',fontSize:25,lineHeight:1,cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='settings'||isFocused('settings')?'translateY(-3px) scale(1.04)':'none'},focusSty('settings'))},'\u2699'),
-          menuPills.map(function(btn){
+          menuPills.filter(Boolean).map(function(btn){
             var b=React.createElement('button',{key:btn.key,'data-tour':btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label,btn.green&&React.createElement(GreenDot),btn.dot&&React.createElement(RedDot));
             return b;
           })
