@@ -114,7 +114,14 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.7.5';
+var GAME_VERSION='v25.7.6';
+// ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
+// frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
+var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
+if(EMBED_AI)(function(){var mem={},real=null;try{real=window.localStorage;}catch(e){}
+  var shim={getItem:function(k){if(Object.prototype.hasOwnProperty.call(mem,k))return mem[k];try{return real?real.getItem(k):null;}catch(e){return null;}},setItem:function(k,v){mem[k]=String(v);},removeItem:function(k){mem[k]=null;},key:function(i){try{return real?real.key(i):null;}catch(e){return null;}},clear:function(){}};
+  Object.defineProperty(shim,'length',{get:function(){try{return real?real.length:0;}catch(e){return 0;}}});
+  try{Object.defineProperty(window,'localStorage',{configurable:true,get:function(){return shim;}});}catch(e){}})();
 // Never start a text selection (e.g. long-pressing a button on a phone) outside text boxes; some mobile
 // browsers ignore the CSS user-select rule on buttons. On touch screens, also block the long-press menu.
 (function(){
@@ -651,7 +658,7 @@ var FIREBASE_CONFIG={
 };
 var CLOUD_SDK='https://www.gstatic.com/firebasejs/10.12.2/';
 var CLOUD={user:null,listeners:[],initPromise:null,saveTimer:0,paused:false};
-function cloudEnabled(){return !!(FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey);}
+function cloudEnabled(){return !EMBED_AI&&!!(FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey);}
 function cloudLoadScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){rej(new Error('Could not load '+src));};document.head.appendChild(s);});}
 function cloudInit(){
   if(!cloudEnabled())return Promise.resolve(false);
@@ -4180,7 +4187,7 @@ function SettingsScreen(props){
       React.createElement('p',{style:{margin:0,fontSize:11,color:'rgba(255,255,255,0.62)'}},'Settings are saved on this device.')));
 }
 function App(){
-  var s_done=useState(false),introDone=s_done[0],setIntroDone=s_done[1];
+  var s_done=useState(EMBED_AI),introDone=s_done[0],setIntroDone=s_done[1];
   // First visit: offer the How to Play tutorial once.
   var s_tut=useState(function(){try{return !window.localStorage.getItem('slime_tut_seen');}catch(e){return false;}}),tutPrompt=s_tut[0],setTutPrompt=s_tut[1];
   function answerTutorial(show){try{window.localStorage.setItem('slime_tut_seen','1');}catch(e){}setTutPrompt(false);if(show)startTutorial();}
@@ -4230,6 +4237,8 @@ function App(){
   var s_rematch=useState(false),rematchRequested=s_rematch[0],setRematchRequested=s_rematch[1];
   var s_opponentRematch=useState(false),opponentRematchRequested=s_opponentRematch[0],setOpponentRematchRequested=s_opponentRematch[1];
   var s_onl=useState({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'}),onl=s_onl[0],setOnl=s_onl[1];
+  var s_waitAi=useState(false),waitAi=s_waitAi[0],setWaitAi=s_waitAi[1];
+  useEffect(function(){if(!EMBED_AI)return;var t=setTimeout(function(){pmRef.current='single';setGmode('single');startGame('2min','single',DC,null,'left','regular',null,null,{scoreLimit:0,overtime:true});},60);return function(){clearTimeout(t);};},[]);
   var s_stickerSlots=useState(loadOnlineStickerSlots),stickerSlots=s_stickerSlots[0],setStickerSlots=s_stickerSlots[1];
   var onlineStickerButtonRefs=useRef({});
   var onlineStickerGridRef=useRef(null);
@@ -5682,7 +5691,7 @@ function makePeerRoom(peer,role,code){
     // practice clips saved before the fix still include the idle opponent: hide whichever slime stayed further from the ball
     if(m.kind==='practice'&&frs.length){var dl=0,dr=0;frs.forEach(function(f){if(f.left.x<-500||f.right.x<-500)return;dl+=Math.abs(f.left.x-f.ball.x);dr+=Math.abs(f.right.x-f.ball.x);});if(dl||dr){var hide=dl>dr?'left':'right';frs.forEach(function(f){f[hide].x=-999;f[hide].y=-999;});}}
     setViewReplay({frames:frs,goals:rec.goals||[],colors:m.colors||DC,names:{left:m.left||'Left',right:m.right||'Right'},theme:m.theme||themeMode,skins:m.skins?{left:m.skins.left==='robot'?aiRobotSkin(m.aiDiff):achievementSkinDetails(m.skins.left),right:m.skins.right==='robot'?aiRobotSkin(m.aiDiff):achievementSkinDetails(m.skins.right)}:null,title:m.title||'Replay',kind:m.kind,meta:m});});}
-  function exitToMenu(){dailyRunRef.current=null;setDailyResult(null);gsRef.current._combust=false;tutRef.current=null;setTut(null);clearTimeout(postRpRef.current);onlineCleanup();setNetMsg('');winRef.current=null;readyRef.current=null;setRunning(false);setWinner(null);setGmode(null);setIsPractice(false);practRef.current=false;setGoalFlash(false);goalFlashRef.current=false;frozenRef.current=false;setPaused(false);pausedRef.current=false;setOt(false);otRef.current=false;otReadyRef.current=false;setOtLive(false);goRef.current=false;flashRef.current=false;replayActiveRef.current=false;setReplayActive(false);replayBufRef.current=[];replayFrRef.current=[];matchRecRef.current=[];matchRecActiveRef.current=false;setMatchFrames([]);setShowMatchReplay(false);particlesRef.current=[];ballTrailRef.current=[];setScreen('menu');setPendDur('1min');}
+  function exitToMenu(){if(EMBED_AI){restartGame();return;}dailyRunRef.current=null;setDailyResult(null);gsRef.current._combust=false;tutRef.current=null;setTut(null);clearTimeout(postRpRef.current);onlineCleanup();setNetMsg('');winRef.current=null;readyRef.current=null;setRunning(false);setWinner(null);setGmode(null);setIsPractice(false);practRef.current=false;setGoalFlash(false);goalFlashRef.current=false;frozenRef.current=false;setPaused(false);pausedRef.current=false;setOt(false);otRef.current=false;otReadyRef.current=false;setOtLive(false);goRef.current=false;flashRef.current=false;replayActiveRef.current=false;setReplayActive(false);replayBufRef.current=[];replayFrRef.current=[];matchRecRef.current=[];matchRecActiveRef.current=false;setMatchFrames([]);setShowMatchReplay(false);particlesRef.current=[];ballTrailRef.current=[];setScreen('menu');setPendDur('1min');}
   function restartGame(){startGame(lastGM.current,lastPM.current,lastCol.current,lastNm.current,lastSide.current,practModeRef.current,p1IdRef.current,p2IdRef.current,lastGameOptionsRef.current);}
   function toggleUnlimJump(){if(!practRef.current)return;setUnlimJump(function(p){unlimJumpRef.current=!p;return !p;});}
   function togglePause(){if(goRef.current||onRoleRef.current)return;var np=!pausedRef.current;pausedRef.current=np;if(!goalFlashRef.current&&!replayActiveRef.current)frozenRef.current=np;setPaused(np);}
@@ -6426,6 +6435,7 @@ function makePeerRoom(peer,role,code){
       oBody.push(React.createElement('div',{key:'l',style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Room code'));
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:56,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.peerOn?'Your friend is in! Pick a length and start.':(onl.status==='Connected'?'Waiting for your friend to join…':onl.status)));
+      if(onl.status==='Connected'||onl.peerOn)oBody.push(React.createElement('button',{key:'wai',type:'button',onClick:function(){setWaitAi(!waitAi);},'aria-pressed':waitAi,style:Object.assign(pill(waitAi?'rgba(255,255,255,0.14)':'linear-gradient(135deg,#2563eb,#1e40af)',{fontSize:13,padding:'9px 20px',textTransform:'none',letterSpacing:0}),focusSty('online_waitai'))},waitAi?'Hide the AI match':'🎮 Play vs AI while you wait'));
       if(onl.diag)oBody.push(React.createElement('div',{key:'dg',style:{fontSize:10,color:'rgba(255,255,255,0.4)',maxWidth:340,textAlign:'center',margin:'6px auto 0',fontFamily:'monospace',wordBreak:'break-word'}},onl.diag));
       if(onl.warn)oBody.push(React.createElement('div',{key:'w',role:'alert',style:{fontSize:12,color:'#fde68a',maxWidth:320,textAlign:'center',lineHeight:1.4,margin:'4px auto 0'}},onl.warn));
       if(onl.peerOn){
@@ -6441,6 +6451,7 @@ function makePeerRoom(peer,role,code){
     }else{
       oBody.push(React.createElement('div',{key:'cd',style:{fontFamily:DISP,fontSize:44,letterSpacing:'0.22em',paddingLeft:'0.22em',color:'#fff',textShadow:titleGlow,lineHeight:1}},onl.code));
       oBody.push(React.createElement('div',{key:'s',style:oTxt},onl.status!=='Connected'?onl.status:(onl.peerOn?'Connected! Waiting for the host to start the match…':'Connected. Looking for the host…')));
+      if(onl.status==='Connected')oBody.push(React.createElement('button',{key:'wai',type:'button',onClick:function(){setWaitAi(!waitAi);},'aria-pressed':waitAi,style:Object.assign(pill(waitAi?'rgba(255,255,255,0.14)':'linear-gradient(135deg,#2563eb,#1e40af)',{fontSize:13,padding:'9px 20px',textTransform:'none',letterSpacing:0}),focusSty('online_waitai'))},waitAi?'Hide the AI match':'🎮 Play vs AI while you wait'));
       if(onl.diag)oBody.push(React.createElement('div',{key:'dg',style:{fontSize:10,color:'rgba(255,255,255,0.4)',maxWidth:340,textAlign:'center',margin:'6px auto 0',fontFamily:'monospace',wordBreak:'break-word'}},onl.diag));
       if(onl.warn)oBody.push(React.createElement('div',{key:'w',role:'alert',style:{fontSize:12,color:'#fde68a',maxWidth:320,textAlign:'center',lineHeight:1.4,margin:'4px auto 0'}},onl.warn));
     }
@@ -6449,7 +6460,11 @@ function makePeerRoom(peer,role,code){
     var backAct=oV==='choose'?oBack:oV==='stickers'?cancelOnlineStickerPicker:oBackToChoose;
     oBody.push(React.createElement('button',{key:'b',onClick:backAct,style:Object.assign(pill('rgba(255,255,255,0.12)',{fontSize:13,padding:'9px 22px',textTransform:'none',letterSpacing:0,flexShrink:0}),focusSty(backId))},oV==='choose'?'Back':'Cancel'));
     var onlineStyle=oV==='stickers'?lockedScreen({minHeight:0,padding:'8px 16px'}):baseStyle;
-    return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
+    var showAi=waitAi&&(oV==='host'||oV==='guest');
+    var aiPane=showAi&&React.createElement('div',{key:'aipane',style:{display:'flex',flexDirection:'column',gap:8,alignItems:'center',position:'relative',zIndex:1}},
+      React.createElement('div',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.75)'}},'Practice vs the AI · click the match to play · nothing here counts towards coins or stats'),
+      React.createElement('iframe',{title:'Player vs AI while you wait',src:location.pathname+'?embed=ai',onLoad:function(e){try{e.target.contentWindow.focus();}catch(x){}},style:{width:'min(860px,56vw)',height:'min(560px,72vh)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,background:'#050c23',boxShadow:'0 18px 50px rgba(0,0,0,0.5)'}}));
+    return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),showAi?React.createElement('div',{style:{display:'flex',gap:24,alignItems:'center',justifyContent:'center',flexWrap:'wrap',width:'100%',position:'relative',zIndex:1}},React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)),aiPane):React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
   }
 
   if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{onTour:function(){try{window.localStorage.removeItem('slime_tour_seen');}catch(e){}setScreen('menu');setTour(true);},onTutorial:startTutorial,theme:themeMode,keybinds:gameSettings.keybinds,touch:touchUI,onBack:function(){setScreen('menu');},focusSty:focusSty})));
@@ -6895,6 +6910,7 @@ function UpdateBanner(){
     function onGameUi(v){setInGame(v);if(!v)setTimeout(function(){last=0;check();},800);}
     GAME_UI.listeners.push(onGameUi);
     function check(){
+      if(EMBED_AI)return;
       if(Date.now()-last<20000)return;last=Date.now();
       fetchLiveVersion().then(function(v){
         if(!alive||!v||!isNewerVersion(v,GAME_VERSION))return;
