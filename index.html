@@ -114,7 +114,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.7.7';
+var GAME_VERSION='v25.7.8';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -4878,6 +4878,8 @@ function makePeerRoom(peer,role,code){
   function applySnap(sv){for(var fi=0;fi<SF.length;fi++){gsRef.current.left[SF[fi]]=sv.left[SF[fi]];gsRef.current.right[SF[fi]]=sv.right[SF[fi]];}gsRef.current.ball.x=sv.ball.x;gsRef.current.ball.y=sv.ball.y;gsRef.current.ball.vx=sv.ball.vx;gsRef.current.ball.vy=sv.ball.vy;gsRef.current.ball.ang=sv.ball.ang||0;}
 
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
+  // The side game next to the online waiting screen lives on the Player vs AI setup screen instead of the main menu.
+  useEffect(function(){if(EMBED_AI&&screen==='menu'){pmRef.current='single';setGmode('single');setScreen('duration');}},[screen]);
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
   RARE_P.fire=gameSettings.rareFire;RARE_P.boom=gameSettings.rareBoom;
   GAME_AUDIO_VOLUME=gameSettings.sfxVolume;applyKeybinds(gameSettings.keybinds);
@@ -6587,7 +6589,7 @@ function makePeerRoom(peer,role,code){
             settingPill('overtime_yes','On',overtimeEnabled,function(){setOvertimeEnabled(true);}),
             settingPill('overtime_no','Off',!overtimeEnabled,function(){setOvertimeEnabled(false);}))),
         pmRef.current==='single'&&React.createElement('button',{onClick:function(){startGame(selectedDuration,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill(playButton,{fontSize:18,padding:'15px 60px',letterSpacing:'0.08em',border:'2px solid rgba(255,255,255,0.7)',boxShadow:isDay?'0 6px 28px rgba(22,163,74,0.7)':isJapanT?'0 6px 28px rgba(225,29,114,0.7)':'0 6px 28px rgba(129,140,248,0.7)'}),focusSty('play'))},'Play'),
-        React.createElement('button',{onClick:function(){setScreen(pmRef.current==='multi'?'player_select':'menu');},style:ghostBtn('back')},'Back')
+        !EMBED_AI&&React.createElement('button',{onClick:function(){setScreen(pmRef.current==='multi'?'player_select':'menu');},style:ghostBtn('back')},'Back')
       )
     );
   }
