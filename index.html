@@ -115,7 +115,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.9.3';
+var GAME_VERSION='v25.9.5';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -4694,6 +4694,7 @@ function makePeerRoom(peer,role,code){
   function rbOnInput(p){
     if(!p||typeof p!=='object')return;
     if(p.ko){rbKoRef.current=p.ko;return;}
+    if(p.skipReplay){if(onRoleRef.current==='host'&&replayActiveRef.current&&goalFlashDoneRef.current)endReplay();return;}
     var S=rbRef.current;
     if(!S||S.e!==p.e||S.mid!==p.m){var q=rbQRef.current;q.push(p);if(q.length>600)q.shift();return;}
     rbApply(S,p);
@@ -4739,12 +4740,15 @@ function makePeerRoom(peer,role,code){
   }
   // Simulate frame fr from S.cur (saving the state before it). `live` = first time this frame is shown: play effects.
   function rbSim(S,fr,live){
+    if(S.goalHold!=null&&fr<S.goalHold)S.goalHold=null; // re-simulating from before the goal: see if it still happens
     S.st[fr%RB_RING]=simClone(S.cur);
     var lb=S.lin[fr]|0,rb=(fr in S.rin)?S.rin[fr]:((S.rin[S.rconf]|0)&11);
     S.pred[fr]=rb;
     var evs=[];S.ev[fr%RB_RING]=evs;
     var hk=rbHooks(evs,live);
     if(S.side==='left')simStep(S.cur,simIn(lb),simIn(rb),RB_CFG,hk);else simStep(S.cur,simIn(rb),simIn(lb),RB_CFG,hk);
+    // joiner: hold the picture on the goal until the host confirms it (or a correction shows it didn't happen)
+    if(S.side==='right'&&S.goalHold==null&&evs.some(function(ev){return ev.t==='g';})){S.goalHold=fr+1;S.goalHoldState=simClone(S.cur);}
   }
   // When a late input or the host's state moves a slime, show it gliding to the new spot over a few frames instead of snapping.
   function rbVisBegin(S){return{lx:S.cur.left.x,ly:S.cur.left.y,rx:S.cur.right.x,ry:S.cur.right.y};}
@@ -4753,8 +4757,8 @@ function makePeerRoom(peer,role,code){
     for(var i=0;i<2;i++){var q=v[d[i][0]],dx=d[i][1],dy=d[i][2];if(Math.abs(dx)>260||Math.abs(dy)>260){q.x=0;q.y=0;}else{q.x+=dx;q.y+=dy;}}
   }
   function rbShow(S,raw){
-    var gs=gsRef.current;simCopyInto(gs,S.cur);
-    if(raw||!S.vis)return;
+    var gs=gsRef.current,held=S.goalHold!=null&&S.goalHoldState;simCopyInto(gs,held?S.goalHoldState:S.cur);
+    if(raw||held||!S.vis)return;
     ['left','right'].forEach(function(sd){var q=S.vis[sd],sl=gs[sd];if(Math.abs(q.x)<0.4&&Math.abs(q.y)<0.4){q.x=0;q.y=0;return;}sl.x+=q.x;sl.y=Math.min(GH-GRND,sl.y+q.y);});
   }
   // Host: stop play at frame k (everything before k has happened) and tell the joiner.
@@ -4788,6 +4792,7 @@ function makePeerRoom(peer,role,code){
     if(S.roll<S.f){var m=S.roll;S.roll=1e9;if(m>=S.f-RB_RING+1){var vo=rbVisBegin(S);S.cur=simClone(S.st[m%RB_RING]);for(k=m;k<S.f;k++)rbSim(S,k,false);rbVisEnd(S,vo);S.rbs++;}}
     // Joiner: compare with the host's confirmed state and take the host's if we drifted apart.
     if(!isHost&&S.sync){var h=S.sync;if(h.k<S.f-RB_RING+1)S.sync=null;else if(h.k<=S.rconf+1&&h.k<S.f){if(simHash(S.st[h.k%RB_RING])!==simHash(h.s)){S.desync++;try{console.warn('[Soccer Slime] online desync fixed at frame',h.k);}catch(e){}var vo2=rbVisBegin(S);S.cur=simClone(h.s);for(k=h.k;k<S.f;k++)rbSim(S,k,false);rbVisEnd(S,vo2);}S.sync=null;}}
+    if(S.goalHold!=null&&S.f-S.goalHold>60&&S.stopAt<0){S.goalHold=null;S.goalHoldState=null;}
     if(S.stopAt>=0&&S.f>=S.stopAt){if(S.f>S.stopAt){S.cur=simClone(S.st[S.stopAt%RB_RING]);S.f=S.stopAt;}S.on=false;rbShow(S,true);return;}
     if(isHost){while(S.fin<=S.rconf&&S.fin<S.f){rbFinal(S,S.fin++);if(!S.on)return;}}
     // Don't run too far ahead of the other player's real inputs, and give way a frame now and then if we're
@@ -5842,7 +5847,8 @@ function makePeerRoom(peer,role,code){
       // Remember fresh dash / jump presses so a tap that starts and ends between two game steps still counts (online).
       if(!wasDown&&(key==='s'||key==='w'))jrRef.current['p_'+key]=true;
       if(onRoleRef.current==='guest'&&!wasDown){if(key==='w')netCtrRef.current.jc++;if(key==='s')netCtrRef.current.dc++;}
-      if(replayActiveRef.current&&goalFlashDoneRef.current){var scorer=replayScorerRef.current,rmode=pmRef.current,canSkip=false;if(rmode==='multi'){if(scorer==='left'&&key==='w')canSkip=true;if(scorer==='right'&&key==='arrowup')canSkip=true;}else if(rmode==='single'&&(key==='arrowup'||key==='w'))canSkip=true;if(canSkip){endReplay();return;}}
+      // W / Up skips the instant replay (either player; online the joiner asks the host, who runs the replay)
+      if((replayActiveRef.current&&goalFlashDoneRef.current||pmRef.current==='online'&&onRoleRef.current==='guest'&&netReplayRef.current)&&(key==='w'||key==='arrowup')){if(pmRef.current==='online'&&onRoleRef.current==='guest'){var rmS=roomRef.current&&roomRef.current.room;if(rmS&&rmS.sendInput)rmS.sendInput({skipReplay:1});}else endReplay();return;}
       if(key==='escape'){if(showReplayRef.current)return;if(screen==='guide'||screen==='practice_select'){setScreen('menu');return;}if(screen==='game'){if(goRef.current||practRef.current||pausedRef.current){exitToMenu();return;}togglePause();}}
       // Pause / unlimited-jump shortcuts use the physical key, unless that key is bound to a control.
       if((raw==='p'||(raw===' '&&!KEYMAP[' ']))&&screen==='game'&&!goRef.current&&!practRef.current)togglePause();
@@ -5948,7 +5954,7 @@ function makePeerRoom(peer,role,code){
               gctx.restore();
               if(replayActiveRef.current){gctx.setTransform(RSn,0,0,RSn,0,0);if(replaySpeedAt(replayIdxRef.current,replayFrRef.current.length)<1){gctx.save();gctx.font='18px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,255,255,'+(0.6+0.3*Math.sin(now*0.008))+')';gctx.fillText('SLOW-MO',GW/2,40);gctx.restore();}}
               if(goalFlashRef.current){var gfn=netGfRef.current,gfa2=Math.max(0,0.5*(1-gfn/55));gctx.fillStyle='rgba(0,0,0,'+gfa2+')';gctx.fillRect(0,0,GW,GH);var gfs2=Math.min(112,72+gfn*3),gfp2=0.88+0.12*Math.sin(gfn*0.35);drawGoalText(gctx,gfs2*gfp2,1,RSn);}
-              if(replayActiveRef.current){var grt=replayFrRef.current.length,grp=grt?replayIdxRef.current/grt:0;gctx.fillStyle='rgba(0,0,0,0.55)';gctx.fillRect(0,0,GW,32);gctx.save();gctx.font='16px "Lilita One",sans-serif';gctx.textAlign='left';gctx.textBaseline='middle';gctx.fillStyle='#fbbf24';gctx.shadowColor='#fbbf24';gctx.shadowBlur=8;gctx.fillText('INSTANT REPLAY',10,16);gctx.restore();gctx.fillStyle='rgba(255,255,255,0.15)';gctx.fillRect(0,28,GW,4);gctx.fillStyle='#38bdf8';gctx.fillRect(0,28,GW*grp,4);}
+              if(replayActiveRef.current){var grt=replayFrRef.current.length,grp=grt?replayIdxRef.current/grt:0;gctx.fillStyle='rgba(0,0,0,0.55)';gctx.fillRect(0,0,GW,32);gctx.save();gctx.font='16px "Lilita One",sans-serif';gctx.textAlign='left';gctx.textBaseline='middle';gctx.fillStyle='#fbbf24';gctx.shadowColor='#fbbf24';gctx.shadowBlur=8;gctx.fillText('INSTANT REPLAY',10,16);gctx.restore();gctx.save();gctx.font='13px "Lilita One",sans-serif';gctx.textAlign='right';gctx.textBaseline='middle';gctx.fillStyle='rgba(255,255,255,0.7)';gctx.fillText('W / \u2191 to skip',GW-10,16);gctx.restore();gctx.fillStyle='rgba(255,255,255,0.15)';gctx.fillRect(0,28,GW,4);gctx.fillStyle='#38bdf8';gctx.fillRect(0,28,GW*grp,4);}
               if(!replayActiveRef.current&&netRfRef.current>-999&&netRfRef.current<62&&!goRef.current)drawReady(gctx,netRfRef.current,mirO?statsRef.current.rG:statsRef.current.lG,mirO?statsRef.current.lG:statsRef.current.rG,mirO?{left:cols.right,right:cols.left}:cols);
               var gtl=tlRef.current;if(!replayActiveRef.current&&((gtl>0&&gtl<=10)||(gtl===0&&orv!==2))&&!goRef.current){gctx.save();gctx.font='88px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='middle';gctx.fillStyle='rgba(255,255,255,0.95)';gctx.shadowColor='rgba(0,0,0,0.6)';gctx.shadowBlur=12;gctx.fillText(String(gtl),GW/2,GH/2-80);gctx.restore();}
               if(!replayActiveRef.current&&otRef.current&&orv===2&&!goRef.current){gctx.save();gctx.font='22px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,100,100,0.9)';gctx.shadowColor='#ff4444';gctx.shadowBlur=10;gctx.fillText('OVERTIME',GW/2,8);gctx.restore();}
@@ -5962,7 +5968,7 @@ function makePeerRoom(peer,role,code){
           if(goalFlashDoneRef.current){if(rpos<rfr.length-1){applySnap(replayFrameAt(rfr,rpos));replayIdxRef.current=rpos+replaySpeedAt(rpos,rfr.length);}else endReplay();}
           var cv0=cvRef.current;if(cv0&&replayActiveRef.current){var ctx0=cv0.getContext('2d');replayCamera(ctx0,RSn,ball,rpos,rfr.length);drawScene(ctx0,ls,rs,ball,cols,mode,hSide,practRef.current,fanRef.current,false,null,thN(tm),thJ(tm),getGameSlimeSkins(mode));ctx0.setTransform(RSn,0,0,RSn,0,0);
             if(replaySpeedAt(rpos,rfr.length)<1){ctx0.save();ctx0.font='18px "Lilita One",sans-serif';ctx0.textAlign='center';ctx0.textBaseline='top';ctx0.fillStyle='rgba(255,255,255,'+(0.6+0.3*Math.sin(now*0.008))+')';ctx0.fillText('SLOW-MO',GW/2,40);ctx0.restore();}
-            var rtot=rfr.length,rprog=rtot>0?Math.min(1,rpos/(rtot-1)):0;ctx0.fillStyle='rgba(0,0,0,0.55)';ctx0.fillRect(0,0,GW,32);ctx0.save();ctx0.font='16px "Lilita One",sans-serif';ctx0.textAlign='left';ctx0.textBaseline='middle';ctx0.fillStyle='#fbbf24';ctx0.shadowColor='#fbbf24';ctx0.shadowBlur=8;ctx0.fillText('INSTANT REPLAY',10,16);ctx0.restore();var scorer2=replayScorerRef.current,modeNow=pmRef.current,skipHint=modeNow==='single'?'W/↑ to skip':scorer2==='left'?'W to skip (P1)':'↑ to skip (P2)';ctx0.save();ctx0.font='13px "Lilita One",sans-serif';ctx0.textAlign='right';ctx0.textBaseline='middle';ctx0.fillStyle='rgba(255,255,255,0.7)';ctx0.fillText(skipHint,GW-10,16);ctx0.restore();ctx0.fillStyle='rgba(255,255,255,0.15)';ctx0.fillRect(0,28,GW,4);ctx0.fillStyle='#38bdf8';ctx0.fillRect(0,28,GW*rprog,4);}
+            var rtot=rfr.length,rprog=rtot>0?Math.min(1,rpos/(rtot-1)):0;ctx0.fillStyle='rgba(0,0,0,0.55)';ctx0.fillRect(0,0,GW,32);ctx0.save();ctx0.font='16px "Lilita One",sans-serif';ctx0.textAlign='left';ctx0.textBaseline='middle';ctx0.fillStyle='#fbbf24';ctx0.shadowColor='#fbbf24';ctx0.shadowBlur=8;ctx0.fillText('INSTANT REPLAY',10,16);ctx0.restore();var skipHint='W / ↑ to skip';ctx0.save();ctx0.font='13px "Lilita One",sans-serif';ctx0.textAlign='right';ctx0.textBaseline='middle';ctx0.fillStyle='rgba(255,255,255,0.7)';ctx0.fillText(skipHint,GW-10,16);ctx0.restore();ctx0.fillStyle='rgba(255,255,255,0.15)';ctx0.fillRect(0,28,GW,4);ctx0.fillStyle='#38bdf8';ctx0.fillRect(0,28,GW*rprog,4);}
           return;
         }
 
@@ -7093,7 +7099,9 @@ function makePeerRoom(peer,role,code){
         React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
           React.createElement('span',{style:{fontFamily:DISP,fontSize:18,letterSpacing:'0.04em'}},'Match Chat'),
           React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)'}},chatOpen?'Typing…':'/ chat · 1–5 stickers')),
-        React.createElement('div',{ref:chatListRef,style:{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column',gap:7,padding:'4px 2px 8px'}},
+        // column-reverse keeps the list anchored to the bottom (newest message) unless you scroll up yourself
+        React.createElement('div',{ref:chatListRef,style:{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column-reverse',padding:'4px 2px 8px'}},
+          React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:7,minHeight:'100%'}},
           chatMessages.length===0
             ?React.createElement('div',{style:{margin:'auto',textAlign:'center',fontSize:12,color:'rgba(255,255,255,0.5)',lineHeight:1.5}},'Say hi to your opponent!',' ',React.createElement('span',{className:'kbd'},'/'))
             :chatMessages.map(function(message,i){
@@ -7101,9 +7109,14 @@ function makePeerRoom(peer,role,code){
               return React.createElement('div',{key:i,style:{alignSelf:message.mine?'flex-end':'flex-start',maxWidth:'90%',padding:'7px 10px',borderRadius:12,background:message.mine?'rgba(14,165,233,0.28)':'rgba(255,255,255,0.09)',border:'1px solid '+(message.mine?'rgba(56,189,248,0.28)':'rgba(255,255,255,0.08)'),wordBreak:'break-word'}},
                 React.createElement('div',{style:{fontSize:10,fontWeight:800,color:message.mine?'#7dd3fc':'#fca5a5',marginBottom:2}},message.n),
                 sticker
-                  ?React.createElement('img',{src:sticker.src,alt:sticker.name,loading:'lazy',style:{display:'block',width:'100%',maxWidth:210,maxHeight:170,objectFit:'contain',borderRadius:8}})
+                  ?React.createElement('img',{src:sticker.src,alt:sticker.name,style:{display:'block',width:'100%',maxWidth:210,maxHeight:170,objectFit:'contain',borderRadius:8}})
                   :React.createElement('div',{style:{fontFamily:'var(--font-title)',fontSize:13,lineHeight:1.3}},message.m));
-            })),
+            }))),
+        // your five stickers with their number keys, so you can see what 1-5 send (click works too)
+        React.createElement('div',{'aria-label':'Sticker hotkeys',style:{display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))',gap:5,marginTop:7}},
+          [0,1,2,3,4].map(function(i){var st=stickerSlots[i]&&findOnlineSticker(stickerSlots[i]);return React.createElement('button',{key:i,type:'button',disabled:!st,title:st?('Press '+(i+1)+': '+st.name):'Empty slot',onClick:function(){if(st)sendOnlineSticker(st.id);},style:{position:'relative',padding:3,height:46,borderRadius:9,border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.06)',cursor:st?'pointer':'default',overflow:'hidden'}},
+            st&&React.createElement('img',{src:st.src,alt:st.name,style:{display:'block',width:'100%',height:'100%',objectFit:'contain'}}),
+            React.createElement('span',{className:'kbd',style:{position:'absolute',left:2,top:2,margin:0,minWidth:14,padding:'0 4px',fontSize:10}},String(i+1)));})),
         React.createElement('form',{onSubmit:sendChat,style:{display:'flex',gap:6,marginTop:7}},
           React.createElement('input',{ref:chatInputRef,type:'text',maxLength:200,placeholder:'Press / to chat…',onFocus:function(){setChatOpen(true);},onBlur:function(){setChatOpen(false);},onKeyDown:function(e){e.stopPropagation();if(e.key==='Escape'){e.preventDefault();setChatError('');closeChat();}},style:{flex:1,minWidth:0,padding:'8px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.16)',background:'rgba(255,255,255,0.08)',color:'#fff',fontFamily:'var(--font-title)',fontSize:12,outline:'none'}}),
           React.createElement('button',{type:'submit',style:{padding:'0 12px',border:0,borderRadius:10,background:'linear-gradient(135deg,#0ea5e9,#0369a1)',color:'#fff',fontWeight:800,cursor:'pointer'}},'Send')),
