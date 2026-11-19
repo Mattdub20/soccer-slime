@@ -114,7 +114,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.7.8';
+var GAME_VERSION='v25.8.3';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -246,6 +246,7 @@ function cleanGameSettings(value){
     defaultSide:value.defaultSide==='left'?'left':'right',
     soundEnabled:typeof value.soundEnabled==='boolean'?value.soundEnabled:true,
     perfMode:['auto','on','off'].indexOf(value.perfMode)>=0?value.perfMode:'auto',
+    menuLayout:['og','a','b'].indexOf(value.menuLayout)>=0?value.menuLayout:'b',
     battery30:value.battery30===true,
     sfxVolume:typeof value.sfxVolume==='number'&&isFinite(value.sfxVolume)?Math.max(0,Math.min(1,value.sfxVolume)):0.7,
     uiScale:typeof value.uiScale==='number'&&isFinite(value.uiScale)?Math.max(0.6,Math.min(1.6,Math.round(value.uiScale*100)/100)):1,
@@ -1776,8 +1777,8 @@ function SlimePreviewCanvas(props){
     function loop(now){if(!alive)return;if(PERF_LOW){last=0;raf=0;if(!stillDone){stillDone=true;T=fixedT;draw();}poll();return;}stillDone=false;if(!last)last=now;var dt=Math.min(0.1,(now-last)/1000);last=now;T+=dt*(hotRef.current?1.7:1);draw();raf=requestAnimationFrame(loop);}
     T=fixedT;draw();if(PERF_LOW){stillDone=true;poll();}else raf=requestAnimationFrame(loop);
     return function(){alive=false;clearTimeout(tm);cancelAnimationFrame(raf);};
-  },[type,props.k,props.theme,props.label,props.sub,props.h]);
-  return React.createElement('canvas',{ref:cvRef,'aria-hidden':'true',width:Math.round(215*(props.k||1)),height:Math.round((props.h||140)*(props.k||1)),style:{width:'100%',height:'100%',display:'block',transform:props.hot?'scale(1.05)':'scale(1)',transformOrigin:'50% 100%',transition:'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)'}});
+  },[type,props.k,props.theme,props.label,props.sub,props.h,props.w]);
+  return React.createElement('canvas',{ref:cvRef,'aria-hidden':'true',width:Math.round((props.w||215)*(props.k||1)),height:Math.round((props.h||140)*(props.k||1)),style:{width:'100%',height:'100%',display:'block',transform:props.hot?'scale(1.05)':'scale(1)',transformOrigin:'50% 100%',transition:'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)'}});
 }
 function PracticePreviewCanvas(props){
   var type=props.type,cvRef=useRef(null);
@@ -1807,8 +1808,8 @@ function PracticePreviewCanvas(props){
     ctx.save();var bg=ctx.createRadialGradient(bx-br2*0.3,by-br2*0.3,1,bx,by,br2);
     bg.addColorStop(0,'#fff176');bg.addColorStop(0.5,'#FFD700');bg.addColorStop(1,'#f9a825');
     ctx.fillStyle=bg;ctx.beginPath();ctx.arc(bx,by,br2,0,Math.PI*2);ctx.fill();ctx.restore();
-  },[type,props.k,props.theme]);
-  return React.createElement('canvas',{ref:cvRef,width:Math.round(180*(props.k||1)),height:Math.round(120*(props.k||1)),style:{width:'100%',height:'100%',display:'block'}});
+  },[type,props.k,props.theme,props.w,props.h]);
+  return React.createElement('canvas',{ref:cvRef,width:Math.round((props.w||180)*(props.k||1)),height:Math.round((props.h||120)*(props.k||1)),style:{width:'100%',height:'100%',display:'block'}});
 }
 
 // ─── Theme backdrop (fixed layer, never remounts between screens) ─────────
@@ -3848,7 +3849,7 @@ function ShopScreen(props){
         it.shop&&!have?React.createElement(BucksAmount,{value:it.price,size:15,style:{fontSize:12,color:'#fde68a'}}):React.createElement('span',{style:{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.5)'}},isNone?'Default':it.shop?'Owned':'Achievement reward')),
       action);
   }
-  function grid(items){return React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(122px,1fr))',gap:10,width:'100%'}},items.map(card));}
+  function grid(items){return React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(132px,1fr))',gap:12,width:'100%'}},items.map(card));}
   function section(title,items){return items.length?React.createElement('div',{key:title,style:{width:'100%',display:'flex',flexDirection:'column',gap:8}},React.createElement('div',{style:{fontSize:11,fontWeight:900,letterSpacing:'0.12em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)'}},title),grid(items)):null;}
   var noneItem={id:'none',name:tab==='skin'?'Classic':'None',icon:'\u25CB'};
   var preview;
@@ -3858,26 +3859,32 @@ function ShopScreen(props){
   else preview=React.createElement(CosmeticPreview,{color:color,theme:theme,skin:current('skin'),accessory:current('accessory'),celebration:shown('celebration'),trail:shown('trail'),pose:shown('pose'),width:300});
   var peekItem=peek?(peek.kind==='skin'?achievementSkinDetails(peek.id):peek.kind==='frame'?achievementFrameDetails(peek.id):cosmeticDetails(peek.kind,peek.id)):null;
   var panel={width:'min(780px,94vw)',maxHeight:'calc(100dvh - 32px)',overflowY:'auto',overscrollBehavior:'contain',boxSizing:'border-box',padding:'20px 20px 22px',borderRadius:22,background:'rgba(5,12,35,0.86)',border:'1px solid rgba(253,230,138,0.35)',boxShadow:'0 20px 60px rgba(0,0,0,0.45)',display:'flex',flexDirection:'column',alignItems:'center',gap:14,color:'#fff'};
-  return React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'shop-title',onKeyDown:handleKey,style:{width:'100%',minHeight:'100%',display:'flex',alignItems:'center',justifyContent:'center',padding:16,boxSizing:'border-box'}},
-    React.createElement('div',{ref:rootRef,style:panel},
+  var narrowShop=window.innerWidth<820;
+  // Wide layout, no box around it: categories, preview and how-to-earn on the left; the items fill the right.
+  return React.createElement('div',{role:'dialog','aria-modal':'true','aria-labelledby':'shop-title',onKeyDown:handleKey,style:{width:'100%',minHeight:'100%',display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'20px 16px',boxSizing:'border-box'}},
+    React.createElement('div',{ref:rootRef,style:{width:'min(1120px,100%)',display:'flex',flexDirection:'column',gap:18,color:'#fff',position:'relative',zIndex:1}},
       React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,width:'100%',flexWrap:'wrap'}},
         React.createElement('button',{type:'button',onClick:props.onBack,style:{padding:'8px 16px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},'\u2190 Back'),
         React.createElement('h1',{id:'shop-title',style:{fontFamily:'var(--font-display)',fontSize:32,margin:0,flex:1,textShadow:'0 0 20px rgba(251,191,36,0.55)'}},'Shop'),
         React.createElement('div',{role:'status','aria-label':'Balance: '+bal+' Slime Bucks',style:{display:'flex',alignItems:'center',gap:8,padding:'7px 14px',borderRadius:50,background:'rgba(0,0,0,0.4)',border:'1px solid rgba(253,230,138,0.6)'}},React.createElement(SlimeBuck,{size:26}),React.createElement('span',{style:{fontSize:20,fontWeight:900,color:'#fde68a',fontVariantNumeric:'tabular-nums'}},bal),React.createElement('span',{style:{fontSize:10,fontWeight:800,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)'}},'Slime Bucks'))),
-      React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.7)',textAlign:'center',lineHeight:1.45}},'Earn Slime Bucks against the AI: 1 per goal you score, plus a win bonus from 5 (Super Easy) up to 25 (Chaos). Online, practice and training don\u2019t pay out.'),
-      React.createElement('div',{role:'tablist','aria-label':'Shop categories',style:{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center'}},
-        SHOP_CATS.map(function(c){var on=c.kind===tab;return React.createElement('button',{key:c.kind,type:'button',role:'tab','aria-selected':on,'data-shop-tab':c.kind,onClick:function(){setTab(c.kind);setPeek(null);setMsg(null);},style:{display:'flex',alignItems:'center',gap:5,padding:'7px 12px',borderRadius:50,border:on?'2px solid #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},React.createElement('span',{'aria-hidden':'true'},c.icon),c.label);})),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:narrowShop?'1fr':'280px minmax(0,1fr)',gap:22,alignItems:'start'}},
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:14,position:narrowShop?'static':'sticky',top:12}},
+      React.createElement('div',{role:'tablist','aria-label':'Shop categories',style:{display:'flex',flexDirection:narrowShop?'row':'column',flexWrap:'wrap',gap:6,justifyContent:narrowShop?'center':'flex-start'}},
+        SHOP_CATS.map(function(c){var on=c.kind===tab;return React.createElement('button',{key:c.kind,type:'button',role:'tab','aria-selected':on,'data-shop-tab':c.kind,onClick:function(){setTab(c.kind);setPeek(null);setMsg(null);},style:{display:'flex',alignItems:'center',gap:8,padding:narrowShop?'7px 12px':'10px 14px',borderRadius:narrowShop?50:12,width:narrowShop?'auto':'100%',textAlign:'left',border:on?'2px solid #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},React.createElement('span',{'aria-hidden':'true'},c.icon),c.label);})),
+          React.createElement('div',{style:{padding:14,borderRadius:18,background:'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',alignItems:'center',gap:10}},
       React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6}},
         preview,
         peekItem&&React.createElement('div',{role:'status',style:{fontSize:11,fontWeight:800,color:'#fde68a'}},'Previewing '+peekItem.name+' \u00B7 tap it again to stop')),
-      msg&&React.createElement('div',{role:msg.err?'alert':'status',style:{width:'100%',boxSizing:'border-box',textAlign:'center',padding:'7px 10px',borderRadius:10,fontSize:12,fontWeight:800,color:msg.err?'#fecaca':'#bbf7d0',background:msg.err?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.16)'}},msg.text),
       tab==='skin'&&avatar.kind!=='photo'&&React.createElement('label',{style:{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800,flexWrap:'wrap',justifyContent:'center'}},'Profile picture skin',
         React.createElement('select',{value:avatar.pfpSkin||'same',onChange:function(e){equip('pfpSkin',e.target.value);},style:{padding:'7px 10px',borderRadius:10,background:'#18243c',border:'1px solid rgba(255,255,255,0.26)',color:'#fff',fontFamily:'inherit'}},
-          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(sk){return mine.indexOf(sk.id)>=0;})).map(function(sk){return React.createElement('option',{key:sk.id,value:sk.id},sk.name);}))),
-      React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',gap:14}},
+          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(sk){return mine.indexOf(sk.id)>=0;})).map(function(sk){return React.createElement('option',{key:sk.id,value:sk.id},sk.name);})))),
+      React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.7)',textAlign:narrowShop?'center':'left',lineHeight:1.45}},'Earn Slime Bucks against the AI: 1 per goal you score, plus a win bonus from 5 (Super Easy) up to 25 (Chaos). Online, practice and training don\u2019t pay out.')),
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0}},
+      msg&&React.createElement('div',{role:msg.err?'alert':'status',style:{width:'100%',boxSizing:'border-box',textAlign:'center',padding:'7px 10px',borderRadius:10,fontSize:12,fontWeight:800,color:msg.err?'#fecaca':'#bbf7d0',background:msg.err?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.16)'}},msg.text),
+      React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',gap:16}},
         grid([noneItem]),
         section('For sale',forSale),
-        section(tab==='frame'?'Earned with achievements':'Achievement rewards',rewards))));
+        section(tab==='frame'?'Earned with achievements':'Achievement rewards',rewards))))));
 }
 // First-visit walkthrough of the main menu: a spotlight on each part with a short explanation.
 var MENU_TOUR=[
@@ -4104,6 +4111,11 @@ function SettingsScreen(props){
       return React.createElement('button',{key:o[0],type:'button','data-nav-row':4,'aria-pressed':active,onClick:function(){props.onChange({perfMode:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);
     }))),
     React.createElement('div',{style:{fontSize:11,lineHeight:1.4,color:'rgba(255,255,255,0.6)',maxWidth:340}},'On: no glows, fewer particles, sharper-but-lighter graphics and menus at 30 fps. Auto turns it on for slower devices and battery saver.'),
+    React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
+      React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Main menu layout'),
+      React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap'}},
+        [['b','Tiles'],['a','Big Play'],['og','Original']].map(function(o){var active=(settings.menuLayout||'b')===o[0];
+          return React.createElement('button',{key:o[0],type:'button','data-nav-row':4.4,'aria-pressed':active,onClick:function(){props.onChange({menuLayout:o[0]});},style:{padding:'9px 18px',borderRadius:50,border:active?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:active?'linear-gradient(135deg,#38bdf8,#0369a1)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},o[1]);}))),
     React.createElement('button',{type:'button','data-nav-row':4.5,'aria-pressed':!!settings.battery30,onClick:function(){props.onChange({battery30:!settings.battery30});},style:{alignSelf:'flex-start',padding:'9px 16px',borderRadius:50,border:settings.battery30?'2px solid #fff':'1px solid rgba(255,255,255,0.25)',background:settings.battery30?'linear-gradient(135deg,#22c55e,#15803d)':'rgba(255,255,255,0.1)',color:'#fff',fontWeight:900,cursor:'pointer'}},(settings.battery30?'\u2713 ':'')+'\uD83D\uDD0B Battery saver: 30 fps matches'),
     React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:9}},
       React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7dd3fc'}},'Default AI difficulty'),
@@ -6217,6 +6229,9 @@ function makePeerRoom(peer,role,code){
   function hudChip(active,extra){return Object.assign({padding:'3px 10px',background:active?'linear-gradient(135deg,#22c55e,#15803d)':'rgba(255,255,255,0.1)',border:'none',borderRadius:50,color:'#ffffff',fontSize:11,cursor:'pointer',fontWeight:800},extra||{});}
   function label(txt){return React.createElement('div',{style:{fontWeight:800,fontSize:11,color:'rgba(255,255,255,0.8)',marginBottom:10,letterSpacing:'0.12em',textTransform:'uppercase',textShadow:softText}},txt);}
   function heading(txt,sub,size){return React.createElement('div',{style:{textAlign:'center'}},React.createElement('h1',{style:{fontFamily:DISP,fontSize:size||'clamp(30px,7vw,46px)',fontWeight:700,color:'#ffffff',margin:0,textShadow:titleGlow,letterSpacing:'0.03em',textWrap:'balance'}},txt),sub&&React.createElement('p',{style:{color:'rgba(255,255,255,0.8)',fontSize:12,letterSpacing:'0.16em',textTransform:'uppercase',margin:'8px 0 0',fontWeight:800,textShadow:softText}},sub));}
+  // Sub-screens (game setup, practice, players, training): a centred layout with a title on top (no box around the whole screen).
+  function subPanel(extra){return Object.assign({},wrapStyle,{boxSizing:'border-box',width:'min(760px,94vw)',maxWidth:'94vw',padding:'0 0 8px'},extra||{},{});}
+  function panelHead(txt,sub,size){return React.createElement('div',{style:{alignSelf:'stretch',padding:'4px 0 2px',textAlign:'center'}},React.createElement('h1',{style:{fontFamily:DISP,fontSize:size||'clamp(26px,5vw,36px)',fontWeight:700,color:'#ffffff',margin:0,textShadow:titleGlow,letterSpacing:'0.03em',textWrap:'balance'}},txt),sub&&React.createElement('p',{style:{color:'rgba(255,255,255,0.75)',fontSize:11,letterSpacing:'0.16em',textTransform:'uppercase',margin:'6px 0 0',fontWeight:800}},sub));}
 
   // Screens that are locked to the window on desktop scroll on touch screens instead, so nothing gets cut off
   // (e.g. a phone held sideways). 'safe center' keeps content centred unless it is taller than the screen.
@@ -6294,7 +6309,9 @@ function makePeerRoom(peer,role,code){
           React.createElement('div',{style:{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}},
             React.createElement('button',{type:'button',autoFocus:true,onClick:function(){answerTutorial(true);},style:pill('linear-gradient(135deg,#22c55e,#15803d)',{fontSize:14,padding:'11px 24px'})},'Show me how'),
             React.createElement('button',{type:'button',onClick:function(){answerTutorial(false);},style:pill('rgba(255,255,255,0.12)',{fontSize:14,padding:'11px 22px',border:'1px solid rgba(255,255,255,0.3)'})},'Skip')))),
-      React.createElement('div',{ref:menuWrapRef,className:'rise',style:Object.assign({},wrapStyle,{gap:22},touchUI?null:{zoom:uiZ*menuFit})},
+      React.createElement('div',{ref:menuWrapRef,className:'rise',style:Object.assign({},wrapStyle,{gap:14},touchUI?null:{zoom:uiZ*menuFit})},
+        // Main menu layout (Settings → Main menu layout): 'b' tiles (default), 'a' big Play + side rail, 'og' the original
+        gameSettings.menuLayout==='og'?React.createElement(React.Fragment,null,
         React.createElement(HeroCanvas,{theme:themeMode,k:uiK}),
         React.createElement('div',{style:{textAlign:'center',marginTop:-6}},
           React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:'clamp(44px,11vw,80px)',fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow}},'Soccer Slime'),
@@ -6330,7 +6347,107 @@ function makePeerRoom(peer,role,code){
             var b=React.createElement('button',{key:btn.key,'data-tour':btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg)},btn.label,btn.green&&React.createElement(GreenDot),btn.dot&&React.createElement(RedDot));
             return b;
           })
-        ),
+        )
+        ):gameSettings.menuLayout==='a'?
+        (function(){
+          // ── Layout A: a big Play button with your last settings, smaller mode cards, and everything else on a rail ──
+          var narrowA=touchUI||window.innerWidth<900,pk={},byKey={};menuPills.filter(Boolean).forEach(function(p){pk[p.key]=p;});menuCards.forEach(function(c){byKey[c.key]=c;});
+          function railBtn(key,label,act,inner,bg,dot){var h=hovCard===key||isFocused(key);return React.createElement('button',{key:key,'data-tour':key,type:'button',title:label,'aria-label':label,onClick:act,onMouseEnter:function(){setHovCard(key);},onMouseLeave:function(){setHovCard(null);},style:{position:'relative',width:50,height:50,flex:'0 0 auto',borderRadius:15,border:'none',padding:0,background:bg,color:'#fff',fontSize:22,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transform:h?'scale(1.1)':'none',boxShadow:h?'0 0 0 3px #7dd3fc,0 0 18px rgba(56,189,248,0.55)':'0 4px 12px rgba(0,0,0,0.3)',transition:'transform 0.15s,box-shadow 0.15s'}},inner,dot&&React.createElement(RedDot));}
+          var rail=React.createElement('div',{style:{display:'flex',flexDirection:narrowA?'row':'column',flexWrap:'wrap',justifyContent:'center',alignItems:'center',gap:12,padding:12,borderRadius:20,background:'rgba(5,12,35,0.72)',border:'1px solid rgba(255,255,255,0.12)',alignSelf:narrowA?'stretch':'stretch'}},
+            railBtn('accounts','Your Account',function(){setScreen('accounts');},React.createElement(ProfileAvatar,{profile:account.avatar,size:42}),'rgba(5,12,35,0.6)'),
+            pk.online&&railBtn('online','Play Online',pk.online.act,'\uD83C\uDF10','linear-gradient(135deg,#059669,#047857)'),
+            pk.shop&&railBtn('shop','Shop',pk.shop.act,'\uD83D\uDED2','linear-gradient(135deg,#ca8a04,#854d0e)'),
+            pk.playerdata&&railBtn('playerdata','Stats',pk.playerdata.act,'\uD83D\uDCCA','linear-gradient(135deg,#d97706,#92400e)'),
+            pk.social&&railBtn('social','Social',pk.social.act,'\uD83D\uDCAC','linear-gradient(135deg,#db2777,#9d174d)',pk.social.dot),
+            pk.guide&&railBtn('guide','How to Play',pk.guide.act,'\u2753','linear-gradient(135deg,#475569,#1e293b)'),
+            !narrowA&&React.createElement('div',{key:'sp',style:{flex:1}}),
+            railBtn('settings','Settings',function(){setSettingsSaveError('');setShowSettings(true);},'\u2699','rgba(30,41,59,0.95)'));
+          var hovP=hovCard==='single'||isFocused('single'),lenA=pendDur==='custom'?customMinuteValue(customMinutes,10)+' min':pendDur.replace('min',' min');
+          var playBig=React.createElement('button',{key:'single','data-tour':'single',type:'button','aria-label':'Play vs AI. '+DIFF_LABEL[diff]+', '+lenA,onClick:byKey.single.act,onMouseEnter:function(){setHovCard('single');},onMouseLeave:function(){setHovCard(null);},style:{display:'flex',alignItems:'center',gap:16,width:'100%',boxSizing:'border-box',padding:'18px 22px',borderRadius:22,border:'2px solid '+(hovP?'#fff':'rgba(255,255,255,0.18)'),cursor:'pointer',color:'#fff',textAlign:'left',background:'linear-gradient(135deg,#2563eb,#1e3a8a)',boxShadow:hovP?'0 0 0 3px #7dd3fc,0 0 30px rgba(56,189,248,0.55)':'0 10px 28px rgba(0,0,0,0.4)',transform:hovP?'translateY(-3px) scale(1.02)':'none',transition:'transform 0.18s,box-shadow 0.18s'}},
+            React.createElement('span',{'aria-hidden':'true',style:{fontSize:34,lineHeight:1}},'\u25B6'),
+            React.createElement('span',{style:{flex:1}},React.createElement('span',{style:{display:'block',fontFamily:'var(--font-display)',fontSize:32,lineHeight:1}},'Play vs AI'),React.createElement('span',{style:{display:'block',fontSize:13,fontWeight:800,color:'#c7d7fe',marginTop:6}},DIFF_LABEL[diff]+' \u00B7 '+lenA+(scoreLimit?' \u00B7 first to '+scoreLimit:''))),
+            React.createElement('span',{style:{fontSize:11,fontWeight:800,color:'#c7d7fe',textAlign:'right',lineHeight:1.3}},'Enter',React.createElement('br'),'to set up'));
+          function smallCard(c,sub){var h=hovCard===c.key||isFocused(c.key);return React.createElement('button',{key:c.key,'data-tour':c.key,type:'button','aria-label':c.label+'. '+sub,onClick:c.act,onMouseEnter:function(){setHovCard(c.key);},onMouseLeave:function(){setHovCard(null);},style:{flex:1,minWidth:0,textAlign:'left',padding:'14px 16px',borderRadius:18,cursor:'pointer',color:'#fff',background:'rgba(5,12,35,0.78)',border:'2px solid '+(h?'#fff':'rgba(255,255,255,0.14)'),boxShadow:h?'0 0 0 3px '+c.ring+',0 12px 28px rgba(0,0,0,0.45)':'0 6px 18px rgba(0,0,0,0.3)',transform:h?'translateY(-3px)':'none',transition:'transform 0.18s,box-shadow 0.18s'}},React.createElement('span',{style:{display:'block',fontFamily:'var(--font-display)',fontSize:22}},c.label),React.createElement('span',{style:{display:'block',fontSize:12,color:'rgba(255,255,255,0.7)',marginTop:3}},sub));}
+          var main=React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:14,minWidth:0,flex:'1 1 420px',maxWidth:narrowA?'100%':470}},
+            React.createElement('div',{style:{textAlign:narrowA?'center':'left'}},React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:narrowA?44:64,fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:0.95,textShadow:titleGlow}},'Soccer',narrowA?' ':React.createElement('br'),'Slime'),
+              React.createElement('div',{style:{display:'flex',justifyContent:narrowA?'center':'flex-start',marginTop:4}},React.createElement('button',{type:'button','data-tour':'version',title:'What\u2019s new in each update','aria-label':'Version '+GAME_VERSION+'. Open update notes',onClick:function(){setScreen('updates');},style:{display:'block',margin:'4px 0 0',padding:'2px 10px',background:'none',border:'none',borderBottom:'1px dashed rgba(255,255,255,0.45)',color:'rgba(255,255,255,0.85)',fontFamily:'inherit',fontSize:11,letterSpacing:'0.2em',textTransform:'uppercase',fontWeight:800,textShadow:softText,cursor:'pointer'}},GAME_VERSION))),
+            playBig,
+            React.createElement('div',{style:{display:'flex',gap:12}},smallCard(byKey.multi,'Same keyboard'),smallCard(byKey.practice,'Free play and drills')),
+        (function(){
+          var dch=todaysChallenge(),done=dailyDoneToday(dailyState),streak=dailyStreakNow(dailyState);
+          return React.createElement('div',{role:'note','data-tour':'daily','aria-label':'Daily challenge: '+dch.title+'. '+dch.desc+(done?' Completed.':''),style:{display:'flex',alignItems:'center',gap:10,width:'100%',height:'100%',boxSizing:'border-box',padding:'8px 14px',borderRadius:14,background:done?'rgba(34,197,94,0.16)':'rgba(5,12,35,0.72)',border:'1px solid '+(done?'rgba(74,222,128,0.6)':'rgba(249,115,22,0.55)'),boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}},
+            React.createElement('div',{'aria-hidden':'true',style:{fontSize:20,flex:'0 0 auto'}},done?'✅':'📅'),
+            React.createElement('div',{style:{flex:1,minWidth:0,textAlign:'left',lineHeight:1.25}},
+              React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff'}},
+                React.createElement('span',{style:{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:done?'#86efac':'#fdba74',marginRight:8}},done?'Daily done':'Daily challenge'),dch.title),
+              React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.75)'}},done?'Nice! A new challenge unlocks tomorrow.':dch.desc+(dch.series>1&&dailyProgress(dailyState)>0?' · '+dailyProgress(dailyState)+'/'+dch.series+' done':''))),
+            !done&&React.createElement('button',{type:'button','data-nav':'daily_play',onClick:startDaily,style:Object.assign({flex:'0 0 auto',padding:'7px 14px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#f97316,#c2410c)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap'},focusSty('daily_play'))},dailyProgress(dailyState)>0?'▶ Resume '+dailyProgress(dailyState)+'/'+dch.series:'▶ Play'),
+            React.createElement('div',{title:'Daily streak','aria-label':'Streak '+streak,style:{flex:'0 0 auto',fontSize:16,fontWeight:900,color:streak?'#fdba74':'rgba(255,255,255,0.45)'}},'🔥'+streak));
+        })());
+          var right=!narrowA&&React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:12,alignItems:'flex-end',flex:'0 0 auto'}},
+            React.createElement('div',{style:{padding:'6px 12px',borderRadius:50,background:'rgba(5,12,35,0.72)',border:'1px solid rgba(251,191,36,0.45)'}},React.createElement(BucksAmount,{value:shopBalance(shop),size:20,style:{fontSize:15}})),
+            React.createElement('div',{style:{position:'relative',width:430,height:330,borderRadius:22,overflow:'hidden',border:'2px solid rgba(255,255,255,0.14)',boxShadow:'0 16px 40px rgba(0,0,0,0.45)'}},
+              React.createElement(SlimePreviewCanvas,{type:'single',k:uiK,theme:themeMode,hot:hovP,h:330,w:430,label:' ',sub:' ',noTitle:true}),
+              React.createElement('div',{style:{position:'absolute',left:0,right:0,bottom:12,textAlign:'center',fontSize:12,fontWeight:800,color:'#d1fae5',textShadow:'0 1px 4px rgba(0,0,0,0.8)'}},'Your next match')));
+          return React.createElement('div',{style:{display:'flex',flexDirection:narrowA?'column':'row',gap:22,alignItems:narrowA?'stretch':'center',width:narrowA?Math.min(560,window.innerWidth-24):980,boxSizing:'border-box'}},rail,main,right);
+        })():
+        // ── Top bar: you, the title, coins and settings ──
+        (function(){
+          var narrowM=touchUI||window.innerWidth<820,pk={};menuPills.filter(Boolean).forEach(function(p){pk[p.key]=p;});
+          function modeTile(card){
+                      var hov=hovCard===card.key||isFocused(card.key);
+                      return React.createElement('button',{key:card.key,'data-tour':card.key,'aria-label':card.label+'. '+card.sub,onClick:card.act,onMouseEnter:function(){setHovCard(card.key);},onMouseLeave:function(){setHovCard(null);},style:{'--ring':card.ring,'--glow':card.glow,position:'relative',display:'flex',flexDirection:'column',alignItems:'stretch',width:'100%',height:'100%',boxSizing:'border-box',borderRadius:20,overflow:'hidden',background:card.bg,padding:0,color:'#ffffff',textAlign:'center',outline:'none',border:'2px solid '+(hov?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.12)'),boxShadow:hov?(PERF_LOW?'0 0 0 3px '+card.ring+',0 18px 40px rgba(0,0,0,0.55)':undefined):'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 6px 22px rgba(0,0,0,0.35)',animation:hov?'cardRing 1.6s ease-in-out infinite':'none',transform:hov?(card.big?'translateY(-5px) scale(1.02)':'translateY(-6px) scale(1.04)'):'none',filter:anyCardHot&&!hov?'brightness(0.78) saturate(0.85)':'none',zIndex:hov?2:1,transition:'transform 0.22s cubic-bezier(0.34,1.56,0.64,1),filter 0.2s,border-color 0.2s',cursor:'pointer'}},
+                        React.createElement('div',{style:{width:'100%',height:'100%',background:card.bg,overflow:'hidden'}},React.createElement(SlimePreviewCanvas,{type:card.key,k:uiK,theme:themeMode,hot:hov,h:card.h,w:card.w,label:card.label,sub:card.sub,noTitle:true})),
+                        // The card title is real text on top of the canvas (not painted into it), so it stays sharp when the card scales up on hover.
+                        React.createElement('div',{'aria-hidden':'true',style:{position:'absolute',top:0,left:0,right:0,height:58,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,pointerEvents:'none',padding:'0 8px',boxSizing:'border-box'}},
+                          React.createElement('div',{style:{fontFamily:'var(--font-display)',fontWeight:400,fontSize:23,lineHeight:1,whiteSpace:'nowrap',color:'#fff',WebkitTextStroke:'5px rgba(4,10,34,0.92)',paintOrder:'stroke fill',textShadow:'0 2px 3px rgba(0,0,0,0.45)',letterSpacing:'0.01em'}},card.label),
+                          React.createElement('div',{style:{fontSize:9.5,fontWeight:800,letterSpacing:'0.06em',textTransform:'uppercase',whiteSpace:'nowrap',color:'#fde68a',WebkitTextStroke:'3px rgba(4,10,34,0.9)',paintOrder:'stroke fill'}},card.sub)),
+                        hov&&!PERF_LOW&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',top:0,bottom:0,left:0,width:'45%',pointerEvents:'none',background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.22),rgba(255,255,255,0))',animation:'cardShine 0.7s ease-out 1 both'}}));
+                  }
+          function menuPill(btn,extra){
+                      var b=React.createElement('button',{key:btn.key,'data-tour':btn.key,onClick:btn.act,'aria-haspopup':btn.key==='theme'?'true':undefined,'aria-expanded':btn.key==='theme'?String(themeOpen):undefined,onMouseEnter:function(){setHovCard(btn.key);},onMouseLeave:function(){setHovCard(null);},style:hovPill(btn.key,btn.bg,extra)},btn.label,btn.green&&React.createElement(GreenDot),btn.dot&&React.createElement(RedDot));
+                      return b;
+                  }
+          var W=narrowM?Math.min(560,window.innerWidth-24):960,gap=12,fr=narrowM?W:(W-gap*3)/4,rowH=narrowM?150:156;
+          menuCards.forEach(function(c){if(c.key==='single'){c.big=!narrowM;c.w=narrowM?W:fr*2+gap;c.h=narrowM?190:rowH*2+gap;}else if(c.key==='multi'){c.w=narrowM?W:fr;c.h=rowH;}else{c.w=narrowM?W:fr*2+gap;c.h=rowH;}});
+          var byKey={};menuCards.forEach(function(c){byKey[c.key]=c;});
+          var hovOn=hovCard==='online'||isFocused('online'),me=cleanName(account.name)||'Player';
+          var onlineTile=!EMBED_AI&&React.createElement('button',{key:'online','data-tour':'online','aria-label':'Play online. Create or join a room with a friend',onClick:pk.online&&pk.online.act,onMouseEnter:function(){setHovCard('online');},onMouseLeave:function(){setHovCard(null);},style:{position:'relative',display:'flex',flexDirection:'column',alignItems:'flex-start',justifyContent:'space-between',width:'100%',height:'100%',minHeight:rowH,boxSizing:'border-box',padding:'14px 16px',borderRadius:20,cursor:'pointer',textAlign:'left',color:'#fff',outline:'none',background:'linear-gradient(160deg,rgba(6,78,59,0.92),rgba(5,12,35,0.9))',border:'2px solid '+(hovOn?'rgba(255,255,255,0.85)':'rgba(52,211,153,0.35)'),boxShadow:hovOn?'0 0 0 3px #34d399,0 16px 36px rgba(0,0,0,0.5)':'0 6px 22px rgba(0,0,0,0.35)',transform:hovOn?'translateY(-6px) scale(1.04)':'none',transition:'transform 0.22s cubic-bezier(0.34,1.56,0.64,1),border-color 0.2s',filter:anyCardHot&&!hovOn?'brightness(0.78) saturate(0.85)':'none'}},
+            React.createElement('div',null,React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:23,lineHeight:1,WebkitTextStroke:'5px rgba(4,10,34,0.92)',paintOrder:'stroke fill'}},'Play Online'),React.createElement('div',{style:{fontSize:10,fontWeight:800,letterSpacing:'0.06em',textTransform:'uppercase',color:'#a7f3d0',marginTop:5}},'Create or join a room')),
+            React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800,color:'#d1fae5'}},React.createElement('span',{style:{fontSize:26}},'\uD83C\uDF10'),friendsOnline>0?friendsOnline+' friend'+(friendsOnline===1?'':'s')+' online':'Play a friend anywhere'));
+          var glassTile={borderRadius:16,background:'rgba(5,12,35,0.72)',border:'1px solid rgba(255,255,255,0.14)'};
+          return React.createElement(React.Fragment,null,
+            React.createElement('div',{style:Object.assign({},glassTile,{display:'flex',alignItems:'center',gap:12,width:W,boxSizing:'border-box',padding:'8px 12px',flexWrap:narrowM?'wrap':'nowrap'})},
+            React.createElement('button',{key:'accounts','data-tour':'accounts',type:'button',title:'Your Account','aria-label':'Your Account',onClick:function(){setScreen('accounts');},onMouseEnter:function(){setHovCard('accounts');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:2,borderRadius:'50%',border:'none',background:'rgba(5,12,35,0.78)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='accounts'||isFocused('accounts')?'translateY(-3px) scale(1.04)':'none'},focusSty('accounts'))},React.createElement(ProfileAvatar,{profile:account.avatar,size:38})),
+              React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:2,minWidth:0,flex:narrowM?1:'0 0 170px'}},React.createElement('span',{style:{fontSize:14,fontWeight:900,maxWidth:170,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},me),(function(){var t=account.avatar&&account.avatar.title;return t&&t!=='none'&&typeof TitleBadge==='function'?React.createElement(TitleBadge,{id:t,small:true}):null;})()),
+              React.createElement('div',{style:{flex:narrowM?'0 0 100%':1,textAlign:'center',order:narrowM?5:0}},
+                React.createElement('h1',{style:{fontFamily:'var(--font-title)',fontSize:narrowM?32:38,fontWeight:700,letterSpacing:'0.05em',textTransform:'uppercase',color:'#ffffff',margin:0,lineHeight:1,textShadow:titleGlow,whiteSpace:'nowrap'}},'Soccer Slime'),
+            React.createElement('button',{type:'button','data-tour':'version',title:'What\u2019s new in each update','aria-label':'Version '+GAME_VERSION+'. Open update notes',onClick:function(){setScreen('updates');},style:{display:'block',margin:'4px auto 0',padding:'2px 10px',background:'none',border:'none',borderBottom:'1px dashed rgba(255,255,255,0.45)',color:'rgba(255,255,255,0.85)',fontFamily:'inherit',fontSize:11,letterSpacing:'0.2em',textTransform:'uppercase',fontWeight:800,textShadow:softText,cursor:'pointer'}},GAME_VERSION)),
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,flex:narrowM?'0 0 auto':'0 0 170px',justifyContent:'flex-end'}},pk.guide&&menuPill(Object.assign({},pk.guide,{label:'?'}),{padding:'0',width:44,height:44,minWidth:44,fontSize:20,display:'inline-flex',alignItems:'center',justifyContent:'center'}),
+            React.createElement('button',{key:'settings','data-tour':'settings',type:'button',title:'Settings','aria-label':'Settings',onClick:function(){setSettingsSaveError('');setShowSettings(true);},onMouseEnter:function(){setHovCard('settings');},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',alignItems:'center',justifyContent:'center',width:44,height:44,flex:'0 0 44px',padding:0,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.18)',background:'rgba(5,12,35,0.78)',color:'#fff',fontSize:25,lineHeight:1,cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.3)',transition:'transform 0.13s,box-shadow 0.13s',transform:hovCard==='settings'||isFocused('settings')?'translateY(-3px) scale(1.04)':'none'},focusSty('settings'))},'\u2699'))),
+            React.createElement('div',{style:{display:'grid',width:W,gap:gap,gridTemplateColumns:narrowM?'1fr':'2fr 1fr 1fr',gridTemplateRows:narrowM?undefined:rowH+'px '+rowH+'px'}},
+              React.createElement('div',{key:'t-single',style:{gridRow:narrowM?undefined:'span 2',minWidth:0}},modeTile(byKey.single)),
+              React.createElement('div',{key:'t-multi',style:{minWidth:0}},modeTile(byKey.multi)),
+              onlineTile&&React.createElement('div',{key:'t-online',style:{minWidth:0}},onlineTile),
+              React.createElement('div',{key:'t-practice',style:{gridColumn:narrowM?undefined:'span 2',minWidth:0}},modeTile(byKey.practice))),
+            React.createElement('div',{style:{display:'grid',width:W,gap:gap,gridTemplateColumns:narrowM?'1fr 1fr':'2fr 1fr 1fr',alignItems:'stretch'}},
+              React.createElement('div',{key:'r-daily',style:{gridColumn:narrowM?'span 2':undefined,minWidth:0}},
+          (function(){
+          var dch=todaysChallenge(),done=dailyDoneToday(dailyState),streak=dailyStreakNow(dailyState);
+          return React.createElement('div',{role:'note','data-tour':'daily','aria-label':'Daily challenge: '+dch.title+'. '+dch.desc+(done?' Completed.':''),style:{display:'flex',alignItems:'center',gap:10,width:'100%',height:'100%',boxSizing:'border-box',padding:'8px 14px',borderRadius:14,background:done?'rgba(34,197,94,0.16)':'rgba(5,12,35,0.72)',border:'1px solid '+(done?'rgba(74,222,128,0.6)':'rgba(249,115,22,0.55)'),boxShadow:'0 6px 18px rgba(0,0,0,0.3)'}},
+            React.createElement('div',{'aria-hidden':'true',style:{fontSize:20,flex:'0 0 auto'}},done?'✅':'📅'),
+            React.createElement('div',{style:{flex:1,minWidth:0,textAlign:'left',lineHeight:1.25}},
+              React.createElement('div',{style:{fontSize:13,fontWeight:900,color:'#fff'}},
+                React.createElement('span',{style:{fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:done?'#86efac':'#fdba74',marginRight:8}},done?'Daily done':'Daily challenge'),dch.title),
+              React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.75)'}},done?'Nice! A new challenge unlocks tomorrow.':dch.desc+(dch.series>1&&dailyProgress(dailyState)>0?' · '+dailyProgress(dailyState)+'/'+dch.series+' done':''))),
+            !done&&React.createElement('button',{type:'button','data-nav':'daily_play',onClick:startDaily,style:Object.assign({flex:'0 0 auto',padding:'7px 14px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#f97316,#c2410c)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap'},focusSty('daily_play'))},dailyProgress(dailyState)>0?'▶ Resume '+dailyProgress(dailyState)+'/'+dch.series:'▶ Play'),
+            React.createElement('div',{title:'Daily streak','aria-label':'Streak '+streak,style:{flex:'0 0 auto',fontSize:16,fontWeight:900,color:streak?'#fdba74':'rgba(255,255,255,0.45)'}},'🔥'+streak));
+        })()),
+              pk.shop&&menuPill(pk.shop,{width:'100%',height:'100%',minHeight:52,borderRadius:16}),
+              React.createElement('div',{key:'r-pair',style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:gap,gridColumn:narrowM?'span 2':undefined}},
+                pk.playerdata&&menuPill(pk.playerdata,{width:'100%',height:'100%',minHeight:52,borderRadius:16,padding:'0 8px'}),
+                pk.social&&menuPill(pk.social,{width:'100%',height:'100%',minHeight:52,borderRadius:16,padding:'0 8px'}))));
+        })(),
         React.createElement('div',{style:{display:'flex',width:'min(681px, 100%)',boxSizing:'border-box',justifyContent:'center',alignItems:'center'}},
           React.createElement('div',{key:'theme','data-theme-dd':'1',style:{display:'flex',alignItems:'center',gap:8,position:'relative',zIndex:themeOpen?2:0,flexWrap:touchUI?'wrap':'nowrap',justifyContent:'center'}},
             React.createElement('button',{'data-tour':'theme',onClick:toggleTheme,'aria-haspopup':'true','aria-expanded':String(themeOpen),onMouseEnter:function(){setHovCard('theme');},onMouseLeave:function(){setHovCard(null);},style:hovPill('theme',THEME_BG[thLoc(themeMode)])},THEME_NAMES[thLoc(themeMode)]+' '+(themeOpen?'\u25B4':'\u25BE')),
@@ -6363,8 +6480,15 @@ function makePeerRoom(peer,role,code){
     }
     if(oV==='choose'){
       oBody.push(React.createElement('div',{key:'t',style:oTxt},'Play a friend on a different computer. One of you creates a room, the other types in the code.'));
-      oBody.push(React.createElement('button',{key:'c',onClick:function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);},style:Object.assign(pill(btnPrimary,{width:240}),focusSty('online_create'))},'Create room'));
-      oBody.push(React.createElement('button',{key:'j',onClick:function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});},style:Object.assign(pill('linear-gradient(135deg,#059669,#047857)',{width:240}),focusSty('online_join'))},'Join room'));
+      // two big choices side by side
+      (function(){
+        function bigChoice(key,navId,icon,title,desc,bg,ring,act){var h=isFocused(navId)||hovCard===navId;return React.createElement('button',{key:key,type:'button',onClick:act,onMouseEnter:function(){setHovCard(navId);},onMouseLeave:function(){setHovCard(null);},style:{flex:'1 1 240px',maxWidth:300,minHeight:180,display:'flex',flexDirection:'column',alignItems:'flex-start',justifyContent:'space-between',gap:12,padding:'18px 20px',borderRadius:22,cursor:'pointer',textAlign:'left',color:'#fff',background:bg,border:'2px solid '+(h?'#fff':'rgba(255,255,255,0.18)'),boxShadow:h?'0 0 0 3px '+ring+',0 16px 36px rgba(0,0,0,0.5)':'0 10px 26px rgba(0,0,0,0.4)',transform:h?'translateY(-5px) scale(1.03)':'none',transition:'transform 0.2s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.2s',outline:'none'}},
+          React.createElement('span',{'aria-hidden':'true',style:{fontSize:44,lineHeight:1}},icon),
+          React.createElement('span',null,React.createElement('span',{style:{display:'block',fontFamily:'var(--font-display)',fontSize:28,lineHeight:1}},title),React.createElement('span',{style:{display:'block',fontSize:12.5,lineHeight:1.4,color:'rgba(255,255,255,0.85)',marginTop:6}},desc)));}
+        oBody.push(React.createElement('div',{key:'choices',style:{display:'flex',gap:16,flexWrap:'wrap',justifyContent:'center',width:'min(640px,92vw)'}},
+          bigChoice('c','online_create','\uD83C\uDFE0','Create room','Get a 4-letter code to send your friend. You pick the match settings.','linear-gradient(150deg,#4f46e5,#1e1b4b)','#a5b4fc',function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);}),
+          bigChoice('j','online_join','\uD83D\uDD11','Join room','Type the code your friend gave you and you\u2019re in.','linear-gradient(150deg,#059669,#064e3b)','#6ee7b7',function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});})));
+      })();
       if(cleanName(account.name))oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',alignItems:'center',gap:9,marginTop:4,padding:'7px 12px',borderRadius:14,background:'rgba(0,0,0,0.28)',border:'1px solid rgba(255,255,255,0.18)'}},React.createElement(ProfileAvatar,{profile:account.avatar,size:32}),React.createElement('span',{style:{fontSize:13,fontWeight:800}},'Playing as '+cleanName(account.name))));
       else oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6,marginTop:4}},
         React.createElement('div',{style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Your name'),
@@ -6465,20 +6589,22 @@ function makePeerRoom(peer,role,code){
     var aiPane=showAi&&React.createElement('div',{key:'aipane',style:{display:'flex',flexDirection:'column',gap:8,alignItems:'center',position:'relative',zIndex:1}},
       React.createElement('div',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.75)'}},'Practice vs the AI · click the match to play · nothing here counts towards coins or stats'),
       React.createElement('iframe',{title:'Player vs AI while you wait',src:location.pathname+'?embed=ai',onLoad:function(e){try{e.target.contentWindow.focus();}catch(x){}},style:{width:'min(860px,56vw)',height:'min(560px,72vh)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:16,background:'#050c23',boxShadow:'0 18px 50px rgba(0,0,0,0.5)'}}));
-    return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),showAi?React.createElement('div',{style:{display:'flex',gap:24,alignItems:'center',justifyContent:'center',flexWrap:'wrap',width:'100%',position:'relative',zIndex:1}},React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)),aiPane):React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)));
+    return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),showAi?React.createElement('div',{style:{display:'flex',gap:24,alignItems:'center',justifyContent:'center',flexWrap:'wrap',width:'100%',position:'relative',zIndex:1}},React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)),aiPane):React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{role:'note',style:{marginTop:-8,padding:'6px 14px',borderRadius:50,background:'rgba(245,158,11,0.18)',border:'1px solid rgba(245,158,11,0.55)',color:'#fde68a',fontSize:12,fontWeight:800,textAlign:'center'}},'⚠️ Try at your own risk, it’s kinda not working right now'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):(oV==='choose'?Object.assign({},oCard,{background:'transparent',border:'none',boxShadow:'none',padding:0}):oCard)},oBody)));
   }
 
   if(screen==='guide')return React.createElement('div',{key:'guide',className:'screen-in',style:Object.assign({},baseStyle,{height:'100dvh',minHeight:0,overflow:'hidden',padding:'8px 16px'})},bgLayer(),React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{height:'100%',minHeight:0,width:'100%'})},React.createElement(GuideScreen,{onTour:function(){try{window.localStorage.removeItem('slime_tour_seen');}catch(e){}setScreen('menu');setTour(true);},onTutorial:startTutorial,theme:themeMode,keybinds:gameSettings.keybinds,touch:touchUI,onBack:function(){setScreen('menu');},focusSty:focusSty})));
 
   // ── PLAYER SELECT ────────────────────────────────────────────────────
   if(screen==='player_select')return React.createElement('div',{key:'player-select',className:'screen-in',style:baseStyle},bgLayer(),
-    React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{maxWidth:520,width:'100%',gap:20})},
-      heading('Select Players','Pick a player or continue as Guest','clamp(26px,6vw,36px)'),
-      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16,width:'100%'}},
-        [['P1',selP1,setSelP1,'p1_guest'],['P2',selP2,setSelP2,'p2_guest']].map(function(col){
-          var lbl=col[0],sel=col[1],setSel=col[2],gid=col[3];
-          return React.createElement('div',{key:lbl,style:{background:cardDark,border:'1px solid '+cardBorder,borderRadius:16,padding:14,minWidth:0}},
-            React.createElement('div',{style:{fontSize:11,color:accentColor,marginBottom:10,fontWeight:800,letterSpacing:'0.14em',textTransform:'uppercase'}},lbl),
+    React.createElement('div',{className:'rise',style:subPanel({width:'min(780px,96vw)',gap:20})},
+      panelHead('Select Players','Pick a player or continue as Guest','clamp(26px,6vw,36px)'),
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:(touchUI||window.innerWidth<700)?'1fr':'minmax(0,1fr) auto minmax(0,1fr)',gap:16,width:'100%',alignItems:'center'}},
+        (function(cards){return [cards[0],React.createElement('div',{key:'vs','aria-hidden':'true',style:{fontFamily:'var(--font-display)',fontSize:34,color:'#fde68a',textShadow:'0 0 16px #fbbf24',textAlign:'center'}},'VS'),cards[1]];})([['P1',selP1,setSelP1,'p1_guest','#1a6bcc'],['P2',selP2,setSelP2,'p2_guest','#e8192c']].map(function(col){
+          var lbl=col[0],sel=col[1],setSel=col[2],gid=col[3],tint=col[4],selName=sel?((dbPlayers.find(function(x){return x.id===sel;})||{}).name||'Guest'):'Guest';
+          return React.createElement('div',{key:lbl,style:{background:cardDark,border:'2px solid '+tint+'88',borderRadius:18,padding:14,minWidth:0,boxShadow:'0 10px 26px rgba(0,0,0,0.35)'}},
+            React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:12}},
+              React.createElement('div',{'aria-hidden':'true',style:{width:54,height:27,borderRadius:'54px 54px 6px 6px',background:tint,boxShadow:'inset 0 -4px 0 rgba(0,0,0,0.25)',flex:'0 0 auto'}}),
+              React.createElement('div',{style:{minWidth:0}},React.createElement('div',{style:{fontSize:11,color:tint==='#e8192c'?'#fca5a5':'#93c5fd',fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase'}},lbl),React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:22,lineHeight:1.1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},selName))),
             React.createElement('button',{onClick:function(){setSel(null);},style:Object.assign(pill(sel===null?btnPrimary:btnSecondary,{display:'block',width:'100%',textAlign:'left',marginBottom:6,padding:'9px 16px',fontSize:13,textTransform:'none',letterSpacing:0}),focusSty(gid))},'Guest'),
             React.createElement('div',{style:{maxHeight:150,overflowY:'auto'}},dbPlayers.map(function(p){return React.createElement('button',{key:p.id,onClick:function(){setSel(p.id);},style:{display:'block',width:'100%',textAlign:'left',padding:'7px 14px',borderRadius:8,fontSize:13,marginBottom:3,background:sel===p.id?btnPrimary:btnSecondary,color:'#ffffff',border:'none',cursor:'pointer',fontWeight:sel===p.id?800:500}},p.name+(p.id===linkedLocalPlayerId()?' (You)':''));})),
             // make a new local player right here, and pick them
@@ -6490,7 +6616,7 @@ function makePeerRoom(peer,role,code){
                 React.createElement('input',{type:'text',value:newPl[lbl]||'',maxLength:16,placeholder:'New player name','aria-label':lbl+' new player name',onChange:function(e){var c={};c[lbl]=e.target.value;setNewPl(Object.assign({},newPl,c,{err:''}));},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')add();if(e.key==='Escape')e.target.blur();},style:{flex:1,minWidth:0,padding:'7px 12px',background:'rgba(255,255,255,0.08)',border:'1px solid '+(newPl.err===lbl?'#f87171':'rgba(255,255,255,0.18)'),borderRadius:50,color:'#fff',fontSize:13,outline:'none'}}),
                 React.createElement('button',{type:'button',onClick:add,style:{padding:'7px 12px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:800,fontSize:12,cursor:'pointer',whiteSpace:'nowrap'}},'+ Add'));
             })());
-        })
+        }))
       ),
       React.createElement('div',{style:{display:'flex',gap:10,width:'100%'}},
         React.createElement('button',{onClick:function(){setScreen('customise');},style:Object.assign(pill(btnPrimary,{flex:1,textAlign:'center'}),focusSty('continue'))},'Continue'),
@@ -6500,17 +6626,18 @@ function makePeerRoom(peer,role,code){
 
   // ── PRACTICE SELECT ──────────────────────────────────────────────────
   if(screen==='practice_select')return React.createElement('div',{key:'practice-select',className:'screen-in',style:baseStyle},bgLayer(),
-    React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:26})},
-      heading('Practice','Choose your drill'),
+    React.createElement('div',{className:'rise',style:subPanel({gap:22,width:'min(900px,96vw)'})},
+      panelHead('Practice','Choose your drill'),
       React.createElement('div',{style:{display:'flex',gap:16,flexWrap:'wrap',justifyContent:'center'}},
-        [['prac_regular','Regular','regular',btnPrimary,'01'],['prac_air','Air-Dash','air','linear-gradient(135deg,#0891b2,#0e7490)','02'],['prac_ground','Ground','ground','linear-gradient(135deg,#059669,#047857)','03']].map(function(item){
+        [['prac_regular','Regular','regular',btnPrimary,'01','Free play from a normal kick-off. Try anything.'],['prac_air','Air-Dash','air','linear-gradient(135deg,#0891b2,#0e7490)','02','The ball is served high. Practise air spins and dashes.'],['prac_ground','Ground','ground','linear-gradient(135deg,#059669,#047857)','03','The ball starts on the ground. Work on dribbles and ground dashes.']].map(function(item){
           var id=item[0],lbl=item[1],mkey=item[2],hdr=item[3],hov=hovCard===id||isFocused(id);
-          return React.createElement('button',{key:id,onClick:function(){setPractMode(mkey);practModeRef.current=mkey;startGame(null,'practice',DC,{left:'P1',right:'P2'},sideRef.current,mkey,null,null);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:165,borderRadius:16,overflow:'hidden',background:cardDark,padding:0,color:'#ffffff',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid '+cardBorder,boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 12px 35px rgba(0,0,0,0.5)':'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 4px 18px rgba(0,0,0,0.3)',transform:hov?'translateY(-5px) scale(1.03)':'none',transition:'all 0.18s',cursor:'pointer'},focusSty(id))},
+          return React.createElement('button',{key:id,onClick:function(){setPractMode(mkey);practModeRef.current=mkey;startGame(null,'practice',DC,{left:'P1',right:'P2'},sideRef.current,mkey,null,null);},onMouseEnter:function(){setHovCard(id);},onMouseLeave:function(){setHovCard(null);},style:Object.assign({display:'flex',flexDirection:'column',alignItems:'stretch',width:250,maxWidth:'86vw',borderRadius:16,overflow:'hidden',background:cardDark,padding:0,color:'#ffffff',border:hov?'2px solid rgba(255,255,255,0.5)':'2px solid '+cardBorder,boxShadow:hov?'inset 0 1px 0 rgba(255,255,255,0.35),inset 0 -2px 0 rgba(0,0,0,0.28),0 12px 35px rgba(0,0,0,0.5)':'inset 0 1px 0 rgba(255,255,255,0.24),inset 0 -2px 0 rgba(0,0,0,0.3),0 4px 18px rgba(0,0,0,0.3)',transform:hov?'translateY(-5px) scale(1.03)':'none',transition:'all 0.18s',cursor:'pointer'},focusSty(id))},
             React.createElement('div',{style:{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',minHeight:52,padding:'8px 11px',boxSizing:'border-box',textAlign:'center',fontFamily:DISP,fontWeight:600,fontSize:16,letterSpacing:'0.035em',background:hdr,boxShadow:'inset 0 1px 0 rgba(255,255,255,0.4),inset 0 -3px 0 rgba(0,0,0,0.2)',textShadow:'0 2px 5px rgba(0,0,0,0.3)'}},
               React.createElement('div',{style:{position:'absolute',top:0,left:'22%',width:'56%',height:2,background:'linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.7),rgba(255,255,255,0))'}}),
               React.createElement('span',null,lbl),
               React.createElement('span',{style:{position:'absolute',right:11,fontSize:10,fontWeight:900,letterSpacing:'0.08em',padding:'5px 7px',borderRadius:8,background:'rgba(0,0,0,0.2)',border:'1px solid rgba(255,255,255,0.24)',boxShadow:'inset 0 1px 0 rgba(255,255,255,0.15)'}},item[4])),
-            React.createElement('div',{style:{height:100,overflow:'hidden'}},React.createElement(PracticePreviewCanvas,{type:mkey,k:uiK,theme:themeMode})));
+            React.createElement('div',{style:{height:150,overflow:'hidden'}},React.createElement(PracticePreviewCanvas,{type:mkey,k:uiK,theme:themeMode,w:250,h:150})),
+            React.createElement('div',{style:{padding:'10px 12px 12px',fontSize:12,lineHeight:1.4,color:'rgba(255,255,255,0.8)',textAlign:'left',background:'rgba(0,0,0,0.25)',flex:1}},item[5]));
         })
       ),
             React.createElement('button',{disabled:true,title:'Coming soon',style:Object.assign(pill('linear-gradient(135deg,#64748b,#475569)',{fontSize:14,padding:'10px 24px'}),{opacity:0.6,cursor:'not-allowed',boxShadow:'none'},focusSty('training_open'))},'Training Challenges - Unavailable'),
@@ -6528,8 +6655,8 @@ function makePeerRoom(peer,role,code){
       {id:'train_save',title:'Goalkeeping',detail:'Block randomized shots with changing speed and height.',medal:'3 / 5 / 7 saves',color:'linear-gradient(135deg,#10b981,#047857)',key:'4'}
     ];
     return React.createElement('div',{key:'training-select',className:'screen-in',style:baseStyle},bgLayer(),
-      React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:720})},
-        heading('Training Challenges','Use 1–4 or keyboard navigation. Rules and medals are on each card.'),
+      React.createElement('div',{className:'rise',style:subPanel({gap:18,width:'min(760px,94vw)'})},
+        panelHead('Training Challenges','Use 1–4 or keyboard navigation. Rules and medals are on each card.'),
         React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:12,width:'100%'}},
           trainingOptions.map(function(item){
             var focused=isFocused(item.id);
@@ -6555,15 +6682,30 @@ function makePeerRoom(peer,role,code){
     var selectedDuration=pendDur==='custom'?'custom-'+customMinuteValue(customMinutes,10):pendDur;
     function settingPill(id,text,active,action){return React.createElement('button',{key:id,onClick:action,'aria-pressed':active,style:Object.assign(pill(active?selectedChoice:btnInactive,{padding:'7px 12px',fontSize:12,color:active?selectedText:'#fff',border:'1px solid '+(active?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:active?selectedGlow:'none'}),focusSty(id))},text);}
     return React.createElement('div',{key:'duration',className:'screen-in',style:baseStyle},bgLayer(),
-      React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:22})},
-        heading(pmRef.current==='single'?'Player vs AI':'Select Duration','How long do you want to play?'),
-        React.createElement('div',{style:{display:'flex',alignItems:'center',background:'rgba(5,12,35,0.82)',borderRadius:16,border:'1px solid '+cardBorder,overflow:'hidden',width:260,boxShadow:'0 0 24px rgba(56,189,248,0.15)'}},
+      React.createElement('div',{className:'rise',style:subPanel({gap:20,width:'min(1000px,96vw)'})},
+        panelHead(pmRef.current==='single'?'Player vs AI':'Select Duration','Set up your match'),
+        (function(){
+          var narrowS=touchUI||window.innerWidth<900,isS=pmRef.current==='single',lvlS=Math.max(0,DIFF_ORDER.indexOf(diff)),dcS=DIFF_COLOR[DIFF_ORDER[lvlS]];
+          var lenTxt=pendDur==='custom'?customMinuteValue(customMinutes,10)+' min':pendDur.replace('min',' min');
+          // left: a live look at the match you're about to play, with a summary of the settings and the Play button
+          var left=React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:14,minWidth:0}},
+            React.createElement('div',{style:{position:'relative',borderRadius:20,overflow:'hidden',border:'2px solid '+(isS?dcS+'99':'rgba(255,255,255,0.15)'),boxShadow:'0 10px 30px rgba(0,0,0,0.4)',height:narrowS?200:290}},
+              React.createElement(SlimePreviewCanvas,{type:isS?'single':'multi',k:uiK,theme:themeMode,hot:false,h:narrowS?200:290,w:narrowS?Math.min(520,window.innerWidth-80):440,label:' ',sub:' ',noTitle:true}),
+              React.createElement('div',{style:{position:'absolute',left:0,right:0,top:0,display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 14px',gap:8,flexWrap:'wrap'}},
+                React.createElement('span',{style:{fontFamily:'var(--font-display)',fontSize:20,WebkitTextStroke:'4px rgba(4,10,34,0.9)',paintOrder:'stroke fill'}},isS?'vs '+DIFF_LABEL[DIFF_ORDER[lvlS]]+' AI':'2 players'),
+                React.createElement('span',{style:{display:'flex',gap:6}},[lenTxt,side==='left'?'You: left':'You: right',scoreLimit?'First to '+scoreLimit:null,overtimeEnabled?'Overtime':null].filter(Boolean).map(function(t,i){return React.createElement('span',{key:i,style:{padding:'3px 9px',borderRadius:50,background:'rgba(5,12,35,0.75)',border:'1px solid rgba(255,255,255,0.18)',fontSize:11,fontWeight:800}},t);})))),
+          isS&&React.createElement('button',{onClick:function(){startGame(selectedDuration,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill(playButton,{fontSize:18,padding:'15px 60px',letterSpacing:'0.08em',border:'2px solid rgba(255,255,255,0.7)',boxShadow:isDay?'0 6px 28px rgba(22,163,74,0.7)':isJapanT?'0 6px 28px rgba(225,29,114,0.7)':'0 6px 28px rgba(129,140,248,0.7)'}),focusSty('play'))},'Play'));
+          // right: the settings, each in its own section
+          var right=React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0,alignItems:'stretch'}},
+            React.createElement('div',{style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:16,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',alignItems:'center',gap:8}},React.createElement('div',{style:{fontSize:11,fontWeight:900,color:'rgba(255,255,255,0.68)',letterSpacing:'0.12em',textTransform:'uppercase'}},'Match length'),
+          React.createElement('div',{style:{display:'flex',alignItems:'center',background:'rgba(5,12,35,0.82)',borderRadius:16,border:'1px solid '+cardBorder,overflow:'hidden',width:260,boxShadow:'0 0 24px rgba(56,189,248,0.15)'}},
           React.createElement('div',{style:{background:'rgba(0,0,0,0.5)',padding:pendDur==='custom'?'14px 12px':'14px 20px',minWidth:62,textAlign:'center'}},pendDur==='custom'?React.createElement('input',{type:'number',min:1,max:60,step:1,inputMode:'numeric','aria-label':'Custom match duration in minutes',value:customMinutes,onChange:function(e){setCustomMinutes(e.target.value);},onBlur:function(){setCustomMinutes(String(customMinuteValue(customMinutes,10)));},style:{width:68,padding:0,border:0,outline:'none',background:'transparent',color:'#ffffff',fontFamily:'var(--font-body)',fontSize:36,fontWeight:900,textAlign:'center',fontVariantNumeric:'tabular-nums'}}):React.createElement('span',{style:{fontSize:36,fontWeight:900,color:'#ffffff',fontFamily:'var(--font-body)',fontVariantNumeric:'tabular-nums'}},pendDur.replace('min',''))),
           React.createElement('div',{style:{display:'flex',flexDirection:'column',padding:'4px 2px',borderLeft:'1px solid '+cardBorder}},
             React.createElement('button',{onClick:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.min(i+1,opts.length-1)]);},style:Object.assign({background:'none',border:'none',color:accentColor,fontSize:15,cursor:'pointer',padding:'3px 10px',lineHeight:1,borderRadius:8},focusSty('dur_up')),'aria-label':'Longer'},'▲'),
             React.createElement('button',{onClick:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.max(i-1,0)]);},style:Object.assign({background:'none',border:'none',color:accentColor,fontSize:15,cursor:'pointer',padding:'3px 10px',lineHeight:1,borderRadius:8},focusSty('dur_down')),'aria-label':'Shorter'},'▼')),
-          React.createElement('div',{style:{flex:1,textAlign:'center'}},React.createElement('span',{style:{fontSize:18,fontWeight:900,color:'#ffffff',letterSpacing:'0.04em'}},pendDur==='custom'?'Custom':'Mins'))),
-        React.createElement('div',{style:{display:'flex',gap:'22px 36px',alignItems:'flex-start',flexWrap:'wrap',justifyContent:'center'}},
+          React.createElement('div',{style:{flex:1,textAlign:'center'}},React.createElement('span',{style:{fontSize:18,fontWeight:900,color:'#ffffff',letterSpacing:'0.04em'}},pendDur==='custom'?'Custom':'Mins')))),
+            React.createElement('div',{style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:16,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',alignItems:'center',gap:8}},
+          React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:16,alignItems:'center',width:'100%'}},
           React.createElement('div',{style:{textAlign:'center'}},label('Your Side'),
             React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?selectedChoice:btnInactive,{padding:'9px 18px',fontSize:13,color:isActive?selectedText:'#fff',border:'2px solid '+(isActive?selectedBorder:'rgba(255,255,255,0.24)'),boxShadow:isActive?selectedGlow:'0 4px 14px rgba(0,0,0,0.3)'}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
           pmRef.current==='single'&&React.createElement('div',{style:{textAlign:'center'}},label('AI Difficulty'),
@@ -6578,8 +6720,8 @@ function makePeerRoom(peer,role,code){
                       on&&React.createElement('span',{'aria-hidden':'true',style:{position:'absolute',left:0,right:0,top:0,height:'40%',background:'rgba(255,255,255,0.25)'}}));})),
                 React.createElement('div',{'aria-hidden':'true',style:{display:'flex',marginTop:5}},DIFF_ORDER.map(function(val,k){return React.createElement('div',{key:val,onClick:function(){setDiff(val);diffRef.current=val;},style:{flex:1,textAlign:'center',fontSize:9.5,fontWeight:900,cursor:'pointer',whiteSpace:'nowrap',color:k===lvl?dc:'rgba(255,255,255,0.55)'}},DIFF_LABEL[val]);})));})(),
             React.createElement('p',{style:{margin:'10px auto 0',maxWidth:300,minHeight:34,fontSize:12,lineHeight:1.45,color:'rgba(255,255,255,0.85)',textShadow:softText}},diffInfo[diff]||''))
-        ),
-        React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:10,padding:'12px 16px',borderRadius:16,background:'rgba(5,12,35,0.7)',border:'1px solid '+cardBorder}},
+        )),
+          React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:10,padding:'12px 14px',width:'100%',boxSizing:'border-box',borderRadius:16,background:'rgba(5,12,35,0.7)',border:'1px solid '+cardBorder}},
           React.createElement('div',{style:{fontSize:11,fontWeight:900,color:'rgba(255,255,255,0.68)',letterSpacing:'0.12em',textTransform:'uppercase'}},'Match options'),
           React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',justifyContent:'center'}},
             React.createElement('span',{style:{fontSize:12,fontWeight:800,marginRight:4}},'Score to win'),
@@ -6587,8 +6729,9 @@ function makePeerRoom(peer,role,code){
           React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',justifyContent:'center'}},
             React.createElement('span',{style:{fontSize:12,fontWeight:800,marginRight:4}},'Overtime'),
             settingPill('overtime_yes','On',overtimeEnabled,function(){setOvertimeEnabled(true);}),
-            settingPill('overtime_no','Off',!overtimeEnabled,function(){setOvertimeEnabled(false);}))),
-        pmRef.current==='single'&&React.createElement('button',{onClick:function(){startGame(selectedDuration,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill(playButton,{fontSize:18,padding:'15px 60px',letterSpacing:'0.08em',border:'2px solid rgba(255,255,255,0.7)',boxShadow:isDay?'0 6px 28px rgba(22,163,74,0.7)':isJapanT?'0 6px 28px rgba(225,29,114,0.7)':'0 6px 28px rgba(129,140,248,0.7)'}),focusSty('play'))},'Play'),
+            settingPill('overtime_no','Off',!overtimeEnabled,function(){setOvertimeEnabled(false);}))));
+          return React.createElement('div',{style:{display:'grid',gridTemplateColumns:narrowS?'1fr':'minmax(0,1.05fr) minmax(0,1fr)',gap:22,width:'100%',alignItems:'start'}},left,right);
+        })(),
         !EMBED_AI&&React.createElement('button',{onClick:function(){setScreen(pmRef.current==='multi'?'player_select':'menu');},style:ghostBtn('back')},'Back')
       )
     );
