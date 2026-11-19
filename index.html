@@ -116,7 +116,20 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.9.8';
+var GAME_VERSION='v25.9.9';
+// ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
+var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
+function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
+function cxHexes(a,n){for(var i=0;i<n;i++)if(!CX_HEX.test(a[i]||''))return false;return true;}
+function cxSkin(id){if(CX_CACHE[id])return CX_CACHE[id];var a=cxParts(id);if(!a||a.length!==5||!cxHexes(a,3)||CX_PATTERNS.indexOf(a[3])<0||(a[4]!=='0'&&a[4]!=='1'))return null;return CX_CACHE[id]={id:id,name:'Custom Skin',color:a[0],accent:a[1],detail:a[2],pattern:a[3]==='plain'?'none':a[3],sheen:a[4]==='1'?'#ffffff':null,shop:true,customMade:true};}
+function cxFrame(id){var a=cxParts(id);if(!a||a.length!==2||!cxHexes(a,2))return null;return{id:id,name:'Custom Frame',color:a[0],color2:a[1],customMade:true};}
+function cxTrail(id){var a=cxParts(id);if(!a||a.length<1||a.length>3||!cxHexes(a,a.length))return null;return{id:id,name:'Custom Trail',icon:'🎨',colors:a,customMade:true};}
+function cxTitleText(t){return String(t||'').replace(/[^A-Za-z0-9 !?'.&\-]/g,'').replace(/\s+/g,' ').slice(0,18);}
+function cxTitle(id){if(typeof id!=='string'||id.indexOf('cx:')!==0||id.length>40)return null;var bar=id.indexOf('|');if(bar<0)return null;var c=id.slice(3,bar),t=id.slice(bar+1);if(!CX_HEX.test(c)||!t||cxTitleText(t)!==t||t.trim()!==t)return null;return{id:id,name:t,color:c,customMade:true};}
+function cxBoom(id){var a=cxParts(id);if(!a||a.length!==5||!cxHexes(a,3)||CX_SHAPES.indexOf(a[3])<0||CX_STYLES.indexOf(a[4])<0)return null;return{id:id,name:'Custom Explosion',icon:'🎆',cols:a.slice(0,3),shape:a[3],style:a[4],customMade:true};}
+function cxDetails(kind,id){return kind==='skin'?cxSkin(id):kind==='frame'?cxFrame(id):kind==='trail'?cxTrail(id):kind==='title'?cxTitle(id):kind==='celebration'?cxBoom(id):null;}
+// owning the "custom" item of a kind lets you wear any design of that kind
+function ownsId(list,id){return list.indexOf(id)>=0||(typeof id==='string'&&id.indexOf('cx:')===0&&list.indexOf('custom')>=0);}
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -475,6 +488,7 @@ function skinFx(P,from,skin,isGoal){
 // Ball trail dots fade out over about 1/BALL_TRAIL_DECAY frames (it used to be 0.2, i.e. 5 frames).
 var BALL_TRAIL_DECAY=0.07;
 function trailColor(style,isJapan,t){
+  if(style&&style.indexOf('cx:')===0){var tc=cxTrail(style);if(tc)return tc.colors[Math.floor(t/70)%tc.colors.length];}
   if(style==='rainbow')return hslToHex((t*0.25)%360,90,62);
   if(style==='fire')return ['#f97316','#facc15','#ef4444'][Math.floor(t/90)%3];
   if(style==='ice')return ['#a5f3fc','#e0f2fe','#67e8f9'][Math.floor(t/90)%3];
@@ -496,6 +510,17 @@ function trailColor(style,isJapan,t){
   if(style==='slimeate')return ['#22c55e','#facc15','#4ade80','#fde047','#ffffff'][Math.floor(t/60)%5];
   return isJapan?'#cc0000':'#FFD700';
 }
+// Custom Studio goal explosion: the player's three colours, particle shape and blast style.
+function emitCustomBoom(P,b,ox,gy,dir){
+  var c=b.cols,i,v,p,a,sp,n=b.shape==='coin'?50:70;
+  function mk(x,y,vx,vy,k){p=mkP(x,y,vx,vy,c[k%3],60+Math.random()*40,b.shape==='bubble'?3+Math.random()*3:2.5+Math.random()*2);if(b.shape!=='dot')p.shape=b.shape;if(b.shape==='coin')p.spin=Math.random()*6;p.drag=0.975;P.push(p);}
+  fxFlash(P,ox,gy,130,c[0],14);
+  if(b.style==='burst'){fxRing(P,ox,gy,8,220,c[1],28,5,dir,0,0.8);for(i=0;i<n;i++){v=coneVel(dir,4+Math.random()*10,1.8,3);mk(ox,gy+(Math.random()-0.5)*40,v[0],v[1],i);p.grav=0.15;}}
+  else if(b.style==='rings'){for(i=0;i<4;i++)fxRing(P,ox,gy,8,320-i*50,c[i%3],30+i*3,7-i,0,i*5,0.85);for(i=0;i<42;i++){a=i/42*Math.PI*2;sp=5+Math.random()*3;mk(ox,gy,Math.cos(a)*sp,Math.sin(a)*sp,i);p.grav=0.02;}}
+  else if(b.style==='fountain'){for(i=0;i<n;i++){mk(ox,gy,dir*(1.5+Math.random()*6),-(7+Math.random()*7),i);p.grav=0.22;p.delay=Math.floor(i/3);}}
+  else if(b.style==='rain'){fxRing(P,ox,gy,8,200,c[1],28,4,dir,0,0.8);for(i=0;i<n;i++){mk(ox+dir*(Math.random()*300-40),-20-Math.random()*160,(Math.random()-0.5)*0.8,2+Math.random()*3,i);p.grav=0.1;p.life+=40;p.maxLife=p.life;p.delay=Math.floor(Math.random()*30);}}
+  else{for(i=0;i<n;i++){a=i/n*Math.PI*6;mk(ox,gy,Math.cos(a)*(2+i*0.08)+dir*1.5,Math.sin(a)*(2+i*0.08),i);p.grav=0.01;p.delay=Math.floor(i/4);}fxRing(P,ox,gy,8,260,c[2],32,5,0,10,0.85);}
+}
 // Extra goal celebration on top of the normal goal burst. Every one fires out of the goal that was scored in.
 function emitCelebration(P,style,gx,gy){if(PERF_LOW)return; // performance mode: no goal celebrations
 
@@ -512,6 +537,7 @@ function emitCelebration(P,style,gx,gy){if(PERF_LOW)return; // performance mode:
     for(i=0;i<16;i++){p=mkP(ox,gy+(Math.random()-0.5)*GOALH,dir*(12+Math.random()*10),0,ac,14+Math.random()*10,2);p.grav=0;p.shape='streak';p.len=50;p.drag=0.98;p.keep=true;P.push(p);}
     return;
   }
+  if(style&&style.indexOf('cx:')===0){var cbm=cxBoom(style);if(cbm)emitCustomBoom(P,cbm,ox,gy,dir);return;}
   if(style==='explosion'){
     // fireball out of the net: white-hot flash, blast ring, flames, flying debris, smoke rolling across the pitch
     fxFlash(P,ox,gy,130,'#fff4c2',16);
@@ -840,7 +866,7 @@ function mergeSaves(local,cloud){
     settings:cloud.settings||local.settings,
     friends:(function(){var seen={},out=[];(cloud.friends||[]).concat(local.friends||[]).forEach(function(f){if(f&&f.uid&&!seen[f.uid]){seen[f.uid]=1;out.push(f);}});return out.slice(0,50);})(),
     daily:cloud.daily&&(cloud.daily.lastDone||'')>((local.daily&&local.daily.lastDone)||'')?cloud.daily:(local.daily||{lastDone:'',streak:0}),
-    shop:(function(){var a=cleanShop(local.shop),b=cleanShop(cloud.shop),o=a.owned.slice();b.owned.forEach(function(k){if(o.indexOf(k)<0)o.push(k);});var e=Math.max(a.earned,b.earned),cb=cloud.__bucks;if(cb)e=Math.min(e,Math.floor(cb.v+(cb.legacy?0:bucksAllowance(Date.now()-cb.at))));var tk=a.tokens.concat(b.tokens);if(cloud.__slimeate)tk=slimeateAllowed(cloud.__slimeate,tk,Date.now());return{earned:e,owned:o,tokens:tk};})()
+    shop:(function(){var a=cleanShop(local.shop),b=cleanShop(cloud.shop),o=a.owned.slice();b.owned.forEach(function(k){if(o.indexOf(k)<0)o.push(k);});var e=Math.max(a.earned,b.earned),cb=cloud.__bucks;if(cb)e=Math.min(e,Math.floor(cb.v+(cb.legacy?0:bucksAllowance(Date.now()-cb.at))));var tk=a.tokens.concat(b.tokens);if(cloud.__slimeate)tk=slimeateAllowed(cloud.__slimeate,tk,Date.now());return{earned:e,owned:o,tokens:tk,uses:a.uses.concat(b.uses)};})()
   };
 }
 function writeLocalSave(save){
@@ -874,7 +900,7 @@ function cloudPushNow(){
   var shopS=shopNow(),cb=CLOUD.bucks,allowed=cb?Math.floor(cb.v+(cb.legacy?0:bucksAllowance(Date.now()-cb.at-120000))):BUCKS_LEGACY_CAP,pushB=Math.min(shopS.earned,allowed);
   // Slime-ate drops: only what the rules accept (the cloud's list plus at most one new recent drop)
   var pushT=slimeateAllowed(CLOUD.slimeate||[],shopS.tokens,Date.now());
-  if(pushB<shopS.earned||pushT.join()!==shopS.tokens.join()){SHOP_STATE=cleanShop({earned:pushB,owned:shopS.owned,tokens:pushT});try{window.localStorage.setItem('slime_shop',JSON.stringify(SHOP_STATE));}catch(e){}}
+  if(pushB<shopS.earned||pushT.join()!==shopS.tokens.join()){SHOP_STATE=cleanShop({earned:pushB,owned:shopS.owned,tokens:pushT,uses:shopS.uses});try{window.localStorage.setItem('slime_shop',JSON.stringify(SHOP_STATE));}catch(e){}}
   return cloudDoc().set({data:JSON.stringify(readLocalSave()),bucks:pushB,slimeate:pushT,username:cloudUsernameOf(CLOUD.user),updatedAt:firebase.firestore.FieldValue.serverTimestamp()})
     .then(function(){CLOUD.bucks={v:pushB,at:Date.now()};CLOUD.slimeate=pushT;CLOUD.lastSync=Date.now();cloudPublish();if(CLOUD.onSynced)CLOUD.onSynced(true);return true;})
     .catch(function(e){console.warn('Cloud save failed.',e);if(CLOUD.onSynced)CLOUD.onSynced(false,e);return false;});
@@ -3516,8 +3542,8 @@ var ACHIEVEMENT_SKINS=[
   {id:'aurora',name:'Aurora',color:'#0f766e',accent:'#a3e635',detail:'#d9f99d',pattern:'stars'},
   {id:'bigtric',name:'BIG TRIC',color:'#e3b08c',accent:'#17171c',detail:'#17171c',pattern:'fit',free:true}
 ];
-function achievementFrameDetails(id){for(var i=0;i<ACHIEVEMENT_FRAMES.length;i++)if(ACHIEVEMENT_FRAMES[i].id===id)return ACHIEVEMENT_FRAMES[i];return null;}
-function achievementSkinDetails(id){for(var i=0;i<ACHIEVEMENT_SKINS.length;i++)if(ACHIEVEMENT_SKINS[i].id===id)return ACHIEVEMENT_SKINS[i];return null;}
+function achievementFrameDetails(id){if(typeof id==='string'&&id.indexOf('cx:')===0)return cxFrame(id);for(var i=0;i<ACHIEVEMENT_FRAMES.length;i++)if(ACHIEVEMENT_FRAMES[i].id===id)return ACHIEVEMENT_FRAMES[i];return null;}
+function achievementSkinDetails(id){if(typeof id==='string'&&id.indexOf('cx:')===0)return cxSkin(id);for(var i=0;i<ACHIEVEMENT_SKINS.length;i++)if(ACHIEVEMENT_SKINS[i].id===id)return ACHIEVEMENT_SKINS[i];return null;}
 function blankAchievementProgress(){var p={developerUnlocked:false};ACHIEVEMENT_STATS.forEach(function(k){p[k]=0;});return p;}
 function cleanAchievementProgress(value){
   var clean=blankAchievementProgress(),fields=ACHIEVEMENT_STATS;
@@ -3702,6 +3728,14 @@ var PREMIUM_STOCK=[
   {kind:'frame',id:'pslimeate',name:'Slime-ate',color:'#facc15',color2:'#16a34a',price:5000,slimeate:true}
 ];
 PREMIUM_STOCK.forEach(function(it){it.premium=true;SHOP_STOCK.push(it);});
+// ── Custom Studio: design your own. The priciest things in the Shop, meant to take a long grind. ──
+[
+  {kind:'frame',id:'custom',name:'Custom Frame',color:'#ffffff',color2:'#f472b6',price:10000},
+  {kind:'trail',id:'custom',name:'Custom Trail',icon:'🎨',price:15000},
+  {kind:'title',id:'custom',name:'Custom Title',color:'#f9a8d4',grad:'linear-gradient(90deg,#db2777,#7c3aed,#0891b2)',ink:'#ffffff',price:20000},
+  {kind:'skin',id:'custom',name:'Custom Skin',price:25000,color:'#f472b6',accent:'#22d3ee',detail:'#ffffff',pattern:'stars',sheen:'#ffffff'},
+  {kind:'celebration',id:'custom',name:'Custom Explosion',icon:'🎆',price:35000}
+].forEach(function(it){it.custom=true;SHOP_STOCK.push(it);});
 SHOP_STOCK.forEach(function(it){var item=Object.assign({shop:true},it);if(it.kind==='skin')ACHIEVEMENT_SKINS.push(item);else if(it.kind==='frame')ACHIEVEMENT_FRAMES.push(item);else COSMETICS[it.kind].items.push(item);});
 // premium skins get matching goal bursts
 SKIN_FX.emperorjade={c:['#6ee7b7','#fde68a','#047857'],g:0.1,s:'star'};SKIN_FX.aurum={c:['#fde047','#fff7cc','#ca8a04'],g:0.12,s:'star'};
@@ -3721,23 +3755,28 @@ var SLIMEATE_WEEK=7*864e5,SLIMEATE_GAP=180*864e5,SLIMEATE_FRESH=29*864e5,SLIMEAT
 var SLIMEATE_UI={show:null,done:null};
 function slimeateRoll(diff){var n=SLIMEATE_ODDS[diff];if(!n)return false;var r;try{var a=new Uint32Array(2);window.crypto.getRandomValues(a);r=(a[0]*4294967296+a[1])/18446744073709551616;}catch(e){r=Math.random();}return r<1/n;}
 function slimeateNextYear(t){var d=new Date(t);d.setFullYear(d.getFullYear()+1);return d.getTime();}
-function slimeateWindows(){var out=[];(shopNow().tokens||[]).forEach(function(t){out.push([t,t+SLIMEATE_WEEK]);var n=slimeateNextYear(t);out.push([n,n+SLIMEATE_WEEK]);});return out;}
-function slimeateActive(now){now=now||Date.now();var w=slimeateWindows(),best=null;for(var i=0;i<w.length;i++)if(now>=w[i][0]&&now<w[i][1]&&(!best||w[i][1]>best[1]))best=w[i];return best;}
-function slimeateUpcoming(now){now=now||Date.now();var w=slimeateWindows(),best=null;for(var i=0;i<w.length;i++)if(w[i][0]>now&&(!best||w[i][0]<best[0]))best=w[i];return best;}
+// Each token holds two free weeks: one to start any time in the year after the drop, one any time the year after that.
+// You start them yourself from the Shop (shop.uses = start times); only the first start inside each year counts.
+var SLIMEATE_YEAR=365*864e5;
+function slimeateCharges(){var v=shopNow(),out=[];(v.tokens||[]).forEach(function(t){for(var k=0;k<2;k++){var a=t+k*SLIMEATE_YEAR,b=a+SLIMEATE_YEAR,used=null;(v.uses||[]).forEach(function(u){if(u>=a&&u<b&&(used===null||u<used))used=u;});out.push({token:t,from:a,until:b,used:used});}});return out;}
+function slimeateActive(now){now=now||Date.now();var best=null;slimeateCharges().forEach(function(x){if(x.used!==null&&now>=x.used&&now<x.used+SLIMEATE_WEEK&&(!best||x.used+SLIMEATE_WEEK>best[1]))best=[x.used,x.used+SLIMEATE_WEEK];});return best;}
+function slimeateReady(now){now=now||Date.now();var c=slimeateCharges().filter(function(x){return x.used===null&&now>=x.from&&now<x.until;});c.sort(function(a,b){return a.until-b.until;});return c[0]||null;}
+function slimeateUpcoming(now){now=now||Date.now();var c=slimeateCharges().filter(function(x){return x.used===null&&x.from>now;});c.sort(function(a,b){return a.from-b.from;});return c[0]||null;}
+function slimeateUse(){if(slimeateActive())return'A free week is already running.';if(!slimeateReady())return'You have no Slime-ate token ready to use.';var cur=shopNow();if(!saveShop({earned:cur.earned,owned:cur.owned,tokens:cur.tokens,uses:(cur.uses||[]).concat([Date.now()])}))return'Could not save in this browser.';return'';}
 // What a cloud list may become: the cloud's own entries plus at most one new, recent drop far enough after the last one.
 function slimeateAllowed(base,cands,now){
   var res=(base||[]).slice(0,20),last=res.length?res[res.length-1]:-Infinity,add=null;
   (cands||[]).forEach(function(c){if(res.indexOf(c)>=0)return;if(c<=now+60000&&c>now-SLIMEATE_FRESH&&c-last>SLIMEATE_GAP&&(add===null||c<add))add=c;});
   if(add!==null&&res.length<20)res.push(add);return res;
 }
-function slimeateInfo(at,diff){var ny=slimeateNextYear(at);return{at:at,end:at+SLIMEATE_WEEK,nextStart:ny,nextEnd:ny+SLIMEATE_WEEK,diff:diff,recorded:true};}
+function slimeateInfo(at,diff){return{at:at,y1:at+SLIMEATE_YEAR,y2:at+2*SLIMEATE_YEAR,diff:diff,recorded:true};}
 // Records a drop (if the 180-day rule allows it) and returns what the reveal should say.
 function slimeateGrant(diff){
   var now=Date.now(),cur=shopNow(),info=slimeateInfo(now,diff),last=cur.tokens.length?cur.tokens[cur.tokens.length-1]:-Infinity;
   var ok=now-last>SLIMEATE_GAP;
   if(ok&&CLOUD.user&&CLOUD.slimeate)ok=slimeateAllowed(CLOUD.slimeate,[now],now).length>CLOUD.slimeate.length;
   info.recorded=ok;
-  if(ok){saveShop({earned:cur.earned,owned:cur.owned,tokens:cur.tokens.concat([now])});if(CLOUD.user)cloudPushNow();}
+  if(ok){saveShop({earned:cur.earned,owned:cur.owned,tokens:cur.tokens.concat([now]),uses:cur.uses});if(CLOUD.user)cloudPushNow();}
   return info;
 }
 function slimeatePreview(){var info=slimeateInfo(Date.now(),'impossible');info.preview=true;if(SLIMEATE_UI.show)SLIMEATE_UI.show(info);}
@@ -3749,8 +3788,9 @@ function shopItem(key){for(var j=0;j<SHOP_STOCK.length;j++)if(shopKey(SHOP_STOCK
 // so merging two devices (max earned, union of owned) can never mint extra Bucks.
 function cleanShop(v){
   var owned=[];(v&&Array.isArray(v.owned)?v.owned:[]).forEach(function(k){k=String(k);if(shopItem(k)&&owned.indexOf(k)<0)owned.push(k);});
-  var tk=[];(v&&Array.isArray(v.tokens)?v.tokens:[]).forEach(function(x){x=Math.floor(Number(x));if(isFinite(x)&&x>1.6e12&&x<=Date.now()+864e5&&tk.indexOf(x)<0)tk.push(x);});tk.sort(function(a,b){return a-b;});
-  var e=Number(v&&v.earned);return{earned:isFinite(e)?Math.max(0,Math.floor(e)):0,owned:owned,tokens:tk.slice(-20)};
+  function times(list){var o=[];(Array.isArray(list)?list:[]).forEach(function(x){x=Math.floor(Number(x));if(isFinite(x)&&x>1.6e12&&x<=Date.now()+864e5&&o.indexOf(x)<0)o.push(x);});return o.sort(function(a,b){return a-b;});}
+  var tk=times(v&&v.tokens),us=times(v&&v.uses);
+  var e=Number(v&&v.earned);return{earned:isFinite(e)?Math.max(0,Math.floor(e)):0,owned:owned,tokens:tk.slice(-20),uses:us.slice(-40)};
 }
 function loadShop(){try{return cleanShop(JSON.parse(window.localStorage.getItem('slime_shop')||'null'));}catch(e){return cleanShop(null);}}
 var SHOP_STATE=null;
@@ -3764,7 +3804,7 @@ function shopBalance(v){v=v||shopNow();return Math.max(0,v.earned-shopSpent(v));
 function slimeateKept(kind,id){var it=shopItem(shopKey(kind,id));return !!(it&&it.slimeate&&shopNow().tokens.length);}
 function shopReallyOwns(kind,id){return shopNow().owned.indexOf(shopKey(kind,id))>=0||slimeateKept(kind,id);}
 function shopOwned(kind){if(cloudIsDev()||slimeateActive())return SHOP_STOCK.filter(function(it){return it.kind===kind;}).map(function(it){return it.id;});var out=shopNow().owned.filter(function(k){return k.indexOf(kind+':')===0;}).map(function(k){return k.slice(kind.length+1);});SHOP_STOCK.forEach(function(it){if(it.kind===kind&&out.indexOf(it.id)<0&&slimeateKept(kind,it.id))out.push(it.id);});return out;}
-function cosmeticDetails(kind,id){var list=COSMETICS[kind]?COSMETICS[kind].items:[];for(var i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
+function cosmeticDetails(kind,id){if(typeof id==='string'&&id.indexOf('cx:')===0)return cxDetails(kind,id);var list=COSMETICS[kind]?COSMETICS[kind].items:[];for(var i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
 // Achievements only ever reward these three kinds (achievements have their own 'title' field, which is their name, not a title cosmetic).
 var ACH_COSMETIC_KINDS=['celebration','trail','pose'];
 function achievementCosmetic(a){for(var i=0;i<ACH_COSMETIC_KINDS.length;i++){var k=ACH_COSMETIC_KINDS[i];if(a[k])return{kind:k,item:cosmeticDetails(k,a[k])};}return null;}
@@ -4147,10 +4187,9 @@ function SlimeateOverlay(){
   function close(){setSt(null);setPh(0);if(SLIMEATE_UI.done)SLIMEATE_UI.done();}
   var lite=PERF_LOW,odds=SLIMEATE_ODDS[st.diff],disp='"Lilita One",var(--font-display),sans-serif';
   var lines=st.recorded?[
-    React.createElement('div',{key:'a',style:{fontSize:17,fontWeight:900,color:'#fde047'}},'\uD83C\uDF9F\uFE0F The whole Shop is FREE for 7 days!'),
-    React.createElement('div',{key:'b'},'Every skin, accessory, explosion, celebration, trail, title and frame, the Premium Collection included, is yours to equip until '+slmDate(st.end)+'.'),
-    React.createElement('div',{key:'k',style:{fontWeight:800,color:'#bbf7d0'}},'✨ You also keep all 7 Slime-ate items forever: the skin, crown, eruption, ascension, trail, title and frame.'),
-    React.createElement('div',{key:'c'},'And again next year: '+slmDate(st.nextStart)+' to '+slmDate(st.nextEnd)+'.'),
+    React.createElement('div',{key:'a',style:{fontSize:17,fontWeight:900,color:'#fde047'}},'\uD83C\uDF9F\uFE0F Two free weeks, whenever you want them!'),
+    React.createElement('div',{key:'b'},'Use your token from the Shop and every item (Premium Collection and Custom Studio included) is free for 7 days. Use the first week any time before '+slmDate(st.y1)+', and the second any time from then until '+slmDate(st.y2)+'.'),
+    React.createElement('div',{key:'k',style:{fontWeight:800,color:'#bbf7d0'}},'\u2728 You also keep all 7 Slime-ate items forever: the skin, crown, eruption, ascension, trail, title and frame.'),
     React.createElement('div',{key:'d',style:{fontSize:12,color:'rgba(255,255,255,0.7)'}},'When a free week ends, anything you haven\u2019t bought goes back to the Shop.')
   ]:[React.createElement('div',{key:'a'},'You found another Slime-ate token, but you can only get one free week every 6 months, so this one couldn\u2019t be added.')];
   if(st.preview)lines.push(React.createElement('div',{key:'p',style:{fontSize:12,fontWeight:800,color:'#fca5a5'}},'Dev preview: nothing was recorded.'));
@@ -4184,7 +4223,7 @@ function TitleBadge(props){
   var t=props.id&&props.id!=='none'?cosmeticDetails('title',props.id):null;if(!t)return null;var c=t.color||'#fbbf24';
   return React.createElement('span',{title:'Title: '+t.name,style:Object.assign({display:'inline-block',padding:props.small?'0 6px':'2px 9px',borderRadius:20,fontSize:props.small?9:11,fontWeight:900,letterSpacing:'0.06em',textTransform:'uppercase',color:t.grad?t.ink:c,background:t.grad||'rgba(0,0,0,0.38)',boxShadow:t.grad?'0 0 8px '+c:'none',border:'1px solid '+c,whiteSpace:'nowrap',lineHeight:1.5,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis'},props.style)},t.name);
 }
-var UPDATE_NOTES=[{"v":"v25.9.8","d":"2026-11-19","n":["Premium Collection: 50 new high-end Shop items (skins, accessories, goal explosions, celebrations, trails, titles and frames), each category with its own Slime-ate item","Slime-ate token: a super-rare drop when you score against the AI (1 in 137,500 per goal on Chaos, down to 1 in 1,500,000 on Super Easy). Find one and the whole Shop is free for a week, and again for a week next year"]},{"v":"v25.6.9","d":"2026-11-17","n":["Performance mode: the background (stars, clouds, falling petals, sun) and screen fade-ins no longer animate either"]},{"v":"v25.6.8","d":"2026-11-17","n":["Performance mode: the main menu cards and the title slimes are now a fixed still picture instead of a frozen animation, and nothing animates by itself"]},{"v":"v25.6.7","d":"2026-11-17","n":["Polls show who voted for what","Friends now show as online even when they are on another tab","Performance mode: smaller ball trail, buttons keep one fixed look (no hover or focus animation), and the menu no longer animates for a second after loading"]},{"v":"v25.6.6","d":"2026-11-17","n":["Online: lost messages are now re-sent so a match can no longer freeze","Online: quick dashes from the joiner are no longer dropped","Online: the other player now glides to their corrected position instead of teleporting"]},{"v":"v25.6.5","d":"2026-11-17","n":["Green dot next to Social when any of your friends are online"]},{"v":"v25.6.4","d":"2026-11-16","n":["Update notes: tap the version number on the main menu to see what changed in every update"]},{"v":"v25.6.3","d":"2026-11-16","n":["Longer ball trails","Default theme + day/night setting","Card subtitles back"]},{"v":"v25.6.2","d":"2026-11-16","n":["Browser zoom notice","Menu fills the window at any zoom","Re-fit after fonts load","Perf mode freezes card animations","Remove subtitles on the main menu cards","Larger card titles","Remove credits text under main menu","Larger controls hint"]},{"v":"v25.6.1","d":"2026-11-16","n":["Menu keyboard nav follows real layout","Interface scale 60-160% with presets","Menu-fit loop guard","Crash recovery screen"]},{"v":"v25.6.0","d":"2026-11-16","n":["Pinned slimes can escape in the air (own-goal clock back to normal)","Settings preview matches the real menu","Performance mode turns off button animations","Crisp card hover text","Rare chances back to 0-100% with coins only at 1% or lower"]},{"v":"v25.5.8","d":"2026-11-16","n":["Cap rare-event chances at 1% (resets higher saved values)","No Slime Bucks if rare chances are tampered with"]},{"v":"v25.5.7","d":"2026-11-15","n":["Dimmer city night skyline behind menus","Better mode card hover/focus"]},{"v":"v25.5.6","d":"2026-11-15","n":["Interface size in 1% steps with a live preview"]},{"v":"v25.5.2","d":"2026-11-15","n":["Animated main menu cards"]},{"v":"v25.5.1","d":"2026-11-15","n":["Slime Bucks shop (earn coins vs AI, buy skins, accessories, goal explosions, celebrations, trails, titles; equipping moved to Shop; dev owns all)","Slime Bucks shop (earn coins vs AI, buy skins, accessories, goal explosions, celebrations, trails, titles; equipping moved to Shop)"]},{"v":"v25.4.9","d":"2026-11-15","n":["Smoother intro (lower render cost)"]},{"v":"v25.4.8","d":"2026-11-15","n":["New cinematic intro"]},{"v":"v25.4.7","d":"2026-11-15","n":["New tab icon","Clip editor for saved full-match replays"]},{"v":"v25.4.6","d":"2026-11-14","n":["Online play uses rollback netcode (both players simulate, only inputs are sent)"]},{"v":"v25.4.5","d":"2026-11-14","n":["Online dashes glide instead of teleporting"]},{"v":"v25.4.4","d":"2026-11-14","n":["Game reloads into the newest version on start"]},{"v":"v25.4.3","d":"2026-11-14","n":["Online joiner no longer gets dragged back while moving"]},{"v":"v25.4.2","d":"2026-11-14","n":["Online joiner moves instantly","Smoother corrections","Faster updates"]},{"v":"v25.4.1","d":"2026-11-14","n":["Online play goes through our own relay server"]},{"v":"v25.4.0","d":"2026-11-14","n":["Stats and Social are separate screens"]},{"v":"v25.3.9","d":"2026-11-14","n":["Celebrations replace the classic burst","Performance mode runs menus at 30fps with lower resolution","Battery saver option"]},{"v":"v25.3.7","d":"2026-11-14","n":["Goat goal burst no longer lags"]},{"v":"v25.3.5","d":"2026-11-14","n":["BIG TRIC's classic goal burst is goats"]},{"v":"v25.3.1","d":"2026-11-14","n":["Difficulty bar sits next to Your Side for keyboard nav"]},{"v":"v25.3.0","d":"2026-11-14","n":["Smaller difficulty bar","Left/right adjusts it with the keyboard"]},{"v":"v25.2.9","d":"2026-11-14","n":["Friends guide waits for login to load","Never shows if you have friends"]},{"v":"v25.2.8","d":"2026-11-14","n":["Difficulty picker is one big 5-section bar"]},{"v":"v25.2.7","d":"2026-11-14","n":["Rocket League style goal celebrations out of the net","Rebuilt Sonic Boom"]},{"v":"v25.2.4","d":"2026-11-14","n":["Dev mode tied to the mattdub account","No password in the code"]},{"v":"v25.2.3","d":"2026-11-14","n":["BIG TRIC brown and black hair-flick particles"]},{"v":"v25.2.2","d":"2026-11-13","n":["BIG TRIC skin"]},{"v":"v25.2.1","d":"2026-11-13","n":["Dev announcements with polls and photos","Account and friends guide waits its turn"]},{"v":"v25.2.0","d":"2026-11-13","n":["Account and friends guide (start with mattdub)","Find players list of active non-friends"]},{"v":"v25.1.9","d":"2026-11-12","n":["Chaos varies kickoffs (pop + air dash)","Smarter top-wall saves","No goal-box camping"]},{"v":"v25.1.8","d":"2026-11-12","n":["Chaos contests kickoffs and pre-jumps against aerial power shots"]},{"v":"v25.1.7","d":"2026-11-12","n":["Chaos buffed","AI learning shelved behind a flag"]},{"v":"v25.1.4","d":"2026-11-12","n":["Friend requests","Celebrations layout","Direction-aware arrow keys","Esc anywhere in Stats & Social"]},{"v":"v25.1.2","d":"2026-11-12","n":["Suggestions box with dev-only reading","What's new guide"]},{"v":"v25.1.0","d":"2026-11-11","n":["Versus intro ending","Results mention spontaneous combustion"]},{"v":"v25.0.8","d":"2026-11-11","n":["Cinematic intro with title card","Film grain","Grading","Dutch angles","Slow-mo strike"]},{"v":"v25.0.7","d":"2026-11-11","n":["Super Easy dashes back on defense half as often"]},{"v":"v25.0.6","d":"2026-11-11","n":["Impossible renamed to Chaos","New Super Easy mode"]},{"v":"v25.0.5","d":"2026-11-11","n":["Faster update notices","Practice replays start after reset"]},{"v":"v25.0.3","d":"2026-11-11","n":["Impossible fetches dead balls and stops hovering","Reliable online lobby channel","Real diagnostics","Default AI difficulty setting"]},{"v":"v25.0.1","d":"2026-11-11","n":["Revert Impossible AI to v24.9.5 and add aerial power-shot anticipation"]},{"v":"v25.0.0","d":"2026-11-11","n":["Daily challenge is its own mode with play","Resume","Multi-match series and progress"]},{"v":"v24.9.7","d":"2026-11-11","n":["Show 0 at 0:00 until overtime actually starts"]},{"v":"v24.9.5","d":"2026-11-09","n":["Rare event chances save as you type"]},{"v":"v24.9.3","d":"2026-11-09","n":["Rare event chance settings","Profile picture skin","Impossible AI air and ground dashes"]},{"v":"v24.9.2","d":"2026-11-08","n":["Practice replays hide the opponent","Reset clears last goal stats"]},{"v":"v24.8.9","d":"2026-11-08","n":["Fix online when a browser never reports the connection as open"]},{"v":"v24.8.8","d":"2026-11-08","n":["Fix one-way online connections","Version mismatch and connection warnings"]},{"v":"v24.8.7","d":"2026-11-08","n":["Fix replay progress bar jumping when dragged"]},{"v":"v24.8.6","d":"2026-11-08","n":["Smarter Impossible AI","New player from multiplayer picker","Smoother online","Interactive tutorial","Saved replays and more"]},{"v":"v24.8.4","d":"2026-11-05","n":["Impossible AI clears balls off the wall above its own goal"]},{"v":"v24.8.3","d":"2026-11-05","n":["Impossible AI plays like Hard with defensive planning plus speed and dash buffs"]},{"v":"v24.8.2","d":"2026-11-05","n":["Practice speed reads 0 when the ball is at rest"]},{"v":"v24.8.0","d":"2026-11-05","n":["Three-theme cinematic intro","Sharp menu previews in low-performance mode"]},{"v":"v24.7.9","d":"2026-11-05","n":["More aggressive Impossible AI","New cinematic 5-second intro"]},{"v":"v24.7.7","d":"2026-11-05","n":["Lock scrolling during matches on phones","Cooler intro"]},{"v":"v24.7.6","d":"2026-11-05","n":["Live friend online status","Touch buttons in How to Play","Home-screen app layout"]},{"v":"v24.7.5","d":"2026-11-05","n":["Fix online lobby getting stuck when a presence message is lost"]},{"v":"v24.7.4","d":"2026-11-05","n":["Step-by-step online connection status and clearer errors"]},{"v":"v24.7.3","d":"2026-11-05","n":["Tutorial keys in keyboard layout","Replay tutorial button"]},{"v":"v24.7.1","d":"2026-11-05","n":["Impossible AI - better ball prediction","Planned intercepts","Timed jumps","Faster reactions"]},{"v":"v24.7.0","d":"2026-11-05","n":["Editable keybinds","Full keyboard nav in Settings","Auto-pause on alt-tab in single/local matches"]},{"v":"v24.6.9","d":"2026-11-04","n":["Desktop menu auto-fits the window","Slimmer daily challenge card"]},{"v":"v24.6.8","d":"2026-11-04","n":["Daily challenges with streaks; goal celebrations","Ball trails and victory poses unlocked by 10 new achievements"]},{"v":"v24.6.7","d":"2026-11-04","n":["AI robot gets its own pixel particle effects","Full match replay fills the screen"]},{"v":"v24.6.6","d":"2026-11-04","n":["Update-available pop-up that offers a reload when a newer version is live"]},{"v":"v24.6.5","d":"2026-11-04","n":["Rename Local Player Data / Stats & Achievements to Stats & Social"]},{"v":"v24.6.4","d":"2026-11-04","n":["Phone framing fixes (scrollable menus, bigger landscape field, icon buttons)","Block long-press text selection"]},{"v":"v24.6.3","d":"2026-11-04","n":["Clearer cloud permission error message"]},{"v":"v24.6.1","d":"2026-11-04","n":["Cloud leaderboard","Friends with online match invites","8 new achievements (3 new skins, 5 new frames)"]},{"v":"v24.5.9","d":"2026-11-04","n":["Turn on cloud accounts with Firebase"]},{"v":"v24.5.7","d":"2026-11-04","n":["Achievement unlock notifications after matches","Unique particle effects for each slime skin"]},{"v":"v24.5.6","d":"2026-11-04","n":["TURN relay for online play on restricted networks"]},{"v":"v24.5.5","d":"2026-11-04","n":["Account screen keyboard navigation"]},{"v":"v24.5.4","d":"2026-11-03","n":["Phone touch controls","Account-linked local multiplayer with skins","Skin and frame achievement previews","School Wi-Fi online fix","Battery-saver speed fix","Last-second goal fix","Mobile controls","Account-linked multiplayer","Fixes"]},{"v":"Early versions","d":"2026-10-31","n":["Soccer Slime launches: play against the AI, local multiplayer and practice","Online play with sticker chat, accounts and avatars, game settings and keyboard menu navigation"]}];
+var UPDATE_NOTES=[{"v":"v25.9.9","d":"2026-11-19","n":["Slime-ate token: it now gives you two free weeks you start yourself from the Shop, one any time in the year after you find it and one any time the year after that","Custom Studio: design your own skin (colours, pattern, shine), ball trail colours, title text and colour, goal explosion (colours, particles, style) and frame colours. The most expensive things in the Shop"]},{"v":"v25.9.8","d":"2026-11-19","n":["Premium Collection: 50 new high-end Shop items (skins, accessories, goal explosions, celebrations, trails, titles and frames), each category with its own Slime-ate item","Slime-ate token: a super-rare drop when you score against the AI (1 in 137,500 per goal on Chaos, down to 1 in 1,500,000 on Super Easy). Find one and the whole Shop is free for a week, and again for a week next year"]},{"v":"v25.6.9","d":"2026-11-17","n":["Performance mode: the background (stars, clouds, falling petals, sun) and screen fade-ins no longer animate either"]},{"v":"v25.6.8","d":"2026-11-17","n":["Performance mode: the main menu cards and the title slimes are now a fixed still picture instead of a frozen animation, and nothing animates by itself"]},{"v":"v25.6.7","d":"2026-11-17","n":["Polls show who voted for what","Friends now show as online even when they are on another tab","Performance mode: smaller ball trail, buttons keep one fixed look (no hover or focus animation), and the menu no longer animates for a second after loading"]},{"v":"v25.6.6","d":"2026-11-17","n":["Online: lost messages are now re-sent so a match can no longer freeze","Online: quick dashes from the joiner are no longer dropped","Online: the other player now glides to their corrected position instead of teleporting"]},{"v":"v25.6.5","d":"2026-11-17","n":["Green dot next to Social when any of your friends are online"]},{"v":"v25.6.4","d":"2026-11-16","n":["Update notes: tap the version number on the main menu to see what changed in every update"]},{"v":"v25.6.3","d":"2026-11-16","n":["Longer ball trails","Default theme + day/night setting","Card subtitles back"]},{"v":"v25.6.2","d":"2026-11-16","n":["Browser zoom notice","Menu fills the window at any zoom","Re-fit after fonts load","Perf mode freezes card animations","Remove subtitles on the main menu cards","Larger card titles","Remove credits text under main menu","Larger controls hint"]},{"v":"v25.6.1","d":"2026-11-16","n":["Menu keyboard nav follows real layout","Interface scale 60-160% with presets","Menu-fit loop guard","Crash recovery screen"]},{"v":"v25.6.0","d":"2026-11-16","n":["Pinned slimes can escape in the air (own-goal clock back to normal)","Settings preview matches the real menu","Performance mode turns off button animations","Crisp card hover text","Rare chances back to 0-100% with coins only at 1% or lower"]},{"v":"v25.5.8","d":"2026-11-16","n":["Cap rare-event chances at 1% (resets higher saved values)","No Slime Bucks if rare chances are tampered with"]},{"v":"v25.5.7","d":"2026-11-15","n":["Dimmer city night skyline behind menus","Better mode card hover/focus"]},{"v":"v25.5.6","d":"2026-11-15","n":["Interface size in 1% steps with a live preview"]},{"v":"v25.5.2","d":"2026-11-15","n":["Animated main menu cards"]},{"v":"v25.5.1","d":"2026-11-15","n":["Slime Bucks shop (earn coins vs AI, buy skins, accessories, goal explosions, celebrations, trails, titles; equipping moved to Shop; dev owns all)","Slime Bucks shop (earn coins vs AI, buy skins, accessories, goal explosions, celebrations, trails, titles; equipping moved to Shop)"]},{"v":"v25.4.9","d":"2026-11-15","n":["Smoother intro (lower render cost)"]},{"v":"v25.4.8","d":"2026-11-15","n":["New cinematic intro"]},{"v":"v25.4.7","d":"2026-11-15","n":["New tab icon","Clip editor for saved full-match replays"]},{"v":"v25.4.6","d":"2026-11-14","n":["Online play uses rollback netcode (both players simulate, only inputs are sent)"]},{"v":"v25.4.5","d":"2026-11-14","n":["Online dashes glide instead of teleporting"]},{"v":"v25.4.4","d":"2026-11-14","n":["Game reloads into the newest version on start"]},{"v":"v25.4.3","d":"2026-11-14","n":["Online joiner no longer gets dragged back while moving"]},{"v":"v25.4.2","d":"2026-11-14","n":["Online joiner moves instantly","Smoother corrections","Faster updates"]},{"v":"v25.4.1","d":"2026-11-14","n":["Online play goes through our own relay server"]},{"v":"v25.4.0","d":"2026-11-14","n":["Stats and Social are separate screens"]},{"v":"v25.3.9","d":"2026-11-14","n":["Celebrations replace the classic burst","Performance mode runs menus at 30fps with lower resolution","Battery saver option"]},{"v":"v25.3.7","d":"2026-11-14","n":["Goat goal burst no longer lags"]},{"v":"v25.3.5","d":"2026-11-14","n":["BIG TRIC's classic goal burst is goats"]},{"v":"v25.3.1","d":"2026-11-14","n":["Difficulty bar sits next to Your Side for keyboard nav"]},{"v":"v25.3.0","d":"2026-11-14","n":["Smaller difficulty bar","Left/right adjusts it with the keyboard"]},{"v":"v25.2.9","d":"2026-11-14","n":["Friends guide waits for login to load","Never shows if you have friends"]},{"v":"v25.2.8","d":"2026-11-14","n":["Difficulty picker is one big 5-section bar"]},{"v":"v25.2.7","d":"2026-11-14","n":["Rocket League style goal celebrations out of the net","Rebuilt Sonic Boom"]},{"v":"v25.2.4","d":"2026-11-14","n":["Dev mode tied to the mattdub account","No password in the code"]},{"v":"v25.2.3","d":"2026-11-14","n":["BIG TRIC brown and black hair-flick particles"]},{"v":"v25.2.2","d":"2026-11-13","n":["BIG TRIC skin"]},{"v":"v25.2.1","d":"2026-11-13","n":["Dev announcements with polls and photos","Account and friends guide waits its turn"]},{"v":"v25.2.0","d":"2026-11-13","n":["Account and friends guide (start with mattdub)","Find players list of active non-friends"]},{"v":"v25.1.9","d":"2026-11-12","n":["Chaos varies kickoffs (pop + air dash)","Smarter top-wall saves","No goal-box camping"]},{"v":"v25.1.8","d":"2026-11-12","n":["Chaos contests kickoffs and pre-jumps against aerial power shots"]},{"v":"v25.1.7","d":"2026-11-12","n":["Chaos buffed","AI learning shelved behind a flag"]},{"v":"v25.1.4","d":"2026-11-12","n":["Friend requests","Celebrations layout","Direction-aware arrow keys","Esc anywhere in Stats & Social"]},{"v":"v25.1.2","d":"2026-11-12","n":["Suggestions box with dev-only reading","What's new guide"]},{"v":"v25.1.0","d":"2026-11-11","n":["Versus intro ending","Results mention spontaneous combustion"]},{"v":"v25.0.8","d":"2026-11-11","n":["Cinematic intro with title card","Film grain","Grading","Dutch angles","Slow-mo strike"]},{"v":"v25.0.7","d":"2026-11-11","n":["Super Easy dashes back on defense half as often"]},{"v":"v25.0.6","d":"2026-11-11","n":["Impossible renamed to Chaos","New Super Easy mode"]},{"v":"v25.0.5","d":"2026-11-11","n":["Faster update notices","Practice replays start after reset"]},{"v":"v25.0.3","d":"2026-11-11","n":["Impossible fetches dead balls and stops hovering","Reliable online lobby channel","Real diagnostics","Default AI difficulty setting"]},{"v":"v25.0.1","d":"2026-11-11","n":["Revert Impossible AI to v24.9.5 and add aerial power-shot anticipation"]},{"v":"v25.0.0","d":"2026-11-11","n":["Daily challenge is its own mode with play","Resume","Multi-match series and progress"]},{"v":"v24.9.7","d":"2026-11-11","n":["Show 0 at 0:00 until overtime actually starts"]},{"v":"v24.9.5","d":"2026-11-09","n":["Rare event chances save as you type"]},{"v":"v24.9.3","d":"2026-11-09","n":["Rare event chance settings","Profile picture skin","Impossible AI air and ground dashes"]},{"v":"v24.9.2","d":"2026-11-08","n":["Practice replays hide the opponent","Reset clears last goal stats"]},{"v":"v24.8.9","d":"2026-11-08","n":["Fix online when a browser never reports the connection as open"]},{"v":"v24.8.8","d":"2026-11-08","n":["Fix one-way online connections","Version mismatch and connection warnings"]},{"v":"v24.8.7","d":"2026-11-08","n":["Fix replay progress bar jumping when dragged"]},{"v":"v24.8.6","d":"2026-11-08","n":["Smarter Impossible AI","New player from multiplayer picker","Smoother online","Interactive tutorial","Saved replays and more"]},{"v":"v24.8.4","d":"2026-11-05","n":["Impossible AI clears balls off the wall above its own goal"]},{"v":"v24.8.3","d":"2026-11-05","n":["Impossible AI plays like Hard with defensive planning plus speed and dash buffs"]},{"v":"v24.8.2","d":"2026-11-05","n":["Practice speed reads 0 when the ball is at rest"]},{"v":"v24.8.0","d":"2026-11-05","n":["Three-theme cinematic intro","Sharp menu previews in low-performance mode"]},{"v":"v24.7.9","d":"2026-11-05","n":["More aggressive Impossible AI","New cinematic 5-second intro"]},{"v":"v24.7.7","d":"2026-11-05","n":["Lock scrolling during matches on phones","Cooler intro"]},{"v":"v24.7.6","d":"2026-11-05","n":["Live friend online status","Touch buttons in How to Play","Home-screen app layout"]},{"v":"v24.7.5","d":"2026-11-05","n":["Fix online lobby getting stuck when a presence message is lost"]},{"v":"v24.7.4","d":"2026-11-05","n":["Step-by-step online connection status and clearer errors"]},{"v":"v24.7.3","d":"2026-11-05","n":["Tutorial keys in keyboard layout","Replay tutorial button"]},{"v":"v24.7.1","d":"2026-11-05","n":["Impossible AI - better ball prediction","Planned intercepts","Timed jumps","Faster reactions"]},{"v":"v24.7.0","d":"2026-11-05","n":["Editable keybinds","Full keyboard nav in Settings","Auto-pause on alt-tab in single/local matches"]},{"v":"v24.6.9","d":"2026-11-04","n":["Desktop menu auto-fits the window","Slimmer daily challenge card"]},{"v":"v24.6.8","d":"2026-11-04","n":["Daily challenges with streaks; goal celebrations","Ball trails and victory poses unlocked by 10 new achievements"]},{"v":"v24.6.7","d":"2026-11-04","n":["AI robot gets its own pixel particle effects","Full match replay fills the screen"]},{"v":"v24.6.6","d":"2026-11-04","n":["Update-available pop-up that offers a reload when a newer version is live"]},{"v":"v24.6.5","d":"2026-11-04","n":["Rename Local Player Data / Stats & Achievements to Stats & Social"]},{"v":"v24.6.4","d":"2026-11-04","n":["Phone framing fixes (scrollable menus, bigger landscape field, icon buttons)","Block long-press text selection"]},{"v":"v24.6.3","d":"2026-11-04","n":["Clearer cloud permission error message"]},{"v":"v24.6.1","d":"2026-11-04","n":["Cloud leaderboard","Friends with online match invites","8 new achievements (3 new skins, 5 new frames)"]},{"v":"v24.5.9","d":"2026-11-04","n":["Turn on cloud accounts with Firebase"]},{"v":"v24.5.7","d":"2026-11-04","n":["Achievement unlock notifications after matches","Unique particle effects for each slime skin"]},{"v":"v24.5.6","d":"2026-11-04","n":["TURN relay for online play on restricted networks"]},{"v":"v24.5.5","d":"2026-11-04","n":["Account screen keyboard navigation"]},{"v":"v24.5.4","d":"2026-11-03","n":["Phone touch controls","Account-linked local multiplayer with skins","Skin and frame achievement previews","School Wi-Fi online fix","Battery-saver speed fix","Last-second goal fix","Mobile controls","Account-linked multiplayer","Fixes"]},{"v":"Early versions","d":"2026-10-31","n":["Soccer Slime launches: play against the AI, local multiplayer and practice","Online play with sticker chat, accounts and avatars, game settings and keyboard menu navigation"]}];
 // Update notes: every version and what it added. Tap the version number on the main menu to open it.
 function UpdatesScreen(props){
   var rootRef=useRef(null);
@@ -4248,14 +4287,55 @@ function ShopScreen(props){
   }
   var cat=SHOP_CATS.filter(function(c){return c.kind===tab;})[0]||SHOP_CATS[0];
   var mine=owned(tab),list=itemsOf(tab);
-  var forSale=list.filter(function(it){return it.shop&&!it.premium;}).slice().sort(function(x,y){return x.price-y.price;});
+  var forSale=list.filter(function(it){return it.shop&&!it.premium&&!it.custom;}).slice().sort(function(x,y){return x.price-y.price;});
+  var customList=list.filter(function(it){return it.custom;});
   var premiumList=list.filter(function(it){return it.premium;}).slice().sort(function(x,y){return x.price-y.price;});
   var s_tick=useState(0),setTick=s_tick[1];
   useEffect(function(){var id=setInterval(function(){setTick(function(n){return n+1;});},30000);return function(){clearInterval(id);};},[]);
-  var freeWk=slimeateActive(),nextWk=slimeateUpcoming();
+  var freeWk=slimeateActive(),readyWk=slimeateReady(),nextWk=slimeateUpcoming();
+  var s_cu=useState(false),confirmUse=s_cu[0],setConfirmUse=s_cu[1];
+  function useToken(){if(!confirmUse){setConfirmUse(true);return;}setConfirmUse(false);var r=slimeateUse();setMsg(r?{err:true,text:r}:{err:false,text:'Free week started! Everything in the Shop is yours until '+slmDate(Date.now()+SLIMEATE_WEEK)+'.'});}
+  // ── Custom Studio editor ──
+  var s_ed=useState(null),ed=s_ed[0],setEd=s_ed[1];
+  function cxEncode(e){
+    if(e.kind==='skin')return'cx:'+[e.c1,e.c2,e.c3,e.pattern,e.sheen?'1':'0'].join(',');
+    if(e.kind==='trail')return'cx:'+[e.c1,e.c2,e.c3].join(',');
+    if(e.kind==='title')return'cx:'+e.c1+'|'+cxTitleText(e.text).trim();
+    if(e.kind==='celebration')return'cx:'+[e.c1,e.c2,e.c3,e.shape,e.style].join(',');
+    return'cx:'+[e.c1,e.c2].join(',');
+  }
+  function cxStart(kind){
+    var d=cxDetails(kind,current(kind)),e={kind:kind};
+    if(kind==='skin')Object.assign(e,d?{c1:d.color,c2:d.accent,c3:d.detail,pattern:d.pattern==='none'?'plain':d.pattern,sheen:!!d.sheen}:{c1:'#f472b6',c2:'#22d3ee',c3:'#ffffff',pattern:'stars',sheen:true});
+    else if(kind==='trail'){var tc=d?d.colors:['#f472b6','#22d3ee','#facc15'];e.c1=tc[0];e.c2=tc[1]||tc[0];e.c3=tc[2]||tc[0];}
+    else if(kind==='title')Object.assign(e,d?{c1:d.color,text:d.name}:{c1:'#f9a8d4',text:''});
+    else if(kind==='celebration')Object.assign(e,d?{c1:d.cols[0],c2:d.cols[1],c3:d.cols[2],shape:d.shape,style:d.style}:{c1:'#f472b6',c2:'#22d3ee',c3:'#facc15',shape:'star',style:'burst'});
+    else Object.assign(e,d?{c1:d.color,c2:d.color2}:{c1:'#f472b6',c2:'#22d3ee'});
+    e.c1=e.c1.toLowerCase();if(e.c2)e.c2=e.c2.toLowerCase();if(e.c3)e.c3=e.c3.toLowerCase();
+    setEd(e);setMsg(null);if(cxDetails(kind,cxEncode(e)))setPeek({kind:kind,id:cxEncode(e)});
+  }
+  function cxSet(patch){var e=Object.assign({},ed,patch),id=cxEncode(e);setEd(e);if(cxDetails(e.kind,id))setPeek({kind:e.kind,id:id});}
+  function cxSave(){var id=cxEncode(ed);if(!cxDetails(ed.kind,id)){setMsg({err:true,text:'Give your title 1 to 18 letters, numbers or spaces.'});return;}equip(ed.kind,id);setEd(null);setPeek(null);setMsg({err:false,text:'Saved and equipped your custom design!'});}
+  function cxColor(label,key){return React.createElement('label',{key:key,style:{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:800}},React.createElement('input',{type:'color',value:ed[key],onChange:function(e){var p={};p[key]=e.target.value.toLowerCase();cxSet(p);},style:{width:38,height:30,border:'none',background:'none',padding:0,cursor:'pointer'}}),label);}
+  function cxSelect(label,key,opts){return React.createElement('label',{key:key,style:{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:800}},label,React.createElement('select',{value:ed[key],onChange:function(e){var p={};p[key]=e.target.value;cxSet(p);},style:{padding:'6px 8px',borderRadius:10,background:'#18243c',border:'1px solid rgba(255,255,255,0.26)',color:'#fff',fontFamily:'inherit'}},opts.map(function(o){return React.createElement('option',{key:o[0],value:o[0]},o[1]);})));}
+  function cxPanel(){
+    if(!ed||ed.kind!==tab)return null;var f=[];
+    if(tab==='skin')f=[cxColor('Body','c1'),cxColor('Headband','c2'),cxColor('Pattern','c3'),cxSelect('Pattern','pattern',[['plain','None'],['stripes','Racing stripes'],['stars','Stars'],['waves','Waves'],['spots','Spots'],['checker','Checkers'],['bands','Bands'],['crown','Royal sash'],['facets','Gem facets'],['flames','Flames'],['circuit','Circuit']]),React.createElement('label',{key:'sh',style:{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:800}},React.createElement('input',{type:'checkbox',checked:!!ed.sheen,onChange:function(e){cxSet({sheen:e.target.checked});}}),'Shine')];
+    else if(tab==='trail')f=[cxColor('Colour 1','c1'),cxColor('Colour 2','c2'),cxColor('Colour 3','c3')];
+    else if(tab==='title')f=[React.createElement('input',{key:'t',type:'text',value:ed.text,maxLength:18,placeholder:'Your title','aria-label':'Title text',onChange:function(e){cxSet({text:cxTitleText(e.target.value)});},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')cxSave();},style:{flex:'1 1 160px',minWidth:0,padding:'7px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:13,fontFamily:'inherit',outline:'none'}}),cxColor('Colour','c1')];
+    else if(tab==='celebration')f=[cxColor('Colour 1','c1'),cxColor('Colour 2','c2'),cxColor('Colour 3','c3'),cxSelect('Particles','shape',[['star','Stars'],['coin','Coins'],['pixel','Pixels'],['strand','Ribbons'],['bubble','Bubbles'],['dot','Sparks']]),cxSelect('Style','style',[['burst','Burst'],['rings','Shockwave rings'],['fountain','Fountain'],['rain','Rain from the sky'],['spiral','Spiral']])];
+    else f=[cxColor('Ring','c1'),cxColor('Glow','c2')];
+    return React.createElement('div',{style:{padding:14,borderRadius:16,background:'linear-gradient(140deg,rgba(219,39,119,0.2),rgba(8,145,178,0.16))',border:'1px solid rgba(244,114,182,0.65)',display:'flex',flexDirection:'column',gap:10}},
+      React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#f9a8d4'}},'\uD83D\uDEE0\uFE0F Custom Studio \u00B7 the preview shows your design live'),
+      React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:12,alignItems:'center'}},f),
+      React.createElement('div',{style:{display:'flex',gap:8}},
+        React.createElement('button',{type:'button',onClick:cxSave,style:{padding:'8px 16px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#db2777,#7c3aed)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},'Save & equip'),
+        React.createElement('button',{type:'button',onClick:function(){setEd(null);setPeek(null);},style:{padding:'8px 16px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'transparent',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},'Cancel')));
+  }
   var rewards=list.filter(function(it){return !it.shop;});
   function swatch(it){
-    var id=it.id;
+    var id=it.custom&&String(current(tab)).indexOf('cx:')===0?current(tab):it.id;
+    if(id!==it.id&&tab==='frame')it=achievementFrameDetails(id)||it;
     if(tab==='skin')return React.createElement(ProfileAvatar,{profile:{kind:'slime',color:color,theme:theme,frame:'none',skin:id,accessory:current('accessory')},size:46});
     if(tab==='accessory')return React.createElement(ProfileAvatar,{profile:{kind:'slime',color:color,theme:theme,frame:'none',skin:current('skin'),accessory:id},size:46});
     if(tab==='frame')return React.createElement('span',{style:{width:40,height:40,borderRadius:'50%',border:'4px solid '+(it.color||'rgba(255,255,255,0.7)'),boxShadow:it.color2?'0 0 0 2px '+it.color2+',0 0 12px '+it.color+',0 0 18px '+it.color2:it.color?'0 0 10px '+it.color:'none',boxSizing:'border-box',display:'block'}});
@@ -4266,9 +4346,11 @@ function ShopScreen(props){
     var id=it.id,isNone=id==='none',have=isNone||mine.indexOf(id)>=0,on=current(tab)===id,pk=!!(peek&&peek.kind===tab&&peek.id===id),afford=it.shop&&bal>=it.price,ach=!have&&!it.shop?achFor(tab,id):null,action;
     var btnBase={width:'100%',padding:'6px 8px',borderRadius:20,fontSize:11,fontWeight:900,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:5,fontFamily:'inherit'};
     var lent=have&&!isNone&&it.shop&&!props.dev&&!shopReallyOwns(tab,id);
+    if(it.custom)on=String(current(tab)).indexOf('cx:')===0;
     if(have)action=React.createElement('button',{type:'button','aria-pressed':on,'aria-label':(on?'Unequip ':'Equip ')+it.name,onClick:function(){setPeek(null);setMsg(null);if(on){if(!isNone)equip(tab,'none');}else equip(tab,id);},style:Object.assign({},btnBase,{border:on?'2px solid #fff':'1px solid rgba(255,255,255,0.3)',background:on?'linear-gradient(135deg,#059669,#047857)':'rgba(255,255,255,0.1)',color:'#fff'})},on?(isNone?'Selected':'Equipped \u2713'):'Equip');
     else if(it.shop)action=React.createElement('button',{type:'button',disabled:!afford,'aria-label':'Buy '+it.name+' for '+it.price+' Slime Bucks'+(afford?'':' (not enough Slime Bucks)'),onClick:function(){if(afford)buy(tab,it);},style:Object.assign({},btnBase,{border:'1px solid '+(afford?'rgba(253,230,138,0.85)':'rgba(255,255,255,0.18)'),background:afford?'linear-gradient(135deg,#ca8a04,#854d0e)':'rgba(255,255,255,0.05)',color:afford?'#fff':'rgba(255,255,255,0.5)',cursor:afford?'pointer':'not-allowed'})},afford?'Buy':'Need '+(it.price-bal)+' more');
     else action=React.createElement('div',{title:ach?ach.description:'',style:{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.6)',textAlign:'center',lineHeight:1.3}},'\uD83D\uDD12 '+(ach?ach.title:'Achievement'));
+    if(it.custom&&have)action=React.createElement('button',{type:'button',onClick:function(){cxStart(tab);},style:Object.assign({},btnBase,{border:'1px solid rgba(244,114,182,0.85)',background:'linear-gradient(135deg,#db2777,#7c3aed)',color:'#fff'})},on?'Edit design \u270F\uFE0F':'Customise \uD83C\uDFA8');
     // free-week items: equip now, or buy to keep after the week ends
     if(lent)action=React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:4,width:'100%'}},action,React.createElement('button',{type:'button',disabled:!afford,'aria-label':'Buy '+it.name+' to keep it for '+it.price+' Slime Bucks',onClick:function(){if(afford)buy(tab,it);},style:Object.assign({},btnBase,{padding:'4px 8px',fontSize:10,border:'1px solid '+(afford?'rgba(253,230,138,0.7)':'rgba(255,255,255,0.15)'),background:afford?'rgba(202,138,4,0.35)':'transparent',color:afford?'#fde68a':'rgba(255,255,255,0.45)',cursor:afford?'pointer':'not-allowed'})},'Keep it: '+it.price));
     var prem=!!it.premium;
@@ -4300,7 +4382,7 @@ function ShopScreen(props){
       React.createElement('div',{style:{display:'grid',gridTemplateColumns:narrowShop?'1fr':'280px minmax(0,1fr)',gap:22,alignItems:'start'}},
         React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:14,position:narrowShop?'static':'sticky',top:12}},
       React.createElement('div',{role:'tablist','aria-label':'Shop categories',style:{display:'flex',flexDirection:narrowShop?'row':'column',flexWrap:'wrap',gap:6,justifyContent:narrowShop?'center':'flex-start'}},
-        SHOP_CATS.map(function(c){var on=c.kind===tab;return React.createElement('button',{key:c.kind,type:'button',role:'tab','aria-selected':on,'data-shop-tab':c.kind,onClick:function(){setTab(c.kind);setPeek(null);setMsg(null);},style:{display:'flex',alignItems:'center',gap:8,padding:narrowShop?'7px 12px':'10px 14px',borderRadius:narrowShop?50:12,width:narrowShop?'auto':'100%',textAlign:'left',border:on?'2px solid #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},React.createElement('span',{'aria-hidden':'true'},c.icon),c.label);})),
+        SHOP_CATS.map(function(c){var on=c.kind===tab;return React.createElement('button',{key:c.kind,type:'button',role:'tab','aria-selected':on,'data-shop-tab':c.kind,onClick:function(){setTab(c.kind);setPeek(null);setMsg(null);setEd(null);},style:{display:'flex',alignItems:'center',gap:8,padding:narrowShop?'7px 12px':'10px 14px',borderRadius:narrowShop?50:12,width:narrowShop?'auto':'100%',textAlign:'left',border:on?'2px solid #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},React.createElement('span',{'aria-hidden':'true'},c.icon),c.label);})),
           React.createElement('div',{style:{padding:14,borderRadius:18,background:'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',gap:8}},
             React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},React.createElement('span',{style:{fontSize:11,fontWeight:900,letterSpacing:'0.12em',textTransform:'uppercase',color:'#fde68a'}},'\uD83D\uDCBE Loadouts'),React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',fontWeight:800}},loadouts.length+' / '+LOADOUT_MAX)),
             loadouts.length===0&&React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.6)',lineHeight:1.4}},'Save what you have on now (skin, frame, accessory, explosion, celebration, trail and title) and switch back to it in one click.'),
@@ -4318,22 +4400,25 @@ function ShopScreen(props){
         peekItem&&React.createElement('div',{role:'status',style:{fontSize:11,fontWeight:800,color:'#fde68a'}},'Previewing '+peekItem.name+' \u00B7 tap it again to stop')),
       tab==='skin'&&avatar.kind!=='photo'&&React.createElement('label',{style:{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800,flexWrap:'wrap',justifyContent:'center'}},'Profile picture skin',
         React.createElement('select',{value:avatar.pfpSkin||'same',onChange:function(e){equip('pfpSkin',e.target.value);},style:{padding:'7px 10px',borderRadius:10,background:'#18243c',border:'1px solid rgba(255,255,255,0.26)',color:'#fff',fontFamily:'inherit'}},
-          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(sk){return mine.indexOf(sk.id)>=0;})).map(function(sk){return React.createElement('option',{key:sk.id,value:sk.id},sk.name);})))),
+          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(sk){return mine.indexOf(sk.id)>=0&&!sk.custom;})).map(function(sk){return React.createElement('option',{key:sk.id,value:sk.id},sk.name);})))),
       React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.7)',textAlign:narrowShop?'center':'left',lineHeight:1.45}},'Earn Slime Bucks against the AI: 1 per goal you score, plus a win bonus from 5 (Super Easy) up to 25 (Chaos). Online, practice and training don\u2019t pay out.')),
         React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0}},
       React.createElement('div',{role:'status',style:{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:16,flexWrap:'wrap',background:freeWk?'linear-gradient(120deg,rgba(22,163,74,0.4),rgba(250,204,21,0.28))':'linear-gradient(120deg,rgba(22,163,74,0.16),rgba(250,204,21,0.1))',border:'1px solid '+(freeWk?'rgba(250,204,21,0.8)':'rgba(250,204,21,0.3)')}},
         React.createElement(SlimeateToken,{size:freeWk?46:36}),
         React.createElement('div',{style:{flex:'1 1 220px',minWidth:0,display:'flex',flexDirection:'column',gap:2}},
-          React.createElement('span',{style:{fontSize:13,fontWeight:900,color:'#fde047'}},freeWk?'Slime-ate free week: the whole Shop is free!':nextWk?'Next Slime-ate free week':'Slime-ate token'),
-          React.createElement('span',{style:{fontSize:11.5,color:'rgba(255,255,255,0.8)',lineHeight:1.4}},freeWk?'Ends in '+slmLeft(freeWk[1]-Date.now())+' ('+slmDate(freeWk[1])+'). Buy what you want to keep before then.'+(nextWk?' Next free week: '+slmDate(nextWk[0])+'.':''):nextWk?slmDate(nextWk[0])+' to '+slmDate(nextWk[1])+': every item is free for the week.':'A super-rare drop when you score against the AI: 1 in 137,500 per goal on Chaos, 1 in 1,500,000 on Super Easy. Find one and the whole Shop is free for a week, and again next year.')),
+          React.createElement('span',{style:{fontSize:13,fontWeight:900,color:'#fde047'}},freeWk?'Slime-ate free week: the whole Shop is free!':readyWk?'You have a Slime-ate token ready!':nextWk?'Slime-ate token saved for later':'Slime-ate token'),
+          React.createElement('span',{style:{fontSize:11.5,color:'rgba(255,255,255,0.8)',lineHeight:1.4}},freeWk?'Ends in '+slmLeft(freeWk[1]-Date.now())+' ('+slmDate(freeWk[1])+'). Buy what you want to keep before then.':readyWk?'Use it whenever you like before '+slmDate(readyWk.until)+'. From the moment you use it, everything in the Shop is free for 7 days.':nextWk?'Your next free week can be started any time from '+slmDate(nextWk.from)+' to '+slmDate(nextWk.until)+'.':'A super-rare drop when you score against the AI: 1 in 137,500 per goal on Chaos, 1 in 1,500,000 on Super Easy. Find one and you get two free weeks of the whole Shop to use whenever you want.')),
+        readyWk&&!freeWk&&React.createElement('button',{type:'button',onClick:useToken,onBlur:function(){setConfirmUse(false);},style:{padding:'9px 16px',borderRadius:50,border:'2px solid #fde047',background:'linear-gradient(135deg,#f59e0b,#c2410c)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit',animation:PERF_LOW?'none':'slmGlow 2.4s ease-in-out infinite'}},confirmUse?'Sure? Start the 7 days now':'\uD83C\uDF9F\uFE0F Use token'),
         props.dev&&React.createElement('div',{style:{display:'flex',gap:6,flexWrap:'wrap'}},
           React.createElement('button',{type:'button',onClick:function(){SLIMEATE_DEV_NEXT=true;setMsg({err:false,text:'Dev: your next goal against the AI drops a Slime-ate token.'});},style:{padding:'6px 10px',borderRadius:50,border:'1px solid rgba(250,204,21,0.7)',background:'rgba(0,0,0,0.35)',color:'#fde047',fontWeight:900,fontSize:11,cursor:'pointer',fontFamily:'inherit'}},'Dev: drop on next goal'),
           React.createElement('button',{type:'button',onClick:slimeatePreview,style:{padding:'6px 10px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(0,0,0,0.35)',color:'#fff',fontWeight:900,fontSize:11,cursor:'pointer',fontFamily:'inherit'}},'Dev: preview'))),
+      cxPanel(),
       msg&&React.createElement('div',{role:msg.err?'alert':'status',style:{width:'100%',boxSizing:'border-box',textAlign:'center',padding:'7px 10px',borderRadius:10,fontSize:12,fontWeight:800,color:msg.err?'#fecaca':'#bbf7d0',background:msg.err?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.16)'}},msg.text),
       React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',gap:16}},
         grid([noneItem]),
         section('For sale',forSale),
         section('💎 Premium Collection',premiumList),
+        section('🛠️ Custom Studio: design your own',customList),
         section(tab==='frame'?'Earned with achievements':'Achievement rewards',rewards))))));
 }
 // First-visit walkthrough of the main menu: a spotlight on each part with a short explanation.
@@ -4732,7 +4817,7 @@ function App(){
     if(!it)return'That item isn\u2019t for sale.';
     if(cur.owned.indexOf(key)>=0)return'';
     if(shopBalance(cur)<it.price)return'Not enough Slime Bucks yet. Score goals and beat the AI to earn more.';
-    if(!saveShop({earned:cur.earned,owned:cur.owned.concat([key]),tokens:cur.tokens}))return'Could not save your purchase in this browser. Check available site storage.';
+    if(!saveShop({earned:cur.earned,owned:cur.owned.concat([key]),tokens:cur.tokens,uses:cur.uses}))return'Could not save your purchase in this browser. Check available site storage.';
     setShop(shopNow());return'';
   }
   // Pays out once per finished match. vs AI: 1 per goal + BUCKS_WIN_BASE x difficulty level for a win.
@@ -4746,7 +4831,7 @@ function App(){
     if(mode==='single'){r.goals=goals;if(matchWinner===me){r.mult=bucksWinMult(diffRef.current);r.win=BUCKS_WIN_BASE*r.mult;}}
     else{r.goals=Math.min(goals,BUCKS_MULTI_CAP);r.capped=goals>BUCKS_MULTI_CAP;}
     r.total=r.goals+r.win;
-    if(r.total>0){var cur=shopNow();saveShop({earned:cur.earned+r.total,owned:cur.owned,tokens:cur.tokens});setShop(shopNow());}
+    if(r.total>0){var cur=shopNow();saveShop({earned:cur.earned+r.total,owned:cur.owned,tokens:cur.tokens,uses:cur.uses});setShop(shopNow());}
     setBucksResult(r);
   }
   // Slime-ate token roll: every goal the local player scores against the AI (not own goals; not online, practice or training).
@@ -4768,7 +4853,7 @@ function App(){
     function chk(){
       if(cloudIsDev()||slimeateActive()||!shopNow().tokens.length||(FIREBASE_CONFIG&&!CLOUD.authKnown))return;
       var av=cleanAccountAvatar(account.avatar),p={},n=0;
-      function lent(kind,id){return id&&id!=='none'&&id!=='same'&&shopItem(shopKey(kind,id))&&!shopReallyOwns(kind,id);}
+      function lent(kind,id){if(String(id).indexOf('cx:')===0)id='custom';return id&&id!=='none'&&id!=='same'&&shopItem(shopKey(kind,id))&&!shopReallyOwns(kind,id);}
       if(lent('skin',av.skin)){p.skin='none';n++;}
       if(lent('skin',av.pfpSkin)){p.pfpSkin='same';n++;}
       if(lent('frame',av.frame)){p.frame='none';n++;}
@@ -5548,7 +5633,7 @@ function makePeerRoom(peer,role,code){
   var remoteCosRef=useRef(null),lastTouchRef=useRef(null),impMemRef=useRef({land:null,prevOurs:null,retreat:0}),rareMsgRef=useRef(null),practGoalRef=useRef(null);
   function getGameCosmetics(mode){
     var none={celebration:'none',trail:'none',pose:'none',accessory:'none',title:'none'},mine={};
-    COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&unlockedCosmetics(achievementProgress,k).indexOf(id)>=0?id:'none';});
+    COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&ownsId(unlockedCosmetics(achievementProgress,k),id)?id:'none';});
     var out={left:none,right:none};
     if(mode==='online'){var them=remoteCosRef.current?cleanAccountAvatar(remoteCosRef.current):none,theirs={celebration:them.celebration,trail:them.trail,pose:them.pose,accessory:them.accessory,title:them.title};if(onRoleRef.current==='host'){out.left=mine;out.right=theirs;}else{out.left=theirs;out.right=mine;}}
     else if(achievementSideRef.current==='left'||achievementSideRef.current==='right')out[achievementSideRef.current]=mine;
@@ -5557,7 +5642,7 @@ function makePeerRoom(peer,role,code){
   }
   function getGameSlimeSkins(mode){
     var skins={left:null,right:null},localSkin=achievementSkinDetails(account.avatar.skin);
-    if(localSkin&&unlockedAchievementSkins(achievementProgress).indexOf(localSkin.id)<0)localSkin=null;
+    if(localSkin&&!ownsId(unlockedAchievementSkins(achievementProgress),localSkin.id))localSkin=null;
     if(mode==='online'){
       var remoteSkin=achievementSkinDetails(remoteSkinRef.current);
       if(onRoleRef.current==='host'){skins.left=localSkin;skins.right=remoteSkin;}
@@ -5569,7 +5654,7 @@ function makePeerRoom(peer,role,code){
       skins[achievementSideRef.current]=localSkin;
     }else if(mode==='multi'){
       var unlocked=unlockedAchievementSkins(achievementProgress);
-      ['left','right'].forEach(function(s){var sk=achievementSkinDetails(multiSkinsRef.current[s]);skins[s]=sk&&unlocked.indexOf(sk.id)>=0?sk:null;});
+      ['left','right'].forEach(function(s){var sk=achievementSkinDetails(multiSkinsRef.current[s]);skins[s]=sk&&ownsId(unlocked,sk.id)?sk:null;});
     }
     // shop accessories and titles ride along with the skins (drawScene and the HUD read them)
     var cos=getGameCosmetics(mode);skins.acc={left:null,right:null};skins.title={left:null,right:null};
