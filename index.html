@@ -20,6 +20,7 @@ html.lock-scroll,html.lock-scroll body{overflow:hidden!important;overscroll-beha
 @keyframes introShake{0%,100%{transform:none}15%{transform:translate(-9px,6px)}30%{transform:translate(8px,-7px)}45%{transform:translate(-6px,-4px)}60%{transform:translate(5px,5px)}80%{transform:translate(-2px,2px)}}
 @keyframes introGlow{0%,100%{text-shadow:0 0 30px rgba(56,189,248,.8),0 5px 0 rgba(0,40,100,.45)}50%{text-shadow:0 0 60px rgba(125,211,252,1),0 0 110px rgba(56,189,248,.6),0 5px 0 rgba(0,40,100,.45)}}
 @keyframes introOut{to{opacity:0;transform:scale(1.04)}}
+body[data-nav-focus="version"] [data-tour="version"]{outline:3px solid #7dd3fc;outline-offset:3px;border-radius:8px}
 /* Performance mode: buttons and cards don't animate (no hover glow, shine, lift or transitions) */
 .perf-low button,.perf-low button *,.perf-low button::before,.perf-low button::after{animation:none!important;transition:none!important}
 .perf-low button[data-tour]{transform:none!important}
@@ -114,7 +115,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.8.4';
+var GAME_VERSION='v25.8.6';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -5110,7 +5111,7 @@ function makePeerRoom(peer,role,code){
   useEffect(function(){soundEnabledRef.current=soundEnabled;},[soundEnabled]);
   useEffect(function(){practModeRef.current=practMode;},[practMode]);
   useEffect(function(){themeModeRef.current=themeMode;try{document.documentElement.style.setProperty('--ghost',thN(themeMode)?'rgba(255,255,255,0.12)':thJ(themeMode)?'rgba(70,28,58,0.46)':'rgba(8,42,92,0.42)');}catch(e){}},[themeMode]);
-  useEffect(function(){var fi=0;if(screen==='duration'&&pmRef.current==='single'){var fl=[].concat.apply([],getNavGrid()),pi=fl.indexOf('play');if(pi>=0)fi=pi;}setFocusIdx(fi);setThemeOpen(false);},[screen,onl.view,onl.peerOn]);
+  useEffect(function(){if(screen==='menu')menuInitFocusRef.current=true;var fi=0;if(screen==='duration'&&pmRef.current==='single'){var fl=[].concat.apply([],getNavGrid()),pi=fl.indexOf('play');if(pi>=0)fi=pi;}setFocusIdx(fi);setThemeOpen(false);},[screen,onl.view,onl.peerOn]);
   useEffect(function(){
     if(screen!=='online'||onl.view!=='stickers')return;
     var focusedSticker=onlineStickerButtonRefs.current['sticker_'+focusIdx];
@@ -5129,7 +5130,7 @@ function makePeerRoom(peer,role,code){
   var showReplayRef=useRef(false);
   var s_land=useState(function(){return window.innerWidth>window.innerHeight;}),landscape=s_land[0],setLandscape=s_land[1];
   // Desktop menu is locked to the window, so shrink it a little if its content is taller than the window.
-  var menuWrapRef=useRef(null),menuFitRef=useRef({sig:'',n:0}),menuGridRef=useRef(null),menuXRef=useRef({}),s_mfit=useState(1),menuFit=s_mfit[0],setMenuFit=s_mfit[1],s_ntick=useState(0),setNavTick=s_ntick[1];
+  var menuInitFocusRef=useRef(true),menuWrapRef=useRef(null),menuFitRef=useRef({sig:'',n:0}),menuGridRef=useRef(null),menuXRef=useRef({}),s_mfit=useState(1),menuFit=s_mfit[0],setMenuFit=s_mfit[1],s_ntick=useState(0),setNavTick=s_ntick[1];
   React.useLayoutEffect(function(){
     var el=menuWrapRef.current;if(!el||touchUI||screen!=='menu')return;
     var applied=uiZ*menuFit,natural=el.getBoundingClientRect().height/applied,avail=window.innerHeight-60;MENU_NAT=natural; // screen has 20px padding top and bottom, plus a little breathing room
@@ -5144,8 +5145,8 @@ function makePeerRoom(peer,role,code){
   // really are, so it works the same whether the layout is 3 cards across, 2 + 1, or the pills wrap onto more lines.
   React.useLayoutEffect(function(){
     if(screen!=='menu')return;
-    var ids=['single','multi','practice','accounts','settings','online','guide','playerdata','social','shop','theme','time'],items=[],xs={};
-    ids.forEach(function(id){var el=document.querySelector('[data-tour="'+id+'"]');if(!el)return;var r=el.getBoundingClientRect();if(r.width<2)return;items.push({id:id,x:r.left+r.width/2,y:r.top+r.height/2,h:r.height});xs[id]=r.left+r.width/2;});
+    var ids=['single','multi','practice','accounts','settings','online','guide','playerdata','social','shop','theme','time','version','daily_play'],items=[],xs={};
+    ids.forEach(function(id){var el=id==='daily_play'?document.querySelector('[data-nav="daily_play"]'):document.querySelector('[data-tour="'+id+'"]');if(!el)return;var r=el.getBoundingClientRect();if(r.width<2)return;items.push({id:id,x:r.left+r.width/2,y:r.top+r.height/2,h:r.height});xs[id]=r.left+r.width/2;});
     var dp=document.querySelector('[data-nav="daily_play"]');if(dp){var dr=dp.getBoundingClientRect();xs.daily_play=dr.left+dr.width/2;}
     items.sort(function(a,b){return a.y-b.y||a.x-b.x;});
     var rows=[],cur=null;
@@ -5154,6 +5155,8 @@ function makePeerRoom(peer,role,code){
     menuXRef.current=xs;
     try{var fb=getMenuButtons()[focusIdx];document.body.setAttribute('data-nav-focus',fb?fb.id:'');}catch(e){}
     var prev=JSON.stringify(menuGridRef.current);menuGridRef.current=grid.length?grid:null;
+    // arriving on the main menu: start on Play vs AI
+    if(menuInitFocusRef.current&&grid.length){menuInitFocusRef.current=false;var flatG=[].concat.apply([],grid),si=flatG.indexOf('single');if(si>=0&&si!==focusIdx){setFocusIdx(si);return;}}
     if(JSON.stringify(menuGridRef.current)!==prev)setNavTick(function(n){return n+1;});
   });
   var s_rtick=useState(0),setResizeTick=s_rtick[1];
@@ -5390,7 +5393,7 @@ function makePeerRoom(peer,role,code){
     attempt.resetAt=performance.now()+420;
   }
   function getNavGrid(){
-    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:(menuGridRef.current||[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social','shop'],['theme','time']]).concat(dailyDoneToday(dailyState)?[]:[['daily_play']]);
+    if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:(function(g){return dailyDoneToday(dailyState)||[].concat.apply([],g).indexOf('daily_play')>=0?g:g.concat([['daily_play']]);})(menuGridRef.current||[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social','shop'],['theme','time']]);
     if(screen==='online'){
       if(onl.view==='choose')return cleanName(account.name)?[['online_create'],['online_join'],['online_stickers'],['online_back']]:[['online_create'],['online_join'],['online_name'],['online_stickers'],['online_back']];
       if(onl.view==='stickers'){
@@ -5426,6 +5429,7 @@ function makePeerRoom(peer,role,code){
       train_dash:function(){startTraining('dash');},
       train_save:function(){startTraining('save');},
       accounts:function(){setScreen('accounts');},
+      version:function(){setScreen('updates');},
       daily_play:function(){startDaily();},
       settings:function(){setSettingsSaveError('');setShowSettings(true);},
       online:function(){onlineCleanup();setOnl({view:'choose',code:'',joinCode:'',err:'',status:'',peerOn:false,dur:'2min'});setScreen('online');},
@@ -5506,6 +5510,24 @@ function makePeerRoom(peer,role,code){
       if(themeOpen&&key!=='enter'&&key!==' '&&key!=='escape'){e.preventDefault();var td=(key==='arrowright'||key==='d'||key==='arrowdown'||key==='s')?1:(key==='arrowleft'||key==='a'||key==='arrowup'||key==='w')?-1:0;if(td)setFocusIdx((focusIdx+td+3)%3);return;}
       if(key==='escape'){e.preventDefault();if(themeOpen){setThemeOpen(false);setFocusIdx(10);return;}if(screen==='accounts'||screen==='shop'||screen==='guide'||screen==='practice_select'||screen==='player_select')setScreen('menu');else if(screen==='training_select')setScreen('practice_select');else if(screen==='duration')setScreen(pmRef.current==='multi'?'player_select':'menu');else if(screen==='customise')setScreen('player_select');else if(screen==='online'){var onlineButtons=getMenuButtons();if(onlineButtons.length)onlineButtons[onlineButtons.length-1].act();}return;}
       if(btns[focusIdx]&&btns[focusIdx].id==='diff_bar'){var dstep=(key==='arrowright'||key==='d')?1:(key==='arrowleft'||key==='a')?-1:0;var dcur=DIFF_ORDER.indexOf(diffRef.current);if(dstep&&!(dstep<0&&dcur<=0)){e.preventDefault();var di=Math.max(0,Math.min(DIFF_ORDER.length-1,dcur+dstep));setDiff(DIFF_ORDER[di]);diffRef.current=DIFF_ORDER[di];return;}}
+      // Main menu: arrows move to the nearest button that is really in that direction (works for every layout,
+      // including the side rail), preferring buttons lined up with the current one.
+      if(screen==='menu'&&!themeOpen){
+        var mdir=(key==='arrowdown'||key==='s')?[0,1]:(key==='arrowup'||key==='w')?[0,-1]:(key==='arrowright'||key==='d')?[1,0]:(key==='arrowleft'||key==='a')?[-1,0]:null;
+        if(mdir){
+          e.preventDefault();
+          var navRect=function(id){var el=id==='daily_play'?document.querySelector('[data-nav="daily_play"]'):document.querySelector('[data-tour="'+id+'"]');if(!el)return null;var rr=el.getBoundingClientRect();return rr.width<2?null:rr;};
+          var curB=btns[focusIdx],cr=curB&&navRect(curB.id);
+          if(!cr){var si0=btns.findIndex(function(b){return b.id==='single';});setFocusIdx(si0>=0?si0:0);return;}
+          var cx=cr.left+cr.width/2,cy=cr.top+cr.height/2,best=-1,bestScore=1e12;
+          btns.forEach(function(b,i){if(i===focusIdx)return;var rr=navRect(b.id);if(!rr)return;
+            var along=(rr.left+rr.width/2-cx)*mdir[0]+(rr.top+rr.height/2-cy)*mdir[1];if(along<=4)return;
+            var gap=mdir[0]?Math.max(0,rr.top-cr.bottom,cr.top-rr.bottom):Math.max(0,rr.left-cr.right,cr.left-rr.right);
+            var sc=gap>0?100000+along+gap*3:along;if(sc<bestScore){bestScore=sc;best=i;}});
+          if(best>=0)setFocusIdx(best);
+          return;
+        }
+      }
       var pos=getFocusPos(grid,focusIdx),r=pos[0],c=pos[1],nr=r,nc=c;
       if(key==='arrowdown'||key==='s'){nr=(r+1)%grid.length;}
       else if(key==='arrowup'||key==='w'){nr=(r-1+grid.length)%grid.length;}
