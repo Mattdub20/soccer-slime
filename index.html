@@ -115,7 +115,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.9.5';
+var GAME_VERSION='v25.9.7';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -5369,12 +5369,12 @@ function makePeerRoom(peer,role,code){
   var s_freq=useState({inc:[],out:[]}),friendReqs=s_freq[0],setFriendReqs=s_freq[1];
   var frDot=friendReqs.inc.some(function(r){return r.status==='pending';});
   // Green dot on Social while any friend is online. Listens to friends' public profiles only while the main menu is showing.
-  var s_fon=useState(0),friendsOnline=s_fon[0],setFriendsOnline=s_fon[1];
+  var s_fon=useState(0),friendsOnline=s_fon[0],setFriendsOnline=s_fon[1],s_fol=useState([]),onlineFriends=s_fol[0],setOnlineFriends=s_fol[1];
   var frUids=friends.map(function(f){return f.uid;}).join(',');
   useEffect(function(){
-    if(!cloud.user||!frUids||screen!=='menu'||showPD){setFriendsOnline(0);return;}
+    if(!cloud.user||!frUids||(screen!=='menu'&&screen!=='online')||showPD){setFriendsOnline(0);setOnlineFriends([]);return;}
     var alive=true,m={};
-    function recount(){if(alive)setFriendsOnline(Object.keys(m).filter(function(u){return cloudIsOnline(m[u]);}).length);}
+    function recount(){if(!alive)return;var on=Object.keys(m).filter(function(u){return cloudIsOnline(m[u]);});setFriendsOnline(on.length);setOnlineFriends(on.map(function(u){var d=m[u]||{};return{uid:u,username:d.username||'',name:d.name||d.username||'Friend',color:d.color,skin:d.skin};}));}
     var subs=frUids.split(',').map(function(uid){try{return lbCol().doc(uid).onSnapshot(function(d){m[uid]=d.exists?d.data():null;recount();},function(){});}catch(e){return function(){};}});
     var t=setInterval(recount,15000);
     return function(){alive=false;clearInterval(t);subs.forEach(function(u){try{u();}catch(e){}});};
@@ -6586,6 +6586,13 @@ function makePeerRoom(peer,role,code){
           bigChoice('c','online_create','\uD83C\uDFE0','Create room','Get a 4-letter code to send your friend. You pick the match settings.','linear-gradient(150deg,#4f46e5,#1e1b4b)','#a5b4fc',function(){var cs='abcdefghjkmnpqrstuvwxyz23456789',cd='';for(var ci=0;ci<4;ci++)cd+=cs.charAt(Math.floor(Math.random()*cs.length));openRoom('h',cd);}),
           bigChoice('j','online_join','\uD83D\uDD11','Join room','Type the code your friend gave you and you\u2019re in.','linear-gradient(150deg,#059669,#064e3b)','#6ee7b7',function(){if(!hasOnlineName())return;setOnl(function(o){return Object.assign({},o,{view:'join',err:''});});})));
       })();
+      // friends who are online right now: one click makes a room and sends them an invite
+      if(onlineFriends.length)oBody.push(React.createElement('div',{key:'onfr',style:{width:'min(640px,92vw)',display:'flex',flexDirection:'column',gap:8}},
+        React.createElement('div',{style:{fontSize:11,fontWeight:900,letterSpacing:'0.14em',textTransform:'uppercase',color:'#86efac',display:'flex',alignItems:'center',gap:6}},React.createElement('span',{style:{width:8,height:8,borderRadius:'50%',background:'#22c55e',boxShadow:'0 0 8px #22c55e'}}),'Friends online'),
+        React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:8}},onlineFriends.slice(0,8).map(function(f){return React.createElement('div',{key:f.uid,style:{display:'flex',alignItems:'center',gap:10,padding:'8px 10px 8px 12px',borderRadius:14,background:'rgba(5,12,35,0.72)',border:'1px solid rgba(74,222,128,0.4)',flex:'1 1 280px'}},
+          React.createElement(ProfileAvatar,{profile:{kind:'slime',color:f.color||'#e8192c',theme:'night',frame:'none',skin:f.skin||'none'},size:34}),
+          React.createElement('div',{style:{flex:1,minWidth:0}},React.createElement('div',{style:{fontSize:14,fontWeight:900,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},f.name),React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.6)'}},'@'+f.username)),
+          React.createElement('button',{type:'button',onClick:function(){inviteFriend({uid:f.uid,username:f.username});},style:{padding:'8px 16px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},'Invite'));}))));
       if(cleanName(account.name))oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',alignItems:'center',gap:9,marginTop:4,padding:'7px 12px',borderRadius:14,background:'rgba(0,0,0,0.28)',border:'1px solid rgba(255,255,255,0.18)'}},React.createElement(ProfileAvatar,{profile:account.avatar,size:32}),React.createElement('span',{style:{fontSize:13,fontWeight:800}},'Playing as '+cleanName(account.name))));
       else oBody.push(React.createElement('div',{key:'nl',style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6,marginTop:4}},
         React.createElement('div',{style:{fontSize:11,letterSpacing:'0.18em',textTransform:'uppercase',fontWeight:800,color:'rgba(255,255,255,0.6)'}},'Your name'),
@@ -7101,7 +7108,7 @@ function makePeerRoom(peer,role,code){
           React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)'}},chatOpen?'Typing…':'/ chat · 1–5 stickers')),
         // column-reverse keeps the list anchored to the bottom (newest message) unless you scroll up yourself
         React.createElement('div',{ref:chatListRef,style:{flex:1,minHeight:0,overflowY:'auto',display:'flex',flexDirection:'column-reverse',padding:'4px 2px 8px'}},
-          React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:7,minHeight:'100%'}},
+          React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:7,minHeight:'100%',flexShrink:0}},
           chatMessages.length===0
             ?React.createElement('div',{style:{margin:'auto',textAlign:'center',fontSize:12,color:'rgba(255,255,255,0.5)',lineHeight:1.5}},'Say hi to your opponent!',' ',React.createElement('span',{className:'kbd'},'/'))
             :chatMessages.map(function(message,i){
