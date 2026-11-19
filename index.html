@@ -115,7 +115,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.8.7';
+var GAME_VERSION='v25.8.8';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -3430,12 +3430,15 @@ function unlockedCosmetics(progress,kind){
   var out=shopOwned(kind);if(ACH_COSMETIC_KINDS.indexOf(kind)<0)return out;for(var i=0;i<ACHIEVEMENTS.length;i++){var a=ACHIEVEMENTS[i];if(a[kind]&&isAchievementUnlocked(progress,a)&&out.indexOf(a[kind])<0)out.push(a[kind]);}return out;
 }
 function defaultAccountAvatar(){return{kind:'slime',color:'#e8192c',theme:'night',frame:'none',skin:'none',celebration:'none',trail:'none',pose:'none',accessory:'none',title:'none'};}
+var LOADOUT_MAX=6,LOADOUT_KINDS=['skin','frame'];
 function cleanAccountAvatar(value){
   var theme=value&&['day','night','japan'].indexOf(value.theme)>=0?value.theme:'night';
   var frame=value&&value.frame==='none'?'none':achievementFrameDetails(value&&value.frame)?value.frame:'none';
   var skin=value&&value.skin==='none'?'none':achievementSkinDetails(value&&value.skin)?value.skin:'none';
   var pfpSkin=value&&value.pfpSkin==='none'?'none':value&&achievementSkinDetails(value.pfpSkin)?value.pfpSkin:'same';
   var extra={pfpSkin:pfpSkin};COSMETIC_KINDS.forEach(function(k){extra[k]=value&&cosmeticDetails(k,value[k])?value[k]:'none';});
+  // Saved loadouts: up to 6 named sets of skin, frame and every cosmetic.
+  extra.loadouts=(value&&Array.isArray(value.loadouts)?value.loadouts:[]).slice(0,LOADOUT_MAX).map(function(l){if(!l||typeof l!=='object')return null;var o={name:String(l.name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,16)||'Loadout',skin:l.skin==='none'||!achievementSkinDetails(l.skin)?'none':l.skin,frame:l.frame==='none'||!achievementFrameDetails(l.frame)?'none':l.frame};COSMETIC_KINDS.forEach(function(k){o[k]=cosmeticDetails(k,l[k])?l[k]:'none';});return o;}).filter(Boolean);
   if(value&&value.kind==='photo'&&typeof value.image==='string'&&value.image.indexOf('data:image/jpeg;base64,')===0&&value.image.length<=180000)return Object.assign({kind:'photo',image:value.image,theme:theme,frame:frame,skin:skin},extra);
   return Object.assign({kind:'slime',color:value?normHex(value.color):'#e8192c',theme:theme,frame:frame,skin:skin},extra);
 }
@@ -3810,6 +3813,13 @@ function ShopScreen(props){
   function shown(kind){return peek&&peek.kind===kind?peek.id:current(kind);}
   function achFor(kind,id){if(kind!=='skin'&&kind!=='frame'&&ACH_COSMETIC_KINDS.indexOf(kind)<0)return null;for(var i=0;i<ACHIEVEMENTS.length;i++)if(ACHIEVEMENTS[i][kind]===id)return ACHIEVEMENTS[i];return null;}
   function equip(kind,id){var p={};p[kind]=id;var r=props.onEquip(p);if(r)setMsg({err:true,text:r});}
+  // ── saved loadouts ──
+  var s_lname=useState(''),lname=s_lname[0],setLname=s_lname[1],loadouts=avatar.loadouts||[];
+  function loadoutKinds(){return LOADOUT_KINDS.concat(COSMETIC_KINDS);}
+  function saveLoadout(){if(loadouts.length>=LOADOUT_MAX){setMsg({err:true,text:'You can keep '+LOADOUT_MAX+' loadouts. Delete one first.'});return;}var nm=lname.trim().slice(0,16)||('Loadout '+(loadouts.length+1));var l={name:nm};loadoutKinds().forEach(function(k){l[k]=current(k);});var r=props.onEquip({loadouts:loadouts.concat([l])});if(r){setMsg({err:true,text:r});return;}setLname('');setMsg({err:false,text:'Saved \u201C'+nm+'\u201D.'});}
+  function applyLoadout(l){var p={};loadoutKinds().forEach(function(k){if(l[k]!=null)p[k]=l[k];});var r=props.onEquip(p);setPeek(null);setMsg(r?{err:true,text:r}:{err:false,text:'Equipped \u201C'+l.name+'\u201D.'});}
+  function deleteLoadout(i){props.onEquip({loadouts:loadouts.filter(function(_,j){return j!==i;})});}
+  function loadoutMatches(l){return loadoutKinds().every(function(k){return (l[k]||'none')===current(k);});}
   function buy(kind,it){
     var r=props.onBuy(kind,it.id);
     if(r){setMsg({err:true,text:r});return;}
@@ -3876,6 +3886,17 @@ function ShopScreen(props){
         React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:14,position:narrowShop?'static':'sticky',top:12}},
       React.createElement('div',{role:'tablist','aria-label':'Shop categories',style:{display:'flex',flexDirection:narrowShop?'row':'column',flexWrap:'wrap',gap:6,justifyContent:narrowShop?'center':'flex-start'}},
         SHOP_CATS.map(function(c){var on=c.kind===tab;return React.createElement('button',{key:c.kind,type:'button',role:'tab','aria-selected':on,'data-shop-tab':c.kind,onClick:function(){setTab(c.kind);setPeek(null);setMsg(null);},style:{display:'flex',alignItems:'center',gap:8,padding:narrowShop?'7px 12px':'10px 14px',borderRadius:narrowShop?50:12,width:narrowShop?'auto':'100%',textAlign:'left',border:on?'2px solid #fde68a':'1px solid rgba(255,255,255,0.22)',background:on?'rgba(251,191,36,0.22)':'rgba(255,255,255,0.06)',color:'#fff',fontSize:12,fontWeight:900,cursor:'pointer',fontFamily:'inherit'}},React.createElement('span',{'aria-hidden':'true'},c.icon),c.label);})),
+          React.createElement('div',{style:{padding:14,borderRadius:18,background:'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',gap:8}},
+            React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},React.createElement('span',{style:{fontSize:11,fontWeight:900,letterSpacing:'0.12em',textTransform:'uppercase',color:'#fde68a'}},'\uD83D\uDCBE Loadouts'),React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',fontWeight:800}},loadouts.length+' / '+LOADOUT_MAX)),
+            loadouts.length===0&&React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.6)',lineHeight:1.4}},'Save what you have on now (skin, frame, accessory, explosion, celebration, trail and title) and switch back to it in one click.'),
+            loadouts.map(function(l,i){var on=loadoutMatches(l);return React.createElement('div',{key:i,style:{display:'flex',alignItems:'center',gap:6,padding:'6px 8px',borderRadius:12,background:on?'rgba(16,185,129,0.16)':'rgba(255,255,255,0.05)',border:'1px solid '+(on?'rgba(52,211,153,0.6)':'rgba(255,255,255,0.1)')}},
+              React.createElement(ProfileAvatar,{profile:Object.assign({},avatar,{skin:l.skin,accessory:l.accessory,frame:l.frame,pfpSkin:'same'}),size:30}),
+              React.createElement('span',{style:{flex:1,minWidth:0,fontSize:13,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},l.name),
+              React.createElement('button',{type:'button',disabled:on,onClick:function(){applyLoadout(l);},style:{padding:'5px 10px',borderRadius:50,border:'none',background:on?'rgba(255,255,255,0.1)':'linear-gradient(135deg,#22c55e,#15803d)',color:'#fff',fontWeight:900,fontSize:11,cursor:on?'default':'pointer',fontFamily:'inherit'}},on?'On':'Equip'),
+              React.createElement('button',{type:'button','aria-label':'Delete loadout '+l.name,onClick:function(){deleteLoadout(i);},style:{width:26,height:26,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.22)',background:'transparent',color:'rgba(255,255,255,0.7)',fontWeight:900,fontSize:11,cursor:'pointer',fontFamily:'inherit'}},'\u2715'));}),
+            loadouts.length<LOADOUT_MAX&&React.createElement('div',{style:{display:'flex',gap:6}},
+              React.createElement('input',{type:'text',value:lname,maxLength:16,placeholder:'Name this loadout','aria-label':'Loadout name',onChange:function(e){setLname(e.target.value);},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')saveLoadout();},style:{flex:1,minWidth:0,padding:'7px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.22)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:12,fontFamily:'inherit',outline:'none'}}),
+              React.createElement('button',{type:'button',onClick:saveLoadout,style:{padding:'7px 12px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#f59e0b,#b45309)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}},'Save'))),
           React.createElement('div',{style:{padding:14,borderRadius:18,background:'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',alignItems:'center',gap:10}},
       React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6}},
         preview,
