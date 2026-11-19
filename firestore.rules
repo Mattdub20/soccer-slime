@@ -1,8 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isDev() {
+      return request.auth != null && request.auth.token.email == 'mattdub@players.example.com';
+    }
+    // Slime Bucks: `bucks` is the total a player has ever earned. It can only grow as fast as real play can earn
+    // (40 at once, plus 60 per minute since the last save), so editing the number in the browser gets rejected.
+    // Saves from before this rule (no `bucks` yet) can start at up to 20000.
+    function bucksOk() {
+      let nb = request.resource.data.get('bucks', 0);
+      return nb is int && nb >= 0
+        && request.resource.data.updatedAt == request.time
+        && ((resource == null || !('bucks' in resource.data))
+            ? nb <= 20000
+            : nb <= resource.data.bucks + 40 + (request.time.toMillis() - resource.data.updatedAt.toMillis()) / 60000 * 60);
+    }
     match /saves/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && (request.auth.uid == uid || isDev());
+      allow create, update: if request.auth != null && request.auth.uid == uid && bucksOk();
+      // the dev can correct a player's Slime Bucks (and nothing else in their save)
+      allow update: if isDev()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bucks', 'updatedAt'])
+        && request.resource.data.bucks is int && request.resource.data.bucks >= 0;
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
     match /suggestions/{id} {
       allow create: if request.resource.data.keys().hasOnly(['text','name','user','at','v'])
