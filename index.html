@@ -115,7 +115,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.9.2';
+var GAME_VERSION='v25.9.3';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -139,7 +139,7 @@ var GW=800,GH=400,GRND=80,SR=40,BR=10,GOALW=80,GOALH=120;
 var TS=0.82; // global game-speed scale: every speed x TS, gravity x TS^2, frame counts / TS
 var GRAV=0.6*TS*TS,SPD=5*TS,JUMP=-12*TS,BDAMP=Math.pow(0.99,TS),BBOUND=0.8,MAXBS=15*TS;
 var REPLAY_CHUNK_FRAMES=16;
-var SPIN_F=Math.round(14/TS),DASH_F=Math.round(8/TS),DASH_SPD=SPD*1.8,GDASH_SPD=SPD*4.5,CD_F=180;
+var SPIN_F=Math.round(14/TS),DASH_F=Math.round(8/TS),DASH_SPD=SPD*1.8,GDASH_SPD=SPD*4.5,CD_F=0; // dash cooldown after air dashes: removed (was 180 frames = 3 seconds)
 var CEILING_Y=SR+2;
 var REPLAY_SECS=3,REPLAY_FPS=60,REPLAY_MAX=REPLAY_SECS*REPLAY_FPS;
 // Real-world units for match stats (for fun, not exact): the 800-unit field counts as a 40 m mini-pitch,
@@ -1878,7 +1878,8 @@ function ThemeBg(props){
 
 // Dash cooldown (after an air dash you can't dash for a few seconds): a small gold ring above the slime that
 // fills back up, so it's clear why dash isn't working yet.
-function drawDashCD(c,sl){if(!sl||!(sl.dashCooldown>0)||sl.x<-100)return;var k=Math.min(1,sl.dashCooldown/CD_F),x=sl.x,y=sl.y-SR-14+(sl.spinDipY||0);c.save();c.lineCap='round';c.lineWidth=4;c.strokeStyle='rgba(0,0,0,0.45)';c.beginPath();c.arc(x,y,7,0,Math.PI*2);c.stroke();c.strokeStyle='#fbbf24';c.beginPath();c.arc(x,y,7,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-k));c.stroke();c.restore();}
+function drawDashCD(c,sl){if(!CD_F||!sl||!(sl.dashCooldown>0)||sl.x<-100)return; // nothing to show while there's no player cooldown
+  var k=Math.min(1,sl.dashCooldown/CD_F),x=sl.x,y=sl.y-SR-14+(sl.spinDipY||0);c.save();c.lineCap='round';c.lineWidth=4;c.strokeStyle='rgba(0,0,0,0.45)';c.beginPath();c.arc(x,y,7,0,Math.PI*2);c.stroke();c.strokeStyle='#fbbf24';c.beginPath();c.arc(x,y,7,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-k));c.stroke();c.restore();}
 // ─── Ball (v2: proper panelled football, rotates with spin) ──────────────
 function drawBall(ctx,ball,isNight,isJapan){
   var x=ball.x,y=ball.y,groundY=GH-GRND,h=Math.max(0,groundY-y),sc=Math.max(0.3,1-h/260);
