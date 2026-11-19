@@ -115,7 +115,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v25.9.0';
+var GAME_VERSION='v25.9.2';
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
 // frame, so anything it saves (coins, stats, settings) only goes to memory, and it never touches the cloud.
 var EMBED_AI=/[?&]embed=ai\b/.test(location.search);
@@ -1876,6 +1876,9 @@ function ThemeBg(props){
   return React.createElement('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:0,background:themeBg(t),overflow:'hidden',pointerEvents:'none'}},kids);
 }
 
+// Dash cooldown (after an air dash you can't dash for a few seconds): a small gold ring above the slime that
+// fills back up, so it's clear why dash isn't working yet.
+function drawDashCD(c,sl){if(!sl||!(sl.dashCooldown>0)||sl.x<-100)return;var k=Math.min(1,sl.dashCooldown/CD_F),x=sl.x,y=sl.y-SR-14+(sl.spinDipY||0);c.save();c.lineCap='round';c.lineWidth=4;c.strokeStyle='rgba(0,0,0,0.45)';c.beginPath();c.arc(x,y,7,0,Math.PI*2);c.stroke();c.strokeStyle='#fbbf24';c.beginPath();c.arc(x,y,7,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-k));c.stroke();c.restore();}
 // ─── Ball (v2: proper panelled football, rotates with spin) ──────────────
 function drawBall(ctx,ball,isNight,isJapan){
   var x=ball.x,y=ball.y,groundY=GH-GRND,h=Math.max(0,groundY-y),sc=Math.max(0.3,1-h/260);
@@ -4678,7 +4681,7 @@ function makePeerRoom(peer,role,code){
   // late, which hides most of the network delay so rewinds are rare and small.
   // The host still runs the match: it sends each kick-off (positions + frame 0), says when play stops (goals,
   // overtime, the end), and every half second sends its confirmed state so a mismatch can be corrected.
-  var RB_DELAY=2,RB_MAXPRED=10,RB_RING=64,RB_CFG={pract:false,unlimJump:false,unlim:false,over:false,win:null,solo:null};
+  var RB_DELAY=2,RB_MAXPRED=16,RB_RING=64,RB_CFG={pract:false,unlimJump:false,unlim:false,over:false,win:null,solo:null};
   function rbSnap(s){function cp(o){var out={};for(var fi=0;fi<SF.length;fi++)out[SF[fi]]=o[SF[fi]];return out;}return{left:cp(s.left),right:cp(s.right),ball:{x:s.ball.x,y:s.ball.y,vx:s.ball.vx,vy:s.ball.vy,ang:s.ball.ang||0}};}
   function rbNew(ko,side){
     var S={on:true,e:ko.e,mid:ko.mid,side:side,rf0:ko.rf0|0,f:0,cur:JSON.parse(JSON.stringify(ko.s)),st:[],ev:[],lin:{},rin:{},pred:{},rconf:RB_DELAY-1,fin:0,hw:0,roll:1e9,rF:-1,radv:0,skipCd:0,pend:0,pack:RB_DELAY-1,vis:{left:{x:0,y:0},right:{x:0,y:0}},sent:RB_DELAY-1,sync:null,stopAt:-1,nextSync:30,rbs:0,skips:0,stalls:0,desync:0};
@@ -4789,7 +4792,10 @@ function makePeerRoom(peer,role,code){
     // Don't run too far ahead of the other player's real inputs, and give way a frame now and then if we're
     // ahead of them in time, so neither side keeps having to rewind.
     var stall=S.f-S.rconf>RB_MAXPRED;if(stall)S.stalls++;
-    if(!stall&&S.rF>=0){if(S.skipCd>0)S.skipCd--;else if((S.f-S.rF)-S.radv>=3){stall=true;S.skipCd=4;S.skips++;}}
+    // Time sync: smooth the ahead/behind estimate (one reading is mostly network jitter) and give way at most one
+    // frame every half second, so it never turns into a constant stutter.
+    if(S.rF>=0){var dNow=(S.f-S.rF)-S.radv;S.dEma=S.dEma==null?dNow:S.dEma*0.94+dNow*0.06;}
+    if(!stall&&S.rF>=0){if(S.skipCd>0)S.skipCd--;else if(S.dEma>=2.5){stall=true;S.skipCd=30;S.skips++;S.dEma-=1;}}
     if(!stall){S.lin[S.f+RB_DELAY]=(bits&11)|S.pend;S.pend=0;rbSim(S,S.f,S.f>=S.hw);S.f++;if(S.f>S.hw)S.hw=S.f;}
     rbSend(S);
     if(S.vis){S.vis.left.x*=0.8;S.vis.left.y*=0.8;S.vis.right.x*=0.8;S.vis.right.y*=0.8;}
@@ -5936,6 +5942,7 @@ function makePeerRoom(peer,role,code){
               if(replayActiveRef.current){gctx.restore();gctx.save();replayCamera(gctx,RSn,mirO?{x:GW-ball.x,y:ball.y}:ball,replayIdxRef.current,replayFrRef.current.length);}
               gctx.save();if(mirO){gctx.translate(GW,0);gctx.scale(-1,1);}
               drawScene(gctx,ls,rs,ball,cols,'online',isHostO?'left':'right',false,fanRef.current,replayActiveRef.current?false:goalFlashRef.current,[ls.goalLineTime||0,rs.goalLineTime||0],thN(tm),thJ(tm),getGameSlimeSkins('online'));
+              if(!replayActiveRef.current){drawDashCD(gctx,ls);drawDashCD(gctx,rs);}
               if(!replayActiveRef.current){var otr=ballTrailRef.current;for(var otri=0;otri<otr.length;otri++){gctx.save();gctx.globalAlpha=otr[otri].life*0.4;gctx.fillStyle=otr[otri].c||'#FFD700';gctx.beginPath();gctx.arc(otr[otri].x,otr[otri].y,otr[otri].r,0,Math.PI*2);gctx.fill();gctx.restore();}drawParticles(gctx,particlesRef.current);}
               gctx.restore();
               if(replayActiveRef.current){gctx.setTransform(RSn,0,0,RSn,0,0);if(replaySpeedAt(replayIdxRef.current,replayFrRef.current.length)<1){gctx.save();gctx.font='18px "Lilita One",sans-serif';gctx.textAlign='center';gctx.textBaseline='top';gctx.fillStyle='rgba(255,255,255,'+(0.6+0.3*Math.sin(now*0.008))+')';gctx.fillText('SLOW-MO',GW/2,40);gctx.restore();}}
@@ -6261,6 +6268,7 @@ function makePeerRoom(peer,role,code){
           ctx.setTransform(RSn,0,0,RSn,0,0);ctx.save();var shk=shakeRef.current;if(shk>0.4){ctx.translate((Math.random()-0.5)*shk,(Math.random()-0.5)*shk);shakeRef.current=shk*0.84;}else shakeRef.current=0;
           var mirG=mode2==='online'&&onRoleRef.current==='guest';if(mirG){ctx.save();ctx.translate(GW,0);ctx.scale(-1,1);}
           drawScene(ctx,ls2,rs2,ball2,cols2,mode2,sideRef.current,practRef.current,fanRef.current,flashRef.current,[ls2.goalLineTime,rs2.goalLineTime],thN(tm2),thJ(tm2),getGameSlimeSkins(mode2),mode2==='training'&&trainingChallengeRef.current==='aim');
+          drawDashCD(ctx,ls2);drawDashCD(ctx,rs2);
           var tr=ballTrailRef.current;
           for(var tri=0;tri<tr.length;tri++){ctx.save();ctx.globalAlpha=tr[tri].life*0.45;ctx.fillStyle=tr[tri].c||'#FFD700';ctx.beginPath();ctx.arc(tr[tri].x,tr[tri].y,tr[tri].r,0,Math.PI*2);ctx.fill();ctx.restore();}
           drawParticles(ctx,particlesRef.current);
