@@ -15,9 +15,23 @@ service cloud.firestore {
             ? nb <= 20000
             : nb <= resource.data.bucks + 40 + (request.time.toMillis() - resource.data.updatedAt.toMillis()) / 60000 * 60);
     }
+    // Slime-ate tokens: `slimeate` is the list of times (ms) a player found one. It can only grow by one entry per save,
+    // the new entry must be from the last 30 days (and not the future), and at least 180 days after the previous one.
+    function slimeateOk() {
+      let n = request.resource.data.get('slimeate', []);
+      let o = resource == null ? [] : resource.data.get('slimeate', []);
+      let now = request.time.toMillis();
+      return n == o
+        || (n is list && n.size() == o.size() + 1 && n.size() <= 20
+            && (o.size() == 0 || n[0:o.size()] == o)
+            && n[o.size()] is int
+            && n[o.size()] <= now + 300000
+            && n[o.size()] > now - 2592000000
+            && (o.size() == 0 || n[o.size()] - o[o.size() - 1] > 15552000000));
+    }
     match /saves/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || isDev());
-      allow create, update: if request.auth != null && request.auth.uid == uid && bucksOk();
+      allow create, update: if request.auth != null && request.auth.uid == uid && bucksOk() && slimeateOk();
       // the dev can correct a player's Slime Bucks (and nothing else in their save)
       allow update: if isDev()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bucks', 'updatedAt'])
