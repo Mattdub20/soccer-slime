@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.0.2';
+var GAME_VERSION='v26.0.4';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -1073,7 +1073,7 @@ function paintSlimePattern(ctx,R,skin,dir,t){
       ctx.fillStyle=d;ctx.globalAlpha=0.22+w*0.16;ctx.fill();
     }
   }else if(p==='spots'){
-    var B=[[-0.62,-0.28,0.16,0.13],[-0.3,-0.68,0.11,0.09],[0.08,-0.5,0.09,0.07],[0.58,-0.58,0.12,0.1],[0.7,-0.16,0.08,0.07],[-0.12,-0.14,0.07,0.06],[0.3,-0.84,0.05,0.05]];
+    var B=[[0.36,-0.32,0.15,0.12],[-0.3,-0.68,0.11,0.09],[0.08,-0.5,0.09,0.07],[0.58,-0.58,0.12,0.1],[0.7,-0.16,0.08,0.07],[-0.12,-0.14,0.07,0.06],[0.3,-0.84,0.05,0.05]];
     ctx.fillStyle=d;
     for(var b=0;b<B.length;b++){ctx.globalAlpha=0.72;ctx.beginPath();ctx.ellipse(-dir*B[b][0]*R,B[b][1]*R,B[b][2]*R,B[b][3]*R,b,0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=0.45;ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(-dir*B[b][0]*R-B[b][2]*R*0.3,B[b][1]*R-B[b][3]*R*0.35,B[b][2]*R*0.3,B[b][3]*R*0.22,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=d;}
@@ -1213,7 +1213,7 @@ function drawRobotEye(ctx,x,y,r,ox,oy,glow){
 
 // Paints the whole slime in local space: origin = centre of the flat base.
 function paintSlime(ctx,R,col,acc,isR,skin,ix,iy,isJapan,glowCol,glowBlur,noBlink){
-  var dir=isR?-1:1,T=slimeTones(col),t=performance.now(),robot=!!(skin&&skin.pattern==='robot'),fit=!!(skin&&skin.pattern==='fit'),band=!robot&&!fit;
+  var dir=isR?-1:1,T=slimeTones(col),t=performance.now(),robot=!!(skin&&skin.pattern==='robot'),fit=!!(skin&&skin.pattern==='fit'),band=!robot&&!fit&&!paintSlime.noBand;
   var outline=Math.max(1.2,R*0.06);
   // headband tails trail behind (drawn first so the knot tucks under the body)
   if(band){
@@ -1480,9 +1480,9 @@ function drawSlime(ctx,sl,isR,col,acc,isNight,isJapan,skin,accessory){
   if(rot||scaled){var gY=GH-GRND,hA=Math.max(0,gY-py),aF=Math.min(1,hA/((GH-GRND-CEILING_Y)*0.6)),shs=Math.max(0.15,1-aF*0.82);ctx.save();ctx.globalAlpha=Math.max(0.04,0.3-aF*0.24);ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(px,gY+4,SR*shs,SR*0.16*shs,0,0,Math.PI*2);ctx.fill();ctx.restore();drawSlimeAt.noShadow=true;}
   if(rot){ctx.save();ctx.translate(px,py-SR*0.45);ctx.rotate(rot);ctx.translate(-px,-(py-SR*0.45));}
   if(scaled){ctx.save();ctx.translate(px,py);ctx.scale(sx,sy);ctx.translate(-px,-py);}
-  paintSlime.accessory=accessory&&accessory!=='none'?accessory:null;
+  paintSlime.accessory=accessory&&accessory!=='none'?accessory:null;paintSlime.noBand=!!DRAW_NOBAND[isR?'right':'left'];
   drawSlimeAt(ctx,sl.x,sl.y,skin?skin.color:col,skin?skin.accent:acc,isR,sl.spinAngle,sl.spinDipY,sl.isSpinning,isNight,isJapan,sl.ballRefreshJump,sl.ballRefreshTimer,sl._ballX,sl._ballY,skin);
-  paintSlime.accessory=null;
+  paintSlime.accessory=null;paintSlime.noBand=false;
   if(scaled)ctx.restore();
   if(rot)ctx.restore();
   drawSlimeAt.noShadow=false;
@@ -1783,7 +1783,9 @@ function drawJapanFlag(ctx,t){
   for(i=0;i<N;i++){ph=Math.sin(t*0.004-i*0.55);ctx.drawImage(f,i*sw,0,sw+0.5*RS,f.height,fx+i*w,fy+ph*3.2*(i/N),w+0.5,64);if(ph>0){ctx.fillStyle='rgba(0,0,0,'+(0.07*ph)+')';ctx.fillRect(fx+i*w,fy+ph*3.2*(i/N),w+0.5,64);}}
 }
 
+var DRAW_NOBAND={left:false,right:false};
 function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNight,isJapan,skins,showTrainingKeeper){
+  DRAW_NOBAND=skins&&skins.nb?skins.nb:{left:false,right:false};
   var nightSky=!!isNight,cityBg=(isNight===true||isNight===0);
   if(nightSky){var grN=ctx.createLinearGradient(0,0,0,GH);if(isJapan){grN.addColorStop(0,'#0b0a26');grN.addColorStop(1,'#2a1c44');}else if(cityBg){grN.addColorStop(0,'#020818');grN.addColorStop(1,'#0a1628');}else{grN.addColorStop(0,'#040b22');grN.addColorStop(1,'#16264a');}ctx.fillStyle=grN;ctx.fillRect(0,0,GW,GH);}
   else if(isJapan){var gr=ctx.createLinearGradient(0,0,0,GH-GRND);gr.addColorStop(0,'#3f8fd8');gr.addColorStop(0.55,'#7dbbea');gr.addColorStop(1,'#cfe7f6');ctx.fillStyle=gr;ctx.fillRect(0,0,GW,GH);}
@@ -3843,7 +3845,7 @@ function cleanAccountAvatar(value){
   var frame=value&&value.frame==='none'?'none':achievementFrameDetails(value&&value.frame)?value.frame:'none';
   var skin=value&&value.skin==='none'?'none':achievementSkinDetails(value&&value.skin)?value.skin:'none';
   var pfpSkin=value&&value.pfpSkin==='none'?'none':value&&achievementSkinDetails(value.pfpSkin)?value.pfpSkin:'same';
-  var extra={pfpSkin:pfpSkin};COSMETIC_KINDS.forEach(function(k){extra[k]=value&&cosmeticDetails(k,value[k])?value[k]:'none';});
+  var extra={pfpSkin:pfpSkin,noBand:!!(value&&value.noBand)};COSMETIC_KINDS.forEach(function(k){extra[k]=value&&cosmeticDetails(k,value[k])?value[k]:'none';});
   // Saved loadouts: up to 6 named sets of skin, frame and every cosmetic.
   extra.loadouts=(value&&Array.isArray(value.loadouts)?value.loadouts:[]).slice(0,LOADOUT_MAX).map(function(l){if(!l||typeof l!=='object')return null;var o={name:String(l.name||'').replace(/[^\w \-'.!]/g,'').trim().slice(0,16)||'Loadout',skin:l.skin==='none'||!achievementSkinDetails(l.skin)?'none':l.skin,frame:l.frame==='none'||!achievementFrameDetails(l.frame)?'none':l.frame};COSMETIC_KINDS.forEach(function(k){o[k]=cosmeticDetails(k,l[k])?l[k]:'none';});return o;}).filter(Boolean);
   if(value&&value.kind==='photo'&&typeof value.image==='string'&&value.image.indexOf('data:image/jpeg;base64,')===0&&value.image.length<=180000)return Object.assign({kind:'photo',image:value.image,theme:theme,frame:frame,skin:skin},extra);
@@ -3913,7 +3915,7 @@ function CosmeticPreview(props){
       for(var i=0;i<trail.length;i++){var f=(i+1)/trail.length;ctx.globalAlpha=f*0.75;ctx.fillStyle=trailColor(tst,thJ(theme),now+i*40);ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,BR*(0.35+0.6*f),0,Math.PI*2);ctx.fill();}
       ctx.globalAlpha=1;
       if(ball)drawBall(ctx,ball,thN(theme),thJ(theme));
-      drawSlime(ctx,sl,false,color,accent,thN(theme),thJ(theme),skin,props.accessory);
+      DRAW_NOBAND={left:!!props.noBand,right:false};drawSlime(ctx,sl,false,color,accent,thN(theme),thJ(theme),skin,props.accessory);
       drawParticles(ctx,parts);
     }
     var reduce=false;try{reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
@@ -3961,7 +3963,7 @@ function SkinMotionPreview(props){
       var shadowW=SR*Math.max(0.35,1-(GH-GRND-sl.y)/160);
       ctx.fillStyle='rgba(0,0,0,0.22)';ctx.beginPath();ctx.ellipse(sl.x,GH-GRND+4,shadowW,5,0,0,Math.PI*2);ctx.fill();
       drawParticles(ctx,parts);
-      drawSlime(ctx,sl,false,color,accent,thN(theme),thJ(theme),skin,props.accessory);
+      DRAW_NOBAND={left:!!props.noBand,right:false};drawSlime(ctx,sl,false,color,accent,thN(theme),thJ(theme),skin,props.accessory);
     }
     if(reduce){draw();return;}
     var raf=0,last=0,acc=0;
@@ -4403,7 +4405,9 @@ function ShopScreen(props){
   function itemsBody(){
     var a=inv?invF(forSale):forSale,b=inv?invF(premiumList):premiumList,c=inv?invF(customList):customList,d=inv?invF(rewards):rewards,out=[];
     if(inv)out.push(React.createElement('div',{key:'none'},grid([noneItem])));
-    out.push(section(inv?'Shop items':'For sale',a),section('\uD83D\uDC8E Premium Collection',b),section('\uD83D\uDEE0\uFE0F Custom Studio'+(inv?'':': design your own'),c),section(tab==='frame'?'Earned with achievements':'Achievement rewards',d));
+    out.push(section(inv?'Shop items':'For sale',a),section('\uD83D\uDC8E Premium Collection',b),section('\uD83D\uDEE0\uFE0F Custom Studio'+(inv?'':': design your own'),c));
+    if(inv){var cxp=cxPanel();if(cxp)out.push(React.createElement('div',{key:'cxp'},cxp));} // the customiser sits right under the custom item
+    out.push(section(tab==='frame'?'Earned with achievements':'Achievement rewards',d));
     if(inv&&!a.length&&!b.length&&!c.length&&!d.length)out.push(React.createElement('div',{key:'empty',style:{fontSize:13,color:'rgba(255,255,255,0.7)'}},'Nothing here yet. Buy some in the Shop!'));
     return out;
   }
@@ -4437,10 +4441,10 @@ function ShopScreen(props){
       action);
   }
   var preview;
-  if(tab==='skin'||tab==='accessory')preview=React.createElement(SkinMotionPreview,{color:color,theme:theme,skin:shown('skin'),accessory:shown('accessory'),width:190});
+  if(tab==='skin'||tab==='accessory')preview=React.createElement(SkinMotionPreview,{color:color,theme:theme,skin:shown('skin'),accessory:shown('accessory'),noBand:avatar.noBand,width:330});
   else if(tab==='frame')preview=React.createElement(ProfileAvatar,{profile:Object.assign({},avatar,{frame:shown('frame')}),size:110});
   else if(tab==='title')preview=React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,padding:'14px 18px',borderRadius:14,background:'rgba(0,0,0,0.3)'}},React.createElement(ProfileAvatar,{profile:avatar,size:56}),React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4}},React.createElement('span',{style:{fontSize:16,fontWeight:900,textTransform:'uppercase',letterSpacing:'0.05em'}},account.name||'Player'),shown('title')!=='none'?React.createElement(TitleBadge,{id:shown('title')}):React.createElement('span',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'No title')));
-  else preview=React.createElement(CosmeticPreview,{color:color,theme:theme,skin:shown('skin'),accessory:shown('accessory'),celebration:shown('celebration'),trail:shown('trail'),pose:shown('pose'),width:300});
+  else preview=React.createElement(CosmeticPreview,{width:380,color:color,theme:theme,skin:shown('skin'),accessory:shown('accessory'),noBand:avatar.noBand,celebration:shown('celebration'),trail:shown('trail'),pose:shown('pose'),width:300});
   var peekItem=peek?(peek.kind==='combo'?{name:peek.name+' combo'}:peek.kind==='skin'?achievementSkinDetails(peek.id):peek.kind==='frame'?achievementFrameDetails(peek.id):cosmeticDetails(peek.kind,peek.id)):null;
   var panel={width:'min(780px,94vw)',maxHeight:'calc(100dvh - 32px)',overflowY:'auto',overscrollBehavior:'contain',boxSizing:'border-box',padding:'20px 20px 22px',borderRadius:22,background:'rgba(5,12,35,0.86)',border:'1px solid rgba(253,230,138,0.35)',boxShadow:'0 20px 60px rgba(0,0,0,0.45)',display:'flex',flexDirection:'column',alignItems:'center',gap:14,color:'#fff'};
   var narrowShop=window.innerWidth<820;
@@ -4475,15 +4479,18 @@ function ShopScreen(props){
             loadouts.length<LOADOUT_MAX&&React.createElement('div',{style:{display:'flex',gap:6}},
               React.createElement('input',{type:'text',value:lname,maxLength:16,placeholder:'Name this loadout','aria-label':'Loadout name',onChange:function(e){setLname(e.target.value);},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')saveLoadout();},style:{flex:1,minWidth:0,padding:'7px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.22)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:12,fontFamily:'inherit',outline:'none'}}),
               React.createElement('button',{type:'button',onClick:saveLoadout,style:{padding:'7px 12px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#f59e0b,#b45309)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}},'Save'))),
-          React.createElement('div',{style:{padding:14,borderRadius:18,background:'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.12)',display:'flex',flexDirection:'column',alignItems:'center',gap:10}},
+      React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.7)',textAlign:narrowShop?'center':'left',lineHeight:1.45}},'Earn Slime Bucks against the AI: 1 per goal you score, plus a win bonus from 5 (Super Easy) up to 25 (Chaos). Online, practice and training don\u2019t pay out.')),
+        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0}},
+          // big preview at the top of the items, with the headband switch and profile-picture skin beside it
+          React.createElement('div',{style:{padding:14,borderRadius:18,background:'rgba(5,12,35,0.6)',border:'1px solid rgba(255,255,255,0.12)',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'center',gap:18}},
       React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6}},
         preview,
         peekItem&&React.createElement('div',{role:'status',style:{fontSize:11,fontWeight:800,color:'#fde68a'}},'Previewing '+peekItem.name+' \u00B7 tap it again to stop')),
+            React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:10,alignItems:'stretch',minWidth:200}},
+            React.createElement('button',{type:'button','aria-pressed':!avatar.noBand,onClick:function(){var r=props.onEquip({noBand:!avatar.noBand});if(r)setMsg({err:true,text:r});},style:{alignSelf:'stretch',padding:'8px 12px',borderRadius:50,border:'1px solid rgba(255,255,255,0.25)',background:avatar.noBand?'rgba(255,255,255,0.08)':'linear-gradient(135deg,#38bdf8,#0369a1)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},avatar.noBand?'Headband: off':'Headband: on'),
       inv&&tab==='skin'&&avatar.kind!=='photo'&&React.createElement('label',{style:{display:'flex',alignItems:'center',gap:8,fontSize:12,fontWeight:800,flexWrap:'wrap',justifyContent:'center'}},'Profile picture skin',
         React.createElement('select',{value:avatar.pfpSkin||'same',onChange:function(e){equip('pfpSkin',e.target.value);},style:{padding:'7px 10px',borderRadius:10,background:'#18243c',border:'1px solid rgba(255,255,255,0.26)',color:'#fff',fontFamily:'inherit'}},
-          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(sk){return mine.indexOf(sk.id)>=0&&!sk.custom;})).map(function(sk){return React.createElement('option',{key:sk.id,value:sk.id},sk.name);})))),
-      React.createElement('div',{style:{fontSize:11.5,color:'rgba(255,255,255,0.7)',textAlign:narrowShop?'center':'left',lineHeight:1.45}},'Earn Slime Bucks against the AI: 1 per goal you score, plus a win bonus from 5 (Super Easy) up to 25 (Chaos). Online, practice and training don\u2019t pay out.')),
-        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0}},
+          [{id:'same',name:'Same as in-game'},{id:'none',name:'Classic'}].concat(ACHIEVEMENT_SKINS.filter(function(sk){return mine.indexOf(sk.id)>=0&&!sk.custom;})).map(function(sk){return React.createElement('option',{key:sk.id,value:sk.id},sk.name);}))))),
       React.createElement('div',{role:'status',style:{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:16,flexWrap:'wrap',background:freeWk?'linear-gradient(120deg,rgba(22,163,74,0.4),rgba(250,204,21,0.28))':'linear-gradient(120deg,rgba(22,163,74,0.16),rgba(250,204,21,0.1))',border:'1px solid '+(freeWk?'rgba(250,204,21,0.8)':'rgba(250,204,21,0.3)')}},
         React.createElement(SlimeateToken,{size:freeWk?46:36}),
         React.createElement('div',{style:{flex:'1 1 220px',minWidth:0,display:'flex',flexDirection:'column',gap:2}},
@@ -4493,7 +4500,6 @@ function ShopScreen(props){
         props.dev&&React.createElement('div',{style:{display:'flex',gap:6,flexWrap:'wrap'}},
           React.createElement('button',{type:'button',onClick:function(){SLIMEATE_DEV_NEXT=true;setMsg({err:false,text:'Dev: your next goal against the AI drops a Slime-ate token.'});},style:{padding:'6px 10px',borderRadius:50,border:'1px solid rgba(250,204,21,0.7)',background:'rgba(0,0,0,0.35)',color:'#fde047',fontWeight:900,fontSize:11,cursor:'pointer',fontFamily:'inherit'}},'Dev: drop on next goal'),
           React.createElement('button',{type:'button',onClick:slimeatePreview,style:{padding:'6px 10px',borderRadius:50,border:'1px solid rgba(255,255,255,0.4)',background:'rgba(0,0,0,0.35)',color:'#fff',fontWeight:900,fontSize:11,cursor:'pointer',fontFamily:'inherit'}},'Dev: preview'))),
-      inv&&cxPanel(),
       msg&&React.createElement('div',{role:msg.err?'alert':'status',style:{width:'100%',boxSizing:'border-box',textAlign:'center',padding:'7px 10px',borderRadius:10,fontSize:12,fontWeight:800,color:msg.err?'#fecaca':'#bbf7d0',background:msg.err?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.16)'}},msg.text),
       React.createElement('div',{style:{width:'100%',display:'flex',flexDirection:'column',gap:16}},
         tab==='combo'?comboView():itemsBody())))));
@@ -5770,9 +5776,9 @@ function makePeerRoom(peer,role,code){
   var remoteCosRef=useRef(null),lastTouchRef=useRef(null),impMemRef=useRef({land:null,prevOurs:null,retreat:0}),rareMsgRef=useRef(null),practGoalRef=useRef(null);
   function getGameCosmetics(mode){
     var none={celebration:'none',trail:'none',pose:'none',accessory:'none',title:'none'},mine={};
-    COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&ownsId(unlockedCosmetics(achievementProgress,k),id)?id:'none';});
+    COSMETIC_KINDS.forEach(function(k){var id=account.avatar[k];mine[k]=id&&ownsId(unlockedCosmetics(achievementProgress,k),id)?id:'none';});mine.noBand=!!account.avatar.noBand;
     var out={left:none,right:none};
-    if(mode==='online'){var them=remoteCosRef.current?cleanAccountAvatar(remoteCosRef.current):none,theirs={celebration:them.celebration,trail:them.trail,pose:them.pose,accessory:them.accessory,title:them.title};if(onRoleRef.current==='host'){out.left=mine;out.right=theirs;}else{out.left=theirs;out.right=mine;}}
+    if(mode==='online'){var them=remoteCosRef.current?cleanAccountAvatar(remoteCosRef.current):none,theirs={celebration:them.celebration,trail:them.trail,pose:them.pose,accessory:them.accessory,title:them.title,noBand:!!them.noBand};if(onRoleRef.current==='host'){out.left=mine;out.right=theirs;}else{out.left=theirs;out.right=mine;}}
     else if(achievementSideRef.current==='left'||achievementSideRef.current==='right')out[achievementSideRef.current]=mine;
     if(mode==='single'&&(achievementSideRef.current==='left'||achievementSideRef.current==='right'))out[achievementSideRef.current==='left'?'right':'left']={celebration:'ai:'+(DIFF_COLOR[diffRef.current]||'#38bdf8'),trail:'none',pose:'none'};
     return out;
@@ -5794,8 +5800,8 @@ function makePeerRoom(peer,role,code){
       ['left','right'].forEach(function(s){var sk=achievementSkinDetails(multiSkinsRef.current[s]);skins[s]=sk&&ownsId(unlocked,sk.id)?sk:null;});
     }
     // shop accessories and titles ride along with the skins (drawScene and the HUD read them)
-    var cos=getGameCosmetics(mode);skins.acc={left:null,right:null};skins.title={left:null,right:null};
-    ['left','right'].forEach(function(sd){var c=cos[sd];if(!c)return;if(c.accessory&&c.accessory!=='none')skins.acc[sd]=c.accessory;if(c.title&&c.title!=='none')skins.title[sd]=c.title;});
+    var cos=getGameCosmetics(mode);skins.acc={left:null,right:null};skins.title={left:null,right:null};skins.nb={left:false,right:false};
+    ['left','right'].forEach(function(sd){var c=cos[sd];if(!c)return;skins.nb[sd]=!!c.noBand;if(c.accessory&&c.accessory!=='none')skins.acc[sd]=c.accessory;if(c.title&&c.title!=='none')skins.title[sd]=c.title;});
     return skins;
   }
   var s_hov=useState(null),hovCard=s_hov[0],setHovCard0=s_hov[1],setHovCard=function(v){if(!PERF_LOW)setHovCard0(v);}; // performance mode: buttons look the same whether or not the mouse is over them
