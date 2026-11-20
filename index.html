@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.0.4';
+var GAME_VERSION='v26.0.5';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -4359,13 +4359,18 @@ function ShopScreen(props){
     else if(tab==='title')f=[React.createElement('input',{key:'t',type:'text',value:ed.text,maxLength:18,placeholder:'Your title','aria-label':'Title text',onChange:function(e){cxSet({text:cxTitleText(e.target.value)});},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')cxSave();},style:{flex:'1 1 160px',minWidth:0,padding:'7px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:13,fontFamily:'inherit',outline:'none'}}),cxColor('Colour','c1')];
     else if(tab==='celebration')f=[cxColor('Colour 1','c1'),cxColor('Colour 2','c2'),cxColor('Colour 3','c3'),cxSelect('Particles','shape',[['star','Stars'],['coin','Coins'],['pixel','Pixels'],['strand','Ribbons'],['bubble','Bubbles'],['dot','Sparks']]),cxSelect('Style','style',[['burst','Burst'],['rings','Shockwave rings'],['fountain','Fountain'],['rain','Rain from the sky'],['spiral','Spiral']])];
     else f=[cxColor('Ring','c1'),cxColor('Glow','c2')];
-    return React.createElement('div',{style:{padding:14,borderRadius:16,background:'linear-gradient(140deg,rgba(219,39,119,0.2),rgba(8,145,178,0.16))',border:'1px solid rgba(244,114,182,0.65)',display:'flex',flexDirection:'column',gap:10}},
-      React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#f9a8d4'}},'\uD83D\uDEE0\uFE0F Custom Studio \u00B7 the preview shows your design live'),
+    // the live preview sits right inside the editor, so you never have to scroll up to see your design
+    return React.createElement('div',{'data-cx-panel':'1',style:{scrollMarginTop:16,scrollMarginBottom:16,padding:14,borderRadius:16,background:'linear-gradient(140deg,rgba(219,39,119,0.2),rgba(8,145,178,0.16))',border:'1px solid rgba(244,114,182,0.65)',display:'flex',flexWrap:'wrap',gap:16,alignItems:'center'}},
+      React.createElement('div',{style:{flex:'0 0 auto',display:'flex',justifyContent:'center'}},preview),
+      React.createElement('div',{style:{flex:'1 1 260px',minWidth:0,display:'flex',flexDirection:'column',gap:10}},
+      React.createElement('div',{style:{fontSize:12,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'#f9a8d4'}},'\uD83D\uDEE0\uFE0F Custom Studio \u00B7 your design, live'),
       React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:12,alignItems:'center'}},f),
       React.createElement('div',{style:{display:'flex',gap:8}},
         React.createElement('button',{type:'button',onClick:cxSave,style:{padding:'8px 16px',borderRadius:50,border:'none',background:'linear-gradient(135deg,#db2777,#7c3aed)',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},'Save & equip'),
-        React.createElement('button',{type:'button',onClick:function(){setEd(null);setPeek(null);},style:{padding:'8px 16px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'transparent',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},'Cancel')));
+        React.createElement('button',{type:'button',onClick:function(){setEd(null);setPeek(null);},style:{padding:'8px 16px',borderRadius:50,border:'1px solid rgba(255,255,255,0.3)',background:'transparent',color:'#fff',fontWeight:900,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},'Cancel'))));
   }
+  // opening the editor brings it into view
+  useEffect(function(){if(!ed)return;var t=setTimeout(function(){var el=rootRef.current&&rootRef.current.querySelector('[data-cx-panel]');if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest',behavior:'smooth'});},60);return function(){clearTimeout(t);};},[ed&&ed.kind]);
   var rewards=list.filter(function(it){return !it.shop;});
   function swatch(it){
     var id=it.custom&&String(current(tab)).indexOf('cx:')===0?current(tab):it.id;
