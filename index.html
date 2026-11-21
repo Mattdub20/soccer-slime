@@ -119,12 +119,14 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.1.9';
+var GAME_VERSION='v26.2.0';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
 function cxHexes(a,n){for(var i=0;i<n;i++)if(!CX_HEX.test(a[i]||''))return false;return true;}
-function cxSkin(id){if(CX_CACHE[id])return CX_CACHE[id];var a=cxParts(id);if(!a||a.length!==5||!cxHexes(a,3)||CX_PATTERNS.indexOf(a[3])<0||(a[4]!=='0'&&a[4]!=='1'))return null;return CX_CACHE[id]={id:id,name:'Custom Skin',color:a[0],accent:a[1],detail:a[2],pattern:a[3]==='plain'?'none':a[3],sheen:a[4]==='1'?'#ffffff':null,shop:true,customMade:true};}
+// skins can add two optional parts: particle shape and particle colours (older 5-part designs still work)
+var CX_PFX_SHAPES=['auto','dot','star','flake','bubble','pixel'],CX_PFX_COLS=['skin','rainbow','fire','ice','gold','white'];
+function cxSkin(id){if(CX_CACHE[id])return CX_CACHE[id];var a=cxParts(id);if(!a||(a.length!==5&&a.length!==7)||(a.length===7&&(CX_PFX_SHAPES.indexOf(a[5])<0||CX_PFX_COLS.indexOf(a[6])<0))||!cxHexes(a,3)||CX_PATTERNS.indexOf(a[3])<0||(a[4]!=='0'&&a[4]!=='1'))return null;return CX_CACHE[id]={id:id,name:'Custom Skin',color:a[0],accent:a[1],detail:a[2],pattern:a[3]==='plain'?'none':a[3],sheen:a[4]==='1'?'#ffffff':null,fxShape:a[5]||'auto',fxCol:a[6]||'skin',shop:true,customMade:true};}
 function cxFrame(id){var a=cxParts(id);if(!a||a.length!==2||!cxHexes(a,2))return null;return{id:id,name:'Custom Frame',color:a[0],color2:a[1],customMade:true};}
 function cxTrail(id){var a=cxParts(id);if(!a||a.length<1||a.length>3||!cxHexes(a,a.length))return null;return{id:id,name:'Custom Trail',icon:'🎨',colors:a,customMade:true};}
 function cxTitleText(t){return String(t||'').replace(/[^A-Za-z0-9 !?'.&\-]/g,'').replace(/\s+/g,' ').slice(0,18);}
@@ -498,8 +500,10 @@ var SKIN_FX={
 var CX_FX={};
 function cxSkinFx(skin){if(!skin||String(skin.id).indexOf('cx:')!==0||!skin.color)return null;if(CX_FX[skin.id])return CX_FX[skin.id];
   function lighten(h){var n=parseInt(String(h).slice(1),16);if(isNaN(n))return'#ffffff';var r=(n>>16)&255,g=(n>>8)&255,b=n&255;r=Math.round(r+(255-r)*0.5);g=Math.round(g+(255-g)*0.5);b=Math.round(b+(255-b)*0.5);return'#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);}
-  var c=[skin.color,skin.color,skin.accent||skin.color,skin.detail||skin.color,lighten(skin.color)];
-  return CX_FX[skin.id]={c:c,g:0.08,s:skin.sheen?'star':undefined};}
+  var mode=skin.fxCol||'skin',sh=skin.fxShape||'auto';
+  var c=mode==='fire'?['#fb923c','#fed7aa','#ef4444','#facc15']:mode==='ice'?['#e0f2fe','#ffffff','#67e8f9','#7dd3fc']:mode==='gold'?['#fde047','#fff7cc','#ca8a04','#facc15']:mode==='white'?['#ffffff','#f1f5f9','#e2e8f0']:[skin.color,skin.color,skin.accent||skin.color,skin.detail||skin.color,lighten(skin.color)];
+  var shape=sh==='auto'?(skin.sheen?'star':undefined):sh==='dot'?undefined:sh;
+  return CX_FX[skin.id]={c:c,rainbow:mode==='rainbow',g:mode==='fire'?-0.1:sh==='flake'?0.02:sh==='bubble'?-0.06:0.08,s:shape,slow:sh==='flake'};}
 // Restyle the particles emitted since index `from` to match a skin.
 function skinFx(P,from,skin,isGoal){
   var fx=skin&&(SKIN_FX[skin.id]||cxSkinFx(skin));if(!fx)return;
@@ -4459,7 +4463,7 @@ function ShopScreen(props){
   // ── Custom Studio editor ──
   var s_ed=useState(null),ed=s_ed[0],setEd=s_ed[1];
   function cxEncode(e){
-    if(e.kind==='skin')return'cx:'+[e.c1,e.c2,e.c3,e.pattern,e.sheen?'1':'0'].join(',');
+    if(e.kind==='skin')return'cx:'+[e.c1,e.c2,e.c3,e.pattern,e.sheen?'1':'0'].concat((e.fxShape&&e.fxShape!=='auto')||(e.fxCol&&e.fxCol!=='skin')?[e.fxShape||'auto',e.fxCol||'skin']:[]).join(',');
     if(e.kind==='trail')return'cx:'+[e.c1,e.c2,e.c3].join(',');
     if(e.kind==='title')return'cx:'+e.c1+'|'+cxTitleText(e.text).trim();
     if(e.kind==='celebration')return'cx:'+[e.c1,e.c2,e.c3,e.shape,e.style].join(',');
@@ -4467,7 +4471,7 @@ function ShopScreen(props){
   }
   function cxStart(kind){
     var d=cxDetails(kind,current(kind)),e={kind:kind};
-    if(kind==='skin')Object.assign(e,d?{c1:d.color,c2:d.accent,c3:d.detail,pattern:d.pattern==='none'?'plain':d.pattern,sheen:!!d.sheen}:{c1:'#f472b6',c2:'#22d3ee',c3:'#ffffff',pattern:'stars',sheen:true});
+    if(kind==='skin')Object.assign(e,d?{c1:d.color,c2:d.accent,c3:d.detail,pattern:d.pattern==='none'?'plain':d.pattern,sheen:!!d.sheen,fxShape:d.fxShape||'auto',fxCol:d.fxCol||'skin'}:{c1:'#f472b6',c2:'#22d3ee',c3:'#ffffff',pattern:'stars',sheen:true,fxShape:'auto',fxCol:'skin'});
     else if(kind==='trail'){var tc=d?d.colors:['#f472b6','#22d3ee','#facc15'];e.c1=tc[0];e.c2=tc[1]||tc[0];e.c3=tc[2]||tc[0];}
     else if(kind==='title')Object.assign(e,d?{c1:d.color,text:d.name}:{c1:'#f9a8d4',text:''});
     else if(kind==='celebration')Object.assign(e,d?{c1:d.cols[0],c2:d.cols[1],c3:d.cols[2],shape:d.shape,style:d.style}:{c1:'#f472b6',c2:'#22d3ee',c3:'#facc15',shape:'star',style:'burst'});
@@ -4481,7 +4485,9 @@ function ShopScreen(props){
   function cxSelect(label,key,opts){return React.createElement('label',{key:key,style:{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:800}},label,React.createElement('select',{value:ed[key],onChange:function(e){var p={};p[key]=e.target.value;cxSet(p);},style:{padding:'6px 8px',borderRadius:10,background:'#18243c',border:'1px solid rgba(255,255,255,0.26)',color:'#fff',fontFamily:'inherit'}},opts.map(function(o){return React.createElement('option',{key:o[0],value:o[0]},o[1]);})));}
   function cxPanel(){
     if(!ed||ed.kind!==tab)return null;var f=[];
-    if(tab==='skin')f=[cxColor('Body','c1'),cxColor('Headband','c2'),cxColor('Pattern','c3'),cxSelect('Pattern','pattern',[['plain','None'],['stripes','Racing stripes'],['stars','Stars'],['waves','Waves'],['spots','Spots'],['checker','Checkers'],['bands','Bands'],['crown','Royal sash'],['facets','Gem facets'],['flames','Flames'],['circuit','Circuit']]),React.createElement('label',{key:'sh',style:{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:800}},React.createElement('input',{type:'checkbox',checked:!!ed.sheen,onChange:function(e){cxSet({sheen:e.target.checked});}}),'Shine')];
+    if(tab==='skin')f=[cxColor('Body','c1'),cxColor('Headband','c2'),cxColor('Pattern','c3'),cxSelect('Pattern','pattern',[['plain','None'],['stripes','Racing stripes'],['stars','Stars'],['waves','Waves'],['spots','Spots'],['checker','Checkers'],['bands','Bands'],['crown','Royal sash'],['facets','Gem facets'],['flames','Flames'],['circuit','Circuit']]),React.createElement('label',{key:'sh',style:{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:800}},React.createElement('input',{type:'checkbox',checked:!!ed.sheen,onChange:function(e){cxSet({sheen:e.target.checked});}}),'Shine'),
+      cxSelect('Particles','fxShape',[['auto','Auto'],['dot','Dots'],['star','Stars'],['flake','Snowflakes'],['bubble','Bubbles'],['pixel','Pixels']]),
+      cxSelect('Particle colours','fxCol',[['skin','Skin colours'],['rainbow','Rainbow'],['fire','Fire'],['ice','Ice'],['gold','Gold'],['white','White']])];
     else if(tab==='trail')f=[cxColor('Colour 1','c1'),cxColor('Colour 2','c2'),cxColor('Colour 3','c3')];
     else if(tab==='title')f=[React.createElement('input',{key:'t',type:'text',value:ed.text,maxLength:18,placeholder:'Your title','aria-label':'Title text',onChange:function(e){cxSet({text:cxTitleText(e.target.value)});},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')cxSave();},style:{flex:'1 1 160px',minWidth:0,padding:'7px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:13,fontFamily:'inherit',outline:'none'}}),cxColor('Colour','c1')];
     else if(tab==='celebration')f=[cxColor('Colour 1','c1'),cxColor('Colour 2','c2'),cxColor('Colour 3','c3'),cxSelect('Particles','shape',[['star','Stars'],['coin','Coins'],['pixel','Pixels'],['strand','Ribbons'],['bubble','Bubbles'],['dot','Sparks']]),cxSelect('Style','style',[['burst','Burst'],['rings','Shockwave rings'],['fountain','Fountain'],['rain','Rain from the sky'],['spiral','Spiral']])];
@@ -7063,6 +7069,10 @@ function makePeerRoom(peer,role,code){
             if(mode==='single'&&matchArenaRef.current==='ice'){var aiI=hSide==='right'?ls:rs;if(aiI.y>=GH-GRND-1&&!aiI.isSpinning&&aiI.dashFrames<=0){var tvI=aiI.vx;aiI.vx=aiVx0+(tvI-aiVx0)*(Math.abs(tvI)<0.5?0.012:Math.sign(tvI)!==Math.sign(aiVx0)?0.022:0.035);}}
             if(mode==='single'&&CHAOS_AS_HARD&&diffRef.current==='impossible'){var aiC=hSide==='right'?ls:rs,twC=hSide==='right'?1:-1,fC=(ball.x-aiC.x)*twC,hC=GH-GRND-ball.y,gC=aiC.y>=GH-GRND-1;
               if(gC&&hC<SR*0.95&&fC>-10&&fC<SR+BR+30&&aiC.vy<0&&Math.abs(aiC.x-ball.x)<SR+BR+40)aiC.vy=0;                       // no hop into a low ball
+              // ball dropping onto its head would just bounce straight up: back off so it lands in front, then drive it
+              if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&ball.vy>0&&Math.abs(ball.vx)<3&&hC>SR*0.9&&hC<260&&fC>-SR*0.7&&fC<SR*0.7){aiC.vx=-twC*SPD*1.2;if(aiC.vy<0)aiC.vy=0;}
+              // no jumping straight up under the ball either
+              if(gC&&aiC.vy<0&&Math.abs(ball.vx)<3&&Math.abs(ball.x-aiC.x)<SR*0.6&&hC>SR)aiC.vy=0;
               if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&hC<SR*0.85&&fC>12&&fC<115&&ball.vy>-3){aiC.dashFrames=DASH_F;aiC.dashDir=twC;aiC.groundDash=true;}}
             var pinAi=hSide==='right'?ls:rs,pinHum=hSide==='right'?rs:ls,pinLeft=hSide==='right',PIN={supereasy:0.12,easy:0.15,medium:0.2,hard:0.25,impossible:0.3}[diffRef.current]||0.25;
             var pdx=pinHum.x-pinAi.x,pdy=pinHum.y-pinAi.y,inBox=pinLeft?pinAi.x<GOALW+6:pinAi.x>GW-GOALW-6,pinned=inBox&&(pinLeft?pdx>0:pdx<0)&&Math.abs(pdx)<SR*2+8&&Math.abs(pdy)<SR*4;
