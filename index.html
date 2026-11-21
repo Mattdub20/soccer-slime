@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.2.0';
+var GAME_VERSION='v26.2.1';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -6850,7 +6850,7 @@ function makePeerRoom(peer,role,code){
               if(behind){newT=b.x+(aiLeft?-10:10);spd2=SPD*s2.ib*1.15;if(bh>15&&bh<s2.jx&&ai.y>=GH-GRND-1&&aiR()<s2.jf*0.7)doJump=true;if(!ai.isSpinning&&ai.y>=GH-GRND-1&&ai.dashFrames===0&&ai.dashCooldown===0){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;ai.dashCooldown=3;}}
               else if(aer){var gsd=aiLeft?-1:1;newT=Math.max(SR,Math.min(GW-SR,aer.x+gsd*16));spd2=SPD*s2.ib*1.12;var grd=ai.y>=GH-GRND-1,nrb=Math.abs(ai.x-aer.x)<75;if(grd&&nrb&&aer.t>=2&&aer.t<=(aer.h>105?28:19))doJump=true;if(!grd&&nrb&&!ai.hasDoubleJumped&&!ai.isSpinning&&aer.h>112&&ai.vy>-3&&aer.t<=16){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}
               else if(threat||s2.def||alerted){var bx2=b.x;for(var prj=0;prj<preds.length;prj++){var ttrj=Math.abs(ai.x-preds[prj].x)/SPD;if(ttrj<=preds[prj].time+3){bx2=preds[prj].x;break;}}var shade=smart?Math.max(0.1,Math.min(alerted?0.4:0.3,Math.abs(bx2-ownGx)/GW*0.5)):0,cutX=smart?bx2+(ownGx-bx2)*shade:bx2+(aiLeft?-5:5);newT=aiLeft?Math.max(cutX,ownGx+SR):Math.min(cutX,ownGx-SR);spd2=SPD*s2.ib;if(aDist<100&&bh<120&&ai.y>=GH-GRND-1&&aiR()<s2.jf)doJump=true;if(ai.stuckCounter>15){doJump=true;newT=aiLeft?b.x+20:b.x-20;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}else if(aiLeft?(b.x>GW*s2.hl):(b.x<GW*(1-s2.hl))){newT=b.x+s2.ao*(aiLeft?1:-1)+(!isImp&&!chaosH&&Math.random()<0.3?(Math.random()*28-14):0);if(aDist<130){if(hPatA&&ai.y>=GH-GRND-1&&bh>10&&Math.random()<hPatA.jf*0.6)doJump=true;if(hPatA&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y>=GH-GRND-1&&aDist<s2.dr*1.2&&aiR()<Math.min(0.5,hPatA.df*3)){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(bh>s2.jn&&bh<s2.jx&&ai.y>=GH-GRND-1&&aiR()<s2.jf){var ttr2=aDist/SPD,bhy=b.y+b.vy*ttr2+0.5*GRAV*ttr2*ttr2;if(bhy>GH-GRND-s2.jx&&bhy<GH-GRND-8)doJump=true;}if(ai.stuckCounter>18){doJump=true;newT=b.x+s2.ao*(aiLeft?1:-1)-10;}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr&&bon&&ai.y>=GH-GRND-1){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}if(s2.ad&&!ai.isSpinning&&ai.dashCooldown===0&&ai.y<GH-GRND-15&&aDist<90&&ai.spinPhase===0){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}if(s2.ad&&ai.spinPhase===1&&aDist<70){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}}}else{newT=GW*s2.hx+(!isImp&&!chaosH&&Math.random()<0.08?(Math.random()*40-20):0);if(smart)newT+=(b.x-newT)*0.16;for(var prk=0;prk<preds.length;prk++){if(preds[prk].y<GH-GRND-35&&Math.abs(preds[prk].x-newT)<140){var ttr3=Math.abs(ai.x-preds[prk].x)/SPD;if(ttr3<preds[prk].time+6&&preds[prk].time<50&&aiR()<s2.jf){newT=preds[prk].x+(aiLeft?-18:18);if(preds[prk].time<30&&ai.y>=GH-GRND-1)doJump=true;break;}}}if(!ai.isSpinning&&ai.dashCooldown===0&&aDist<s2.dr*0.7&&bon&&ai.y>=GH-GRND-1&&aiR()<0.3){ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;ai.groundDash=true;}}
-              if(isImp)(function(){
+              if(isImp||chaosH)(function(){
                 // Impossible: plan an interception from the full predicted path instead of reacting late.
                 var mem=impMemRef.current,gsd=aiLeft?-1:1;
                 function lt0(){return mem.kt||0;}
@@ -6864,7 +6864,7 @@ function makePeerRoom(peer,role,code){
                 //  rush - dash straight at the ball and challenge for it
                 //  pop  - get under the ball, juggle it up off its head, then jump and air-dash it at goal
                 //  hold - hang back a little, let the opponent commit, and play it from there
-                if(mem.kickoff){
+                if(mem.kickoff&&!chaosH){
                   if(!mem.kplan){var kr=Math.random(),last2=mem.klast||[];mem.kplan=kr<0.3?'rush':kr<0.78?'pop':'hold';
                     if(last2.length>=2&&last2[0]===mem.kplan&&last2[1]===mem.kplan)mem.kplan=mem.kplan==='pop'?'rush':'pop';
                     mem.klast=[mem.kplan].concat(last2).slice(0,2);mem.kst=0;mem.ktouch=0;mem.kcd=0;}
@@ -6933,7 +6933,7 @@ function makePeerRoom(peer,role,code){
                 var setup=hAir&&hdx>-15&&hdx<SR+BR+55&&hdy>-10&&hdy<SR+BR+50&&toGoal<560;
                 var onWall=Math.abs(b.x-(aiLeft?0:GW))<GOALW+70&&b.y<GH-GRND-GOALH-BR*0.5;
                 if(onWall)mem.guardT=0;
-                if(setup&&!onWall&&(hum.spinPhase===1||hum.isSpinning||Math.abs(hum.x-b.x)<SR+BR+30))mem.guardT=45;
+                if(!chaosH&&setup&&!onWall&&(hum.spinPhase===1||hum.isSpinning||Math.abs(hum.x-b.x)<SR+BR+30))mem.guardT=45;
                 if(mem.guardT>0){
                   mem.guardT--;
                   var shotIn=(aiLeft?b.vx<-6:b.vx>6);
@@ -6977,6 +6977,7 @@ function makePeerRoom(peer,role,code){
                   if(Math.hypot(b.x-ai.x,b.y-ai.y)<SR+BR+6)mem.retreat=34;
                   return;
                 }
+                if(chaosH)return; // Chaos (buffed Hard) only borrows the wall save above from the old Chaos brain
                 function ours(x){return aiLeft?x<GW/2+40:x>GW/2-40;}
                 // frames for the slime's top to rise `rise` px after jumping (Infinity if out of reach)
                 function tReach(rise){if(rise<=0)return 0;var disc=JUMP*JUMP-2*GRAV*(matchArenaRef.current==='moon'?ARENA_GRAV.moon:1)*rise;return disc<0?Infinity:(-JUMP-Math.sqrt(disc))/(GRAV*(matchArenaRef.current==='moon'?ARENA_GRAV.moon:1));}
@@ -7067,7 +7068,7 @@ function makePeerRoom(peer,role,code){
           // player (slimes pass through each other in the air inside their own goal box). Easier AIs react sooner.
           if(mode==='single'&&!gameOver){
             if(mode==='single'&&matchArenaRef.current==='ice'){var aiI=hSide==='right'?ls:rs;if(aiI.y>=GH-GRND-1&&!aiI.isSpinning&&aiI.dashFrames<=0){var tvI=aiI.vx;aiI.vx=aiVx0+(tvI-aiVx0)*(Math.abs(tvI)<0.5?0.012:Math.sign(tvI)!==Math.sign(aiVx0)?0.022:0.035);}}
-            if(mode==='single'&&CHAOS_AS_HARD&&diffRef.current==='impossible'){var aiC=hSide==='right'?ls:rs,twC=hSide==='right'?1:-1,fC=(ball.x-aiC.x)*twC,hC=GH-GRND-ball.y,gC=aiC.y>=GH-GRND-1;
+            if(mode==='single'&&CHAOS_AS_HARD&&diffRef.current==='impossible'){var aiC=hSide==='right'?ls:rs,twC=hSide==='right'?1:-1,fC=(ball.x-aiC.x)*twC,hC=GH-GRND-ball.y,gC=aiC.y>=GH-GRND-1&&Math.abs(ball.x-(twC>0?0:GW))>GOALW+130; /* leave the area by its own goal to the wall save */
               if(gC&&hC<SR*0.95&&fC>-10&&fC<SR+BR+30&&aiC.vy<0&&Math.abs(aiC.x-ball.x)<SR+BR+40)aiC.vy=0;                       // no hop into a low ball
               // ball dropping onto its head would just bounce straight up: back off so it lands in front, then drive it
               if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&ball.vy>0&&Math.abs(ball.vx)<3&&hC>SR*0.9&&hC<260&&fC>-SR*0.7&&fC<SR*0.7){aiC.vx=-twC*SPD*1.2;if(aiC.vy<0)aiC.vy=0;}
