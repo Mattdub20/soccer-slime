@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.1.8';
+var GAME_VERSION='v26.1.9';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -344,7 +344,7 @@ var HP=mkPool(HARD),EP=mkPool(EASY),IP=mkPool(chaosBuff(IMPOSSIBLE));
 // CHAOS_AS_HARD: Chaos plays as a souped-up Hard AI (same tactics, but faster, sharper prediction, instant decisions,
 // no coin flips or aim wobble) instead of its own special brain. Set to false to bring the old Chaos back.
 var CHAOS_AS_HARD=true,HARD_X={};
-Object.keys(HARD).forEach(function(k){var o=Object.assign({},HARD[k]);o.sm*=1.2;o.ib*=1.15;o.dr+=15;o.jf=1;o.cd=1;o.ad=true;o.dj=true;o.er=true;HARD_X['hx_'+k]=o;});
+Object.keys(HARD).forEach(function(k){var o=Object.assign({},HARD[k]);o.sm*=1.2;o.ib*=1.15;o.dr+=25;o.jn=Math.max(o.jn,75);o.jf=1;o.cd=1;o.ad=true;o.dj=true;o.er=true;HARD_X['hx_'+k]=o;});
 Object.assign(ALL_S,HARD_X);var HXP=mkPool(HARD_X);
 // AI personality (Player vs AI setup): Balanced = any strategy; Keeper = defensive ones (stays home, blocks);
 // Striker = attacking ones (high line, presses). Falls back to the full pool if a level has none of that kind.
@@ -6836,7 +6836,7 @@ function makePeerRoom(peer,role,code){
                 ai.stableStart=false;var koR=Math.random(),koDir=b.x>ai.x?1:-1;
                 if(koR<0.3){ai.dashFrames=DASH_F;ai.dashDir=koDir;ai.groundDash=true;}                                  // rush: dash straight in
                 else if(koR<0.55){ai.targetX=ai.x-koDir*50;ai.decisionCooldown=20+Math.floor(Math.random()*35);}        // hold: step back, let you commit
-                else if(koR<0.8){if(ai.y>=GH-GRND-1)ai.vy=JUMP;ai.targetX=b.x-koDir*25;ai.decisionCooldown=14;}         // hop: jump in to take it in the air
+                else if(koR<0.8){ai.targetX=b.x-koDir*(SR+BR+6);ai.decisionCooldown=26;}                                  // low drive: wait behind it, then drive it along the ground
                 else{ai.targetX=b.x+koDir*(60+Math.random()*60);ai.decisionCooldown=18;}                                // fake: run past the ball's side, then turn
               }
               if(ai.stableStart){if(s2.er)ai.stableStart=false;else if(tlRef.current>55){ai.targetX=aiLeft?200:600;ai.vx=0;if(Math.abs(b.x-ai.x)<150)ai.stableStart=false;}else ai.stableStart=false;}else{var preds=[],ptx=b.x,pty=b.y,ptvx=b.vx,ptvy=b.vy,ptsp=b.spin||0;for(var pri=0;pri<((isImp||chaosH)?160:120);pri++){ptvy+=GRAV*(matchArenaRef.current==='moon'?ARENA_GRAV.moon:1);ptvx*=BDAMP;ptx+=ptvx;pty+=ptvy;if(isImp||chaosH){ptsp*=0.996;if(pty<BR){pty=BR;ptvy=-ptvy*BBOUND;}}if(ptx<BR){ptx=BR;ptvx=-ptvx*0.88;if(isImp||chaosH){ptvy+=ptsp*BR*0.45;ptsp*=0.5;}}if(ptx>GW-BR){ptx=GW-BR;ptvx=-ptvx*0.88;if(isImp||chaosH){ptvy-=ptsp*BR*0.45;ptsp*=0.5;}}preds.push({x:ptx,y:pty,time:pri+1});if(pty>GH-GRND-BR){pty=GH-GRND-BR;ptvy=-ptvy*BBOUND;if(isImp||chaosH){ptvx+=ptsp*BR*0.25;ptsp*=0.7;}}}var bh=GH-GRND-b.y,aDist=Math.abs(ai.x-b.x),bon=bh<20,behind=aiLeft?(b.x<ai.x-15):(b.x>ai.x+15),threat=aiLeft?(b.x<GW*0.4&&b.vx<-0.5):(b.x>GW*0.6&&b.vx>0.5),stuckB=Math.abs(b.y-ai.lastBallY)<3&&Math.abs(b.vx)<1;ai.stuckCounter=stuckB?ai.stuckCounter+1:0;ai.lastBallY=b.y;var ownGx=aiLeft?GOALW/2:GW-GOALW/2,newT=ai.targetX,doJump=false,spd2=SPD*s2.sm;var aer=null,alerted=isImp&&aiAlertRef.current>0;
@@ -7061,6 +7061,9 @@ function makePeerRoom(peer,role,code){
           // player (slimes pass through each other in the air inside their own goal box). Easier AIs react sooner.
           if(mode==='single'&&!gameOver){
             if(mode==='single'&&matchArenaRef.current==='ice'){var aiI=hSide==='right'?ls:rs;if(aiI.y>=GH-GRND-1&&!aiI.isSpinning&&aiI.dashFrames<=0){var tvI=aiI.vx;aiI.vx=aiVx0+(tvI-aiVx0)*(Math.abs(tvI)<0.5?0.012:Math.sign(tvI)!==Math.sign(aiVx0)?0.022:0.035);}}
+            if(mode==='single'&&CHAOS_AS_HARD&&diffRef.current==='impossible'){var aiC=hSide==='right'?ls:rs,twC=hSide==='right'?1:-1,fC=(ball.x-aiC.x)*twC,hC=GH-GRND-ball.y,gC=aiC.y>=GH-GRND-1;
+              if(gC&&hC<SR*0.95&&fC>-10&&fC<SR+BR+30&&aiC.vy<0&&Math.abs(aiC.x-ball.x)<SR+BR+40)aiC.vy=0;                       // no hop into a low ball
+              if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&hC<SR*0.85&&fC>12&&fC<115&&ball.vy>-3){aiC.dashFrames=DASH_F;aiC.dashDir=twC;aiC.groundDash=true;}}
             var pinAi=hSide==='right'?ls:rs,pinHum=hSide==='right'?rs:ls,pinLeft=hSide==='right',PIN={supereasy:0.12,easy:0.15,medium:0.2,hard:0.25,impossible:0.3}[diffRef.current]||0.25;
             var pdx=pinHum.x-pinAi.x,pdy=pinHum.y-pinAi.y,inBox=pinLeft?pinAi.x<GOALW+6:pinAi.x>GW-GOALW-6,pinned=inBox&&(pinLeft?pdx>0:pdx<0)&&Math.abs(pdx)<SR*2+8&&Math.abs(pdy)<SR*4;
             if(pinned&&pinAi.goalLineTime>PIN&&!pinAi.isSpinning){var outDir=pinLeft?1:-1;
