@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.2.3';
+var GAME_VERSION='v26.2.5';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -5779,7 +5779,7 @@ function makePeerRoom(peer,role,code){
   var s_scr=useState('menu'),screen=s_scr[0],setScreen=s_scr[1];
   // The side game next to the online waiting screen lives on the Player vs AI setup screen instead of the main menu.
   // the waiting-room match skips every menu: straight into a long match vs the AI, and back into one whenever it ends or you exit
-  useEffect(function(){if(EMBED_AI&&(screen==='menu'||screen==='duration')){pmRef.current='single';setGmode('single');startGame('custom-30','single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);}},[screen]);
+  useEffect(function(){if(EMBED_AI&&screen==='menu'){pmRef.current='single';setGmode('single');setScreen('duration');}},[screen]);
   var s_settings=useState(loadGameSettings),gameSettings=s_settings[0],setGameSettings=s_settings[1];
   RARE_P.fire=gameSettings.rareFire;RARE_P.boom=gameSettings.rareBoom;
   GAME_AUDIO_VOLUME=gameSettings.sfxVolume;applyKeybinds(gameSettings.keybinds);
@@ -6293,6 +6293,7 @@ function makePeerRoom(peer,role,code){
       if(onl.view==='host'&&onl.peerOn)return[['online_dur1','online_dur2','online_dur4'],['arena_normal','arena_moon','arena_ice','arena_wind'],['online_score_none','online_score_3','online_score_5','online_score_10'],['online_ot_yes','online_ot_no'],['online_start'],['online_cancel']];
       return[['online_cancel']];
     }
+    if(screen==='duration'&&EMBED_AI)return[['diff_supereasy','diff_easy','diff_medium','diff_hard','diff_impossible'],['side_left','side_right'],['arena_normal','arena_moon','arena_ice','arena_wind'],['embed_play']];
     if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right','diff_bar']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['aistyle_balanced','aistyle_keeper','aistyle_striker']);g.push(['arena_normal','arena_moon','arena_ice','arena_wind']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
     if(screen==='practice_select')return[['prac_regular','prac_air','prac_ground'],['training_open'],['side_left','side_right'],['arena_normal','arena_moon','arena_ice','arena_wind'],['back']];
     if(screen==='training_select')return[['train_aim','train_jump'],['train_dash','train_save'],['side_left','side_right'],['back']];
@@ -6324,6 +6325,8 @@ function makePeerRoom(peer,role,code){
       dur_down:function(){var opts=['1min','2min','4min','8min','custom'],i=opts.indexOf(pendDur==='custom'?'custom':pendDur);setPendDur(opts[Math.max(i-1,0)]);},
       arena_normal:function(){setArena('normal');},arena_moon:function(){setArena('moon');},arena_ice:function(){setArena('ice');},arena_wind:function(){setArena('wind');},
       aistyle_balanced:function(){setAiStyle('balanced');},aistyle_keeper:function(){setAiStyle('keeper');},aistyle_striker:function(){setAiStyle('striker');},
+      embed_play:function(){startGame('custom-30','single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},
+      diff_supereasy:function(){setDiff('supereasy');diffRef.current='supereasy';},diff_easy:function(){setDiff('easy');diffRef.current='easy';},diff_medium:function(){setDiff('medium');diffRef.current='medium';},diff_hard:function(){setDiff('hard');diffRef.current='hard';},diff_impossible:function(){setDiff('impossible');diffRef.current='impossible';},
       score_none:function(){setScoreLimit(0);},score_3:function(){setScoreLimit(3);},score_5:function(){setScoreLimit(5);},score_10:function(){setScoreLimit(10);},
       overtime_yes:function(){setOvertimeEnabled(true);},overtime_no:function(){setOvertimeEnabled(false);},
       side_left:function(){setSide('left');},side_right:function(){setSide('right');},
@@ -7549,7 +7552,7 @@ function makePeerRoom(peer,role,code){
     var onlineStyle=oV==='stickers'?lockedScreen({minHeight:0,padding:'8px 16px'}):baseStyle;
     var showAi=waitAi&&(oV==='host'||oV==='guest');
     var aiPane=showAi&&React.createElement('div',{key:'aipane',style:{display:'flex',flexDirection:'column',gap:8,alignItems:'center',position:'relative',zIndex:1}},
-      React.createElement('iframe',{title:'Player vs AI while you wait',src:location.pathname+'?embed=ai',allowTransparency:'true',onLoad:function(e){try{e.target.contentWindow.focus();}catch(x){}},style:{width:'min(1040px,60vw)',height:'min(640px,72vh)',border:'none',background:'transparent',colorScheme:'normal'}}),
+      React.createElement('iframe',{title:'Player vs AI while you wait',src:location.pathname+'?embed=ai',allowTransparency:'true',onLoad:function(e){try{e.target.contentWindow.focus();}catch(x){}},style:{width:'min(1040px,60vw)',height:'min(640px,72vh)',border:'none',background:'transparent',colorScheme:'dark'}}), /* same scheme as the game page inside, or the browser paints the frame solid */
       React.createElement('div',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.7)'}},'Warm up vs the AI while you wait \u00B7 click the pitch to play \u00B7 doesn\u2019t count for coins or stats'));
     return React.createElement('div',{key:'online-'+oV,className:'screen-in',style:onlineStyle},bgLayer(),showAi?React.createElement('div',{style:{display:'flex',gap:28,alignItems:'flex-end',justifyContent:'center',flexWrap:'wrap',width:'100%',minHeight:'100%',position:'relative',zIndex:1}},React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):oCard},oBody)),aiPane):React.createElement('div',{className:'rise',style:Object.assign({},wrapStyle,{gap:18,maxWidth:'100%',maxHeight:'100%',minHeight:0})},heading('Play Online'),React.createElement('div',{style:oV==='stickers'?Object.assign({},oCard,{width:'min(620px,92vw)',height:'calc(100dvh - 230px)',maxHeight:620,minHeight:0,overflow:'hidden',padding:18,boxSizing:'border-box'}):(oV==='choose'?Object.assign({},oCard,{background:'transparent',border:'none',boxShadow:'none',padding:0}):oCard)},oBody)));
   }
@@ -7638,6 +7641,15 @@ function makePeerRoom(peer,role,code){
   if(screen==='customise')return React.createElement('div',{key:'customise',className:'screen-in',style:baseStyle},bgLayer(),React.createElement('div',{className:'rise',style:wrapStyle},React.createElement(CustomiseScreen,{unlockedSkins:unlockedAchievementSkins(achievementProgress),defaultSkins:(function(){var lk=linkedLocalPlayerId(),sk=account.avatar.skin||'none';return{left:lk&&lk===selP1?sk:'none',right:lk&&lk===selP2?sk:'none'};})(),playerNames:(function(){function nm(id){var p=id&&dbPlayers.find(function(x){return x.id===id;});return p?p.name+(id===linkedLocalPlayerId()?' (You)':''):'';}return{p1:nm(selP1),p2:nm(selP2)};})(),initDur:pendDur,onDurChange:function(d){setPendDur(d);},scoreLimit:scoreLimit,onScoreLimitChange:setScoreLimit,overtime:overtimeEnabled,onOvertimeChange:setOvertimeEnabled,onStart:function(c,dur,options){var n1=selP1?dbPlayers.find(function(p){return p.id===selP1;}):null,n2=selP2?dbPlayers.find(function(p){return p.id===selP2;}):null;startGame(dur||pendDur,'multi',c,{left:n1?n1.name:'P1',right:n2?n2.name:'P2'},'right','regular',selP1,selP2,options);},onBack:function(){setScreen('player_select');}})));
 
   // ── DURATION / DIFFICULTY ────────────────────────────────────────────
+  if(screen==='duration'&&EMBED_AI){
+    var eChip=function(id,txt,on,act,bg){return React.createElement('button',{key:id,type:'button',onClick:act,'aria-pressed':on,style:Object.assign(pill(on?(bg||'linear-gradient(135deg,#818cf8,#4338ca)'):'rgba(255,255,255,0.1)',{padding:'8px 14px',fontSize:13}),focusSty(id))},txt);};
+    return React.createElement('div',{key:'embed-setup',className:'screen-in',style:{minHeight:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,padding:16,boxSizing:'border-box',background:'transparent'}},
+      React.createElement('div',{style:{fontFamily:'var(--font-display)',fontSize:30,color:'#fff',textShadow:'0 0 18px rgba(129,140,248,0.7)'}},'Warm up vs the AI'),
+      React.createElement('div',{style:{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center'}},DIFF_ORDER.map(function(d){return eChip('diff_'+d,DIFF_LABEL[d]||d,diff===d,function(){setDiff(d);diffRef.current=d;},'linear-gradient(135deg,'+(DIFF_COLOR[d]||'#818cf8')+',#1e1b4b)');})),
+      React.createElement('div',{style:{display:'flex',gap:6,alignItems:'center'}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.7)',marginRight:4}},'Your side'),['left','right'].map(function(v){return eChip('side_'+v,v==='left'?'Left':'Right',side===v,function(){setSide(v);});})),
+      React.createElement('div',{style:{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',justifyContent:'center'}},React.createElement('span',{style:{fontSize:12,fontWeight:800,color:'rgba(255,255,255,0.7)',marginRight:4}},'Arena'),ARENAS.map(function(a){return eChip('arena_'+a[0],a[1],arena===a[0],function(){setArena(a[0]);});})),
+      React.createElement('button',{type:'button',onClick:function(){startGame('custom-30','single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill('linear-gradient(135deg,#22c55e,#15803d)',{padding:'12px 44px',fontSize:18}),focusSty('embed_play'))},'Play'));
+  }
   if(screen==='duration'){
     var diffInfo={supereasy:'If u can\u2019t beat this u genuinely suck',easy:'A relaxed opponent. A good place to learn the moves.',medium:'Plays like Hard but reacts slower and dashes less. A fair fight.',hard:'Varied tactics. Cuts off angles and defends high balls.',impossible:'Hard mode on steroids. Faster, more aggressive and impossible to predict.'};
     var selectedChoice=isNightT?'linear-gradient(135deg,#818cf8,#4338ca)':isJapanT?'linear-gradient(135deg,#ec4899,#be185d)':'linear-gradient(135deg,#fde047,#f59e0b)';
