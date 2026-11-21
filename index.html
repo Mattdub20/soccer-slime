@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.0.6';
+var GAME_VERSION='v26.0.8';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -1804,6 +1804,70 @@ function drawJapanFlag(ctx,t){
 var DRAW_NOBAND={left:false,right:false};
 // Phones: a short buzz on your dashes, goals and wins (touch screens only; does nothing where vibration isn't supported).
 function haptic(p){try{if(navigator.vibrate&&window.matchMedia&&window.matchMedia('(pointer:coarse)').matches&&loadGameSettings().haptics!==false)navigator.vibrate(p);}catch(e){}}
+// ─── Arena backdrops (Moon, Ice, Windy Beach): drawn once into a canvas, then animated bits on top ───
+var ARENA_BG={};
+function arenaPalmTop(ctx,x,y,dir,t,wv){ctx.save();ctx.translate(x,y);ctx.fillStyle='#15803d';var sway=Math.sin(t*0.002)*0.08+(wv||0)*0.12;
+  for(var k=0;k<6;k++){var an=-Math.PI/2+(k-2.5)*0.55+sway;ctx.save();ctx.rotate(an);ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(30,-14,62,6);ctx.quadraticCurveTo(30,-2,0,0);ctx.fill();ctx.restore();}
+  ctx.fillStyle='#78350f';ctx.beginPath();ctx.arc(4*dir,6,5,0,Math.PI*2);ctx.arc(-3*dir,8,4.5,0,Math.PI*2);ctx.fill();ctx.restore();}
+function arenaBackdrop(ag){
+  if(ARENA_BG[ag])return ARENA_BG[ag];
+  var c=document.createElement('canvas'),K=2;c.width=GW*K;c.height=GH*K;var x=c.getContext('2d');x.setTransform(K,0,0,K,0,0);var gy=GH-GRND,i;
+  function rnd(n){var v=Math.sin(n*12.9898)*43758.5453;return v-Math.floor(v);}
+  if(ag==='moon'){
+    var g=x.createLinearGradient(0,0,0,gy);g.addColorStop(0,'#02030a');g.addColorStop(1,'#141a33');x.fillStyle=g;x.fillRect(0,0,GW,GH);
+    for(i=0;i<160;i++){x.fillStyle='rgba(255,255,255,'+(0.25+rnd(i)*0.7)+')';var r=rnd(i+500)<0.1?1.6:0.9;x.beginPath();x.arc(rnd(i+1)*GW,rnd(i+2)*(gy-120),r,0,Math.PI*2);x.fill();}
+    // Earth
+    var ex=GW*0.8,ey=78,er=34,eg=x.createRadialGradient(ex-10,ey-10,4,ex,ey,er);eg.addColorStop(0,'#7dd3fc');eg.addColorStop(1,'#1d4ed8');x.fillStyle=eg;x.beginPath();x.arc(ex,ey,er,0,Math.PI*2);x.fill();
+    x.save();x.beginPath();x.arc(ex,ey,er,0,Math.PI*2);x.clip();x.fillStyle='#22c55e';x.beginPath();x.ellipse(ex-12,ey-6,13,9,0.5,0,Math.PI*2);x.ellipse(ex+14,ey+12,10,7,-0.3,0,Math.PI*2);x.fill();x.fillStyle='rgba(255,255,255,0.7)';x.beginPath();x.ellipse(ex+4,ey-20,16,4,0.2,0,Math.PI*2);x.fill();
+    x.fillStyle='rgba(0,0,0,0.45)';x.beginPath();x.arc(ex+16,ey+6,er,0,Math.PI*2);x.fill();x.restore();
+    x.strokeStyle='rgba(125,211,252,0.35)';x.lineWidth=4;x.beginPath();x.arc(ex,ey,er+3,0,Math.PI*2);x.stroke();
+    // far hills and near ridge
+    function ridge(base,amp,col,seed){x.fillStyle=col;x.beginPath();x.moveTo(0,gy);for(var px=0;px<=GW;px+=20)x.lineTo(px,base-amp*(0.5+0.5*Math.sin(px*0.012+seed)+0.3*Math.sin(px*0.041+seed*2)));x.lineTo(GW,gy);x.closePath();x.fill();}
+    ridge(gy-60,70,'#374151',1);ridge(gy-20,40,'#6b7280',4);
+    for(i=0;i<9;i++){var cx=rnd(i+40)*GW,cy=gy-18-rnd(i+41)*30,cr=8+rnd(i+42)*14;x.fillStyle='rgba(55,65,81,0.7)';x.beginPath();x.ellipse(cx,cy,cr,cr*0.3,0,0,Math.PI*2);x.fill();}
+    // lander + flag
+    var lx=120,ly=gy-22;x.fillStyle='#d1d5db';x.fillRect(lx-16,ly-26,32,18);x.fillStyle='#facc15';x.fillRect(lx-12,ly-8,24,6);x.strokeStyle='#9ca3af';x.lineWidth=2;x.beginPath();x.moveTo(lx-12,ly-2);x.lineTo(lx-22,ly+4);x.moveTo(lx+12,ly-2);x.lineTo(lx+22,ly+4);x.stroke();
+    x.strokeStyle='#e5e7eb';x.beginPath();x.moveTo(lx+44,ly+4);x.lineTo(lx+44,ly-40);x.stroke();x.fillStyle='#ef4444';x.fillRect(lx+44,ly-40,22,13);x.fillStyle='#fff';x.fillRect(lx+44,ly-34,22,2);
+    // ground
+    var gg=x.createLinearGradient(0,gy,0,GH);gg.addColorStop(0,'#a8acb4');gg.addColorStop(1,'#6b7280');x.fillStyle=gg;x.fillRect(0,gy,GW,GRND);
+    for(i=0;i<14;i++){var kx=rnd(i+80)*GW,ky=gy+8+rnd(i+81)*(GRND-14),kr=6+rnd(i+82)*14;x.fillStyle='rgba(75,85,99,0.55)';x.beginPath();x.ellipse(kx,ky,kr,kr*0.32,0,0,Math.PI*2);x.fill();x.strokeStyle='rgba(229,231,235,0.4)';x.lineWidth=1;x.beginPath();x.ellipse(kx,ky-1,kr,kr*0.32,0,Math.PI,Math.PI*2);x.stroke();}
+  }else if(ag==='ice'){
+    var g2=x.createLinearGradient(0,0,0,gy);g2.addColorStop(0,'#8fb3d9');g2.addColorStop(1,'#e8f1fb');x.fillStyle=g2;x.fillRect(0,0,GW,GH);
+    // mountains with snow caps
+    [[90,230,190],[300,280,150],[520,210,210],[760,260,170],[920,200,150]].forEach(function(m,k){var mx=m[0],mh=m[1],mw=m[2],top=gy-mh;
+      x.fillStyle=k%2?'#7c93b5':'#64809f';x.beginPath();x.moveTo(mx-mw,gy);x.lineTo(mx,top);x.lineTo(mx+mw,gy);x.closePath();x.fill();
+      x.fillStyle='#f8fafc';x.beginPath();x.moveTo(mx,top);x.lineTo(mx-mw*0.3,top+mh*0.3);x.lineTo(mx-mw*0.12,top+mh*0.25);x.lineTo(mx,top+mh*0.33);x.lineTo(mx+mw*0.14,top+mh*0.24);x.lineTo(mx+mw*0.3,top+mh*0.3);x.closePath();x.fill();});
+    // snowy pines
+    for(i=0;i<16;i++){var tx=20+i*(GW-40)/15+(rnd(i)-0.5)*20,th=50+rnd(i+9)*40,tb=gy-8;x.fillStyle='#5b3a1f';x.fillRect(tx-3,tb-10,6,12);
+      for(var lv=0;lv<3;lv++){var ly2=tb-10-lv*th*0.28,lw=th*0.42*(1-lv*0.25);x.fillStyle='#166534';x.beginPath();x.moveTo(tx-lw,ly2);x.lineTo(tx,ly2-th*0.4);x.lineTo(tx+lw,ly2);x.closePath();x.fill();x.fillStyle='#f8fafc';x.beginPath();x.moveTo(tx-lw*0.45,ly2-th*0.22);x.lineTo(tx,ly2-th*0.4);x.lineTo(tx+lw*0.45,ly2-th*0.22);x.closePath();x.fill();}}
+    // snowbank
+    x.fillStyle='#ffffff';x.beginPath();x.moveTo(0,gy);for(var bx=0;bx<=GW;bx+=30)x.quadraticCurveTo(bx+15,gy-14-rnd(bx)*8,bx+30,gy);x.lineTo(GW,gy+2);x.lineTo(0,gy+2);x.fill();
+    // ice
+    var ig=x.createLinearGradient(0,gy,0,GH);ig.addColorStop(0,'#e0f2fe');ig.addColorStop(1,'#7dd3fc');x.fillStyle=ig;x.fillRect(0,gy,GW,GRND);
+    x.strokeStyle='rgba(255,255,255,0.85)';x.lineWidth=2;for(i=0;i<10;i++){var ix=rnd(i+30)*GW,iy=gy+8+rnd(i+31)*(GRND-14);x.beginPath();x.moveTo(ix,iy);x.lineTo(ix+40+rnd(i+32)*40,iy-5);x.stroke();}
+    x.strokeStyle='rgba(14,116,144,0.25)';x.lineWidth=1;for(i=0;i<6;i++){var qx=rnd(i+60)*GW,qy=gy+10+rnd(i+61)*(GRND-18);x.beginPath();x.moveTo(qx,qy);x.lineTo(qx+12,qy+6);x.lineTo(qx+20,qy+3);x.moveTo(qx+12,qy+6);x.lineTo(qx+14,qy+14);x.stroke();}
+  }else if(ag==='wind'){
+    var g3=x.createLinearGradient(0,0,0,gy);g3.addColorStop(0,'#3ba7e6');g3.addColorStop(1,'#c4ecff');x.fillStyle=g3;x.fillRect(0,0,GW,GH);
+    var sg=x.createRadialGradient(150,70,6,150,70,70);sg.addColorStop(0,'#fffbe6');sg.addColorStop(0.35,'#fde047');sg.addColorStop(1,'rgba(253,224,71,0)');x.fillStyle=sg;x.beginPath();x.arc(150,70,70,0,Math.PI*2);x.fill();
+    // sea + island
+    var sea=x.createLinearGradient(0,gy-80,0,gy);sea.addColorStop(0,'#0e7490');sea.addColorStop(1,'#22d3ee');x.fillStyle=sea;x.fillRect(0,gy-80,GW,80);
+    x.fillStyle='#0f766e';x.beginPath();x.ellipse(GW*0.62,gy-80,80,16,0,Math.PI,Math.PI*2);x.fill();
+    x.fillStyle='rgba(255,255,255,0.35)';x.fillRect(0,gy-80,GW,2);
+    // wet sand edge
+    x.fillStyle='#f5e1a4';x.beginPath();x.moveTo(0,gy);for(var bx2=0;bx2<=GW;bx2+=40)x.quadraticCurveTo(bx2+20,gy-16,bx2+40,gy-8);x.lineTo(GW,gy);x.fill();
+    // palm trunks (leaves are drawn live so they sway in the wind)
+    [[38,1],[GW-38,-1]].forEach(function(p){x.strokeStyle='#92400e';x.lineWidth=11;x.lineCap='round';x.beginPath();x.moveTo(p[0]-p[1]*6,gy+4);x.quadraticCurveTo(p[0]+p[1]*14,gy-80,p[0],gy-150);x.stroke();
+      x.strokeStyle='rgba(120,53,15,0.6)';x.lineWidth=2;for(var r2=0;r2<8;r2++){var yy=gy-10-r2*17;x.beginPath();x.moveTo(p[0]-6+p[1]*(r2<4?3:0),yy);x.lineTo(p[0]+6+p[1]*(r2<4?3:0),yy-3);x.stroke();}});
+    // beach umbrella
+    x.strokeStyle='#e5e7eb';x.lineWidth=3;x.beginPath();x.moveTo(GW-170,gy);x.lineTo(GW-160,gy-70);x.stroke();
+    ['#ef4444','#fff','#ef4444','#fff'].forEach(function(cl,k){x.fillStyle=cl;x.beginPath();x.moveTo(GW-160,gy-72);x.arc(GW-160,gy-72,40,Math.PI+k*Math.PI/4,Math.PI+(k+1)*Math.PI/4);x.closePath();x.fill();});
+    // sand
+    var sg2=x.createLinearGradient(0,gy,0,GH);sg2.addColorStop(0,'#fde68a');sg2.addColorStop(1,'#d9a441');x.fillStyle=sg2;x.fillRect(0,gy,GW,GRND);
+    for(i=0;i<90;i++){x.fillStyle='rgba(146,64,14,'+(0.15+rnd(i+200)*0.2)+')';x.fillRect(rnd(i+201)*GW,gy+4+rnd(i+202)*(GRND-6),2,2);}
+    [[230,gy+22],[610,gy+34]].forEach(function(sh){x.fillStyle='#fecaca';x.beginPath();x.arc(sh[0],sh[1],5,Math.PI,Math.PI*2);x.fill();});
+  }
+  ARENA_BG[ag]=c;return c;
+}
 var DRAW_ARENA=null; // set only around in-match drawScene calls
 var ARENAS=[['normal','Normal','Classic rules.'],['moon','Moon','Low gravity: big jumps, floaty ball.'],['ice','Ice','Slippery ground: you slide when you turn.'],['wind','Windy Beach','Gusts push the ball left and right.']];
 function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNight,isJapan,skins,showTrainingKeeper){
@@ -1853,11 +1917,14 @@ function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNig
   // Sakura has no stands, so there is no crowd to cheer.
   if(doFlash&&!isJapan)drawCrowdCheer(ctx,fanArr,sTop,tH,tNow,cols);
   if(DRAW_ARENA){var ag=DRAW_ARENA,gy=GH-GRND;
-    if(ag==='moon'){ctx.fillStyle='rgba(8,10,30,0.45)';ctx.fillRect(0,0,GW,gy);ctx.fillStyle='#9ca3af';ctx.fillRect(0,gy,GW,GRND);ctx.fillStyle='rgba(75,85,99,0.8)';[[80,14,18],[260,30,10],[430,12,24],[640,34,14],[820,18,20]].forEach(function(c){ctx.beginPath();ctx.ellipse(c[0]%GW,gy+c[1],c[2],c[2]*0.35,0,0,Math.PI*2);ctx.fill();});
-      ctx.fillStyle='#f8fafc';ctx.beginPath();ctx.arc(GW*0.82,70,26,0,Math.PI*2);ctx.fill();ctx.fillStyle='#38bdf8';ctx.beginPath();ctx.arc(GW*0.82-8,64,9,0,Math.PI*2);ctx.fill();}
-    else if(ag==='ice'){var ig=ctx.createLinearGradient(0,gy,0,GH);ig.addColorStop(0,'#e0f2fe');ig.addColorStop(1,'#7dd3fc');ctx.fillStyle=ig;ctx.fillRect(0,gy,GW,GRND);ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=2;for(var ii=0;ii<8;ii++){ctx.beginPath();ctx.moveTo(40+ii*120,gy+12+(ii%3)*9);ctx.lineTo(90+ii*120,gy+8+(ii%3)*9);ctx.stroke();}}
-    else if(ag==='wind'){var sg2=ctx.createLinearGradient(0,gy,0,GH);sg2.addColorStop(0,'#fde68a');sg2.addColorStop(1,'#d9a441');ctx.fillStyle=sg2;ctx.fillRect(0,gy,GW,GRND);
-      var wv=simWind(ball&&ball.wt||0)/(0.055*TS),fx=GW/2,fy=48;ctx.strokeStyle='#e5e7eb';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(fx,fy-18);ctx.lineTo(fx,fy+26);ctx.stroke();
+    ctx.drawImage(arenaBackdrop(ag),0,0,GW,GH);
+    if(ag==='moon'){for(var mi=0;mi<14;mi++){var mx=(mi*151+40)%GW,my=(mi*67)%(gy-170)+10,ma=Math.abs(Math.sin(tNow*0.0012*(1+mi%3)+mi));ctx.fillStyle='rgba(255,255,255,'+(0.35+0.6*ma)+')';ctx.fillRect(mx,my,2,2);}}
+    else if(ag==='ice'){ctx.fillStyle='rgba(255,255,255,0.9)';for(var si=0;si<(PERF_LOW?25:70);si++){var sp=0.025+(si%5)*0.008,sy=((tNow*sp+si*53)%(gy+20))-10,sx=((si*97)%GW)+Math.sin(tNow*0.001+si)*14,sr=1.2+(si%3)*0.8;ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();}}
+    else if(ag==='wind'){var wv=simWind(ball&&ball.wt||0)/(0.055*TS);
+      ctx.fillStyle='rgba(255,255,255,0.85)';for(var ci=0;ci<4;ci++){var cx=((ci*260+tNow*0.012*(1+ci*0.2)+wv*40)%(GW+200)+GW+200)%(GW+200)-100,cy=40+ci*22;ctx.beginPath();ctx.ellipse(cx,cy,46,13,0,0,Math.PI*2);ctx.ellipse(cx+24,cy-8,28,12,0,0,Math.PI*2);ctx.ellipse(cx-26,cy-4,24,10,0,0,Math.PI*2);ctx.fill();}
+      ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;for(var wi=0;wi<6;wi++){var wx=((wi*170+tNow*0.03)%GW),wy=gy-58+(wi%3)*12;ctx.beginPath();ctx.moveTo(wx,wy);ctx.quadraticCurveTo(wx+10,wy-4,wx+22,wy);ctx.stroke();}
+      [[38,1],[GW-38,-1]].forEach(function(p){arenaPalmTop(ctx,p[0],gy-150,p[1],tNow,wv);});
+      var fx=GW/2,fy=48;ctx.strokeStyle='#e5e7eb';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(fx,fy-18);ctx.lineTo(fx,fy+26);ctx.stroke();
       ctx.fillStyle='#f97316';ctx.beginPath();ctx.moveTo(fx,fy-18);ctx.lineTo(fx+wv*44,fy-12+Math.abs(wv)*3);ctx.lineTo(fx,fy-4);ctx.closePath();ctx.fill();
       ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.fillText(Math.abs(wv)<0.15?'calm':(wv>0?'wind \u2192':'\u2190 wind'),fx,fy+40);}}
   var lc=isJapan?'rgba(255,255,255,0.8)':isNight?'rgba(200,255,200,0.7)':'rgba(255,255,255,0.75)';
@@ -6904,6 +6971,17 @@ function makePeerRoom(peer,role,code){
                     if(g4&&shot.h>45&&Math.abs(ai.x-shot.x)<40&&shot.t-shot.tj<=1.5)doJump=true;
                     // low ball right in front of us: drive through it with a ground dash
                     if(g4&&shot.h<32&&shot.t<9&&Math.abs(ai.x-shot.x)<55&&ai.dashCooldown===0&&ai.dashFrames===0){ai.dashFrames=DASH_F;ai.dashDir=toward;ai.groundDash=true;ai.dashCooldown=3;}
+                  }else{
+                    // Ball deep on their side (often behind them): no waiting around. Go after it anywhere on the pitch,
+                    // staying goal-side of it so the touch goes forward, and hop over the opponent if they're in the way.
+                    var ch=null;for(var cp=0;cp<Math.min(preds.length,100);cp++){var q5=preds[cp],h5=GH-GRND-q5.y;if(h5<0||h5>SR+95)continue;var cx5=Math.max(SR,Math.min(GW-SR,q5.x+gsd*14));if(Math.abs(cx5-ai.x)/runSpd<=q5.time){ch={x:cx5,t:q5.time,h:h5};break;}}
+                    if(!ch)ch={x:Math.max(SR,Math.min(GW-SR,b.x+gsd*14)),t:99,h:GH-GRND-b.y};
+                    newT=ch.x;spd2=runSpd;doJump=false;var g5=ai.y>=GH-GRND-1,dirB=Math.sign(ch.x-ai.x),hdx5=hum.x-ai.x;
+                    var blocked=dirB!==0&&Math.sign(hdx5)===dirB&&Math.abs(hdx5)<Math.abs(ch.x-ai.x)+SR&&Math.abs(hdx5)<SR*2+60;
+                    if(blocked){if(g5&&hum.y>=GH-GRND-40)doJump=true;else if(!g5&&!ai.hasDoubleJumped&&!ai.isSpinning&&ai.vy>-1&&ai.y>hum.y-SR*2){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}
+                    else if(g5&&ch.h>45&&Math.abs(ai.x-ch.x)<40&&ch.t<=20)doJump=true;
+                    // long way to go on the ground and nobody in the way: dash to close it down
+                    if(g5&&!blocked&&Math.abs(ch.x-ai.x)>140&&ai.dashCooldown===0&&ai.dashFrames===0&&!ai.isSpinning){ai.dashFrames=DASH_F;ai.dashDir=dirB||1;ai.groundDash=true;ai.dashCooldown=3;}
                   }
                 }else if(onOurs&&incoming&&!best&&!behind){
                   // Can't reach it in time: take a covering spot between ball and goal, deeper against players who like to lob.
