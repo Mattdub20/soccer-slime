@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.2.5';
+var GAME_VERSION='v26.2.6';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -6150,7 +6150,11 @@ function makePeerRoom(peer,role,code){
     var email=cloudEmail(name),attempt=create?CLOUD.auth.createUserWithEmailAndPassword(email,password):CLOUD.auth.signInWithEmailAndPassword(email,password);
     return attempt.then(function(){return'';}).catch(function(e){patchCloud({busy:false});return cloudErrorText(e);});
   }
-  function cloudLogOut(){return cloudPushNow().then(function(){return CLOUD.auth.signOut();}).then(function(){patchCloud({user:'',msg:'',synced:0});});}
+  // Logging out saves to the cloud first, then wipes that account's progress from this device (so the next person
+  // starts fresh and nothing gets merged into someone else's account). Device settings like controls and volume stay.
+  function cloudLogOut(){return cloudPushNow().then(function(){return CLOUD.auth.signOut();}).then(function(){
+    try{['slime_achievements','slime_db','slime_account','slime_sticker_slots','slime_friends','slime_daily','slime_shop','slime_xp','slime_ai_style','slime_myname','slime_chat_read'].forEach(function(k){window.localStorage.removeItem(k);});}catch(e){}
+    SHOP_STATE=null;patchCloud({user:'',msg:'',synced:0});setTimeout(function(){location.reload();},50);});}
 
   // ── Friends + invites ──
   var s_friends=useState(loadFriends),friends=s_friends[0],setFriends=s_friends[1];
