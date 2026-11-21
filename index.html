@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.0.8';
+var GAME_VERSION='v26.0.9';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -378,8 +378,11 @@ function mkSlime(x){return{x:x,y:GH-GRND,vx:0,vy:0,goalLineTime:0,spinAngle:0,is
 var ARENA_GRAV={moon:0.45};function simGrav(cfg){return GRAV*(cfg.arena&&ARENA_GRAV[cfg.arena]||1);}
 function simIceGround(sl,cfg){return cfg.arena==='ice'&&sl.y>=GH-GRND-1;}
 var SIM_NOHOOKS={};
-// Windy Beach: a gust that slowly swings left and right (about 10 s each way), stronger in the middle of a swing.
-function simWind(t){return 0.055*TS*Math.sin(t*Math.PI/600);}
+// Windy Beach: unpredictable wind. A new random strength and direction every ~3 s (eased into, so it builds and
+// fades), plus quicker random gusts on top. Same clock -> same wind, so it stays deterministic.
+function windNoise(i){var v=Math.sin(i*127.1+311.7)*43758.5453;return(v-Math.floor(v))*2-1;}
+function windLayer(t,seg,off){var i=Math.floor(t/seg),f=(t-i*seg)/seg,e=f*f*(3-2*f);return windNoise(i+off)*(1-e)+windNoise(i+1+off)*e;}
+function simWind(t){var w=windLayer(t,190,0)*0.85+windLayer(t,47,1000)*0.4;return 0.06*TS*Math.max(-1,Math.min(1,w));}
 function simKeysIn(kk,jr,a,d,w,s,wp){return{l:!!kk[a],r:!!kk[d],jp:!!kk[w]&&!kk[wp],d:!!kk[s],rel:!!jr[s]};}
 function simBits(i){return(i.l?1:0)|(i.r?2:0)|(i.jp?4:0)|(i.d?8:0)|(i.rel?16:0);}
 function simIn(b){return{l:!!(b&1),r:!!(b&2),jp:!!(b&4),d:!!(b&8),rel:!!(b&16)};}
@@ -418,7 +421,7 @@ function simPhysics(s,inL,inR,cfg,hk){
   if(SNC){var ndx=SNC.tx-ball.x,ndy=SNC.ty-ball.y,ndd=Math.hypot(ndx,ndy)||1,nst=Math.min(ndd,42);ball.vx=ndx/ndd*42;ball.vy=ndy/ndd*42;ball.x+=ndx/ndd*nst;ball.y+=ndy/ndd*nst;ball.spin=0.6;
     if(hk.sonic)hk.sonic(ball,ndx,ndy,ndd);
     if(ndd<=42){s._sonic=null;if(cfg.solo){ball.vx*=0.2;ball.vy*=0.2;}}}
-  else{ball.vy+=simGrav(cfg);if(cfg.arena==='wind'&&!over){ball.wt=((ball.wt||0)+1)%3600;ball.vx+=simWind(ball.wt);}ball.vx*=BDAMP;ball.x+=ball.vx;ball.y+=ball.vy;}ball.spin=(ball.spin||0)*0.996;ball.ang=(ball.ang||0)+ball.spin;
+  else{ball.vy+=simGrav(cfg);if(cfg.arena==='wind'&&!over){ball.wt=((ball.wt||0)+1)%1000000;ball.vx+=simWind(ball.wt);}ball.vx*=BDAMP;ball.x+=ball.vx;ball.y+=ball.vy;}ball.spin=(ball.spin||0)*0.996;ball.ang=(ball.ang||0)+ball.spin;
   if(hk.trail)hk.trail(ball,Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy));
   if(ball.x<BR){var wh1=Math.abs(ball.vx);ball.x=BR;ball.vx=-ball.vx*0.88;ball.vy+=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;if(hk.wall)hk.wall(ball.x,ball.y,wh1);}
   if(ball.x>GW-BR){var wh2=Math.abs(ball.vx);ball.x=GW-BR;ball.vx=-ball.vx*0.88;ball.vy-=(ball.spin||0)*BR*0.45;ball.spin=(ball.spin||0)*0.5;if(hk.wall)hk.wall(ball.x,ball.y,wh2);}
@@ -1805,7 +1808,7 @@ var DRAW_NOBAND={left:false,right:false};
 // Phones: a short buzz on your dashes, goals and wins (touch screens only; does nothing where vibration isn't supported).
 function haptic(p){try{if(navigator.vibrate&&window.matchMedia&&window.matchMedia('(pointer:coarse)').matches&&loadGameSettings().haptics!==false)navigator.vibrate(p);}catch(e){}}
 // ─── Arena backdrops (Moon, Ice, Windy Beach): drawn once into a canvas, then animated bits on top ───
-var ARENA_BG={};
+var ARENA_BG={},WIND_FX={drift:0,wave:0};
 function arenaPalmTop(ctx,x,y,dir,t,wv){ctx.save();ctx.translate(x,y);ctx.fillStyle='#15803d';var sway=Math.sin(t*0.002)*0.08+(wv||0)*0.12;
   for(var k=0;k<6;k++){var an=-Math.PI/2+(k-2.5)*0.55+sway;ctx.save();ctx.rotate(an);ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(30,-14,62,6);ctx.quadraticCurveTo(30,-2,0,0);ctx.fill();ctx.restore();}
   ctx.fillStyle='#78350f';ctx.beginPath();ctx.arc(4*dir,6,5,0,Math.PI*2);ctx.arc(-3*dir,8,4.5,0,Math.PI*2);ctx.fill();ctx.restore();}
@@ -1920,13 +1923,27 @@ function drawScene(ctx,ls,rs,ball,cols,mode,side,isPrac,fanArr,doFlash,glt,isNig
     ctx.drawImage(arenaBackdrop(ag),0,0,GW,GH);
     if(ag==='moon'){for(var mi=0;mi<14;mi++){var mx=(mi*151+40)%GW,my=(mi*67)%(gy-170)+10,ma=Math.abs(Math.sin(tNow*0.0012*(1+mi%3)+mi));ctx.fillStyle='rgba(255,255,255,'+(0.35+0.6*ma)+')';ctx.fillRect(mx,my,2,2);}}
     else if(ag==='ice'){ctx.fillStyle='rgba(255,255,255,0.9)';for(var si=0;si<(PERF_LOW?25:70);si++){var sp=0.025+(si%5)*0.008,sy=((tNow*sp+si*53)%(gy+20))-10,sx=((si*97)%GW)+Math.sin(tNow*0.001+si)*14,sr=1.2+(si%3)*0.8;ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();}}
-    else if(ag==='wind'){var wv=simWind(ball&&ball.wt||0)/(0.055*TS);
-      ctx.fillStyle='rgba(255,255,255,0.85)';for(var ci=0;ci<4;ci++){var cx=((ci*260+tNow*0.012*(1+ci*0.2)+wv*40)%(GW+200)+GW+200)%(GW+200)-100,cy=40+ci*22;ctx.beginPath();ctx.ellipse(cx,cy,46,13,0,0,Math.PI*2);ctx.ellipse(cx+24,cy-8,28,12,0,0,Math.PI*2);ctx.ellipse(cx-26,cy-4,24,10,0,0,Math.PI*2);ctx.fill();}
-      ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;for(var wi=0;wi<6;wi++){var wx=((wi*170+tNow*0.03)%GW),wy=gy-58+(wi%3)*12;ctx.beginPath();ctx.moveTo(wx,wy);ctx.quadraticCurveTo(wx+10,wy-4,wx+22,wy);ctx.stroke();}
+    else if(ag==='wind'){var wv=simWind(ball&&ball.wt||0)/(0.06*TS),aw=Math.abs(wv),wd=wv<0?-1:1;
+      WIND_FX.drift+=wv*5;WIND_FX.wave+=0.08+aw*0.32;var dr=WIND_FX.drift,ph=WIND_FX.wave;
+      // clouds sail with the wind
+      ctx.fillStyle='rgba(255,255,255,0.88)';for(var ci=0;ci<4;ci++){var cx=((ci*260+dr*(0.35+ci*0.1)+tNow*0.004)%(GW+200)+GW+200)%(GW+200)-100,cy=40+ci*22;ctx.beginPath();ctx.ellipse(cx,cy,46,13,0,0,Math.PI*2);ctx.ellipse(cx+24,cy-8,28,12,0,0,Math.PI*2);ctx.ellipse(cx-26,cy-4,24,10,0,0,Math.PI*2);ctx.fill();}
+      // sea ripples
+      ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;for(var wi=0;wi<6;wi++){var wx=((wi*170+dr*0.5)%GW+GW)%GW,wy=gy-58+(wi%3)*12;ctx.beginPath();ctx.moveTo(wx,wy);ctx.quadraticCurveTo(wx+10*wd,wy-4,wx+22*wd,wy);ctx.stroke();}
+      // wind streaks across the sky: longer, faster and brighter the harder it blows
+      if(aw>0.12){ctx.lineCap='round';for(var ki=0;ki<16;ki++){var ky=30+((ki*47)%(gy-90)),kx=((ki*131+dr*(1.6+(ki%4)*0.5))%(GW+160)+GW+160)%(GW+160)-80,kl=20+aw*70,kc=Math.sin(ph*0.3+ki)*5;
+        ctx.strokeStyle='rgba(255,255,255,'+(0.18+aw*0.5)*(0.5+0.5*Math.sin(ki*1.7))+')';ctx.lineWidth=1.5+(ki%3)*0.6;ctx.beginPath();ctx.moveTo(kx,ky);ctx.quadraticCurveTo(kx-wd*kl*0.5,ky+kc,kx-wd*kl,ky);ctx.stroke();}}
+      // sand blowing along the beach
+      if(aw>0.2){ctx.fillStyle='rgba(180,120,40,'+Math.min(0.8,aw)+')';for(var pi=0;pi<(PERF_LOW?12:34);pi++){var px=((pi*89+dr*(2.2+(pi%5)*0.4))%GW+GW)%GW,py=gy-3-((pi*37)%14)-Math.abs(Math.sin(ph*0.2+pi))*6*aw;ctx.fillRect(px,py,2,1.5);}}
       [[38,1],[GW-38,-1]].forEach(function(p){arenaPalmTop(ctx,p[0],gy-150,p[1],tNow,wv);});
-      var fx=GW/2,fy=48;ctx.strokeStyle='#e5e7eb';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(fx,fy-18);ctx.lineTo(fx,fy+26);ctx.stroke();
-      ctx.fillStyle='#f97316';ctx.beginPath();ctx.moveTo(fx,fy-18);ctx.lineTo(fx+wv*44,fy-12+Math.abs(wv)*3);ctx.lineTo(fx,fy-4);ctx.closePath();ctx.fill();
-      ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.fillText(Math.abs(wv)<0.15?'calm':(wv>0?'wind \u2192':'\u2190 wind'),fx,fy+40);}}
+      // windsock-style flag: streams out and ripples with the wind, droops when it's calm
+      var fx=GW/2,fy=30,fl=44+aw*46,n=16;ctx.strokeStyle='#e5e7eb';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(fx,fy-4);ctx.lineTo(fx,fy+58);ctx.stroke();
+      ctx.fillStyle='#fde047';ctx.beginPath();ctx.arc(fx,fy-5,3.5,0,Math.PI*2);ctx.fill();
+      var top=[],bot=[];for(var k=0;k<=n;k++){var u=k/n,lim=1-aw,droop=lim*lim*u*u*26,wav=Math.sin(u*6-ph)*(1.5+aw*4.5)*u,xx=fx+wd*fl*u*(0.5+0.5*aw),yy=fy+droop+wav,hh=20*(1-u*0.4);top.push([xx,yy]);bot.push([xx,yy+hh]);}
+      ctx.beginPath();ctx.moveTo(top[0][0],top[0][1]);for(k=1;k<=n;k++)ctx.lineTo(top[k][0],top[k][1]);for(k=n;k>=0;k--)ctx.lineTo(bot[k][0],bot[k][1]);ctx.closePath();
+      var fg=ctx.createLinearGradient(fx,0,fx+wd*fl,0);fg.addColorStop(0,'#f97316');fg.addColorStop(0.5,'#fff');fg.addColorStop(1,'#ef4444');ctx.fillStyle=fg;ctx.fill();ctx.strokeStyle='rgba(124,45,18,0.5)';ctx.lineWidth=1;ctx.stroke();
+      // strength meter: arrow + 5 bars
+      var bars=Math.round(aw*5),bx0=fx-26,by0=fy+66;for(var bi=0;bi<5;bi++){ctx.fillStyle=bi<bars?(bars>=4?'#ef4444':bars>=2?'#f59e0b':'#22c55e'):'rgba(255,255,255,0.35)';ctx.fillRect(bx0+bi*11,by0+(4-bi)*2,8,6+bi*2-((4-bi)*0));}
+      ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=3;var lbl=bars===0?'calm':(wd<0?'\u2190 ':'')+(bars>=4?'strong':bars>=2?'windy':'breeze')+(wd>0?' \u2192':'');ctx.strokeText(lbl,fx,by0+30);ctx.fillText(lbl,fx,by0+30);}}
   var lc=isJapan?'rgba(255,255,255,0.8)':isNight?'rgba(200,255,200,0.7)':'rgba(255,255,255,0.75)';
   var pY2=GH-GRND;
   ctx.strokeStyle=lc;ctx.lineWidth=2;
