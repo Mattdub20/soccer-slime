@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.0.9';
+var GAME_VERSION='v26.1.0';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -344,7 +344,8 @@ var HP=mkPool(HARD),EP=mkPool(EASY),IP=mkPool(chaosBuff(IMPOSSIBLE));
 // AI personality (Player vs AI setup): Balanced = any strategy; Keeper = defensive ones (stays home, blocks);
 // Striker = attacking ones (high line, presses). Falls back to the full pool if a level has none of that kind.
 var AI_STYLES=[['balanced','Balanced','Mixes defending and attacking.'],['keeper','Keeper','Stays back and guards its goal.'],['striker','Striker','Pushes up and attacks all game.']];
-function aiStylePool(pool,style){var f=style==='keeper'?pool.filter(function(k){return ALL_S[k]&&ALL_S[k].def;}):style==='striker'?pool.filter(function(k){return ALL_S[k]&&!ALL_S[k].def&&ALL_S[k].hl>=0.55;}):pool;return f.length?f:pool;}
+var CHAOS_KEEPERS=['imp_wall','imp_anchor'];
+function aiStylePool(pool,style){var f=style==='keeper'?pool.filter(function(k){return ALL_S[k]&&(ALL_S[k].def||CHAOS_KEEPERS.indexOf(k)>=0);}):style==='striker'?pool.filter(function(k){return ALL_S[k]&&!ALL_S[k].def&&ALL_S[k].hl>=0.55;}):pool;return f.length?f:pool;}
 
 // ─── Impossible AI: Q-learning over strategies ───────────────────────────
 // state = ball side(3) x score situation(5) x time phase(4) x ball height(2)
@@ -6972,6 +6973,10 @@ function makePeerRoom(peer,role,code){
                   doJump=false;
                   if(ground&&best.h>48&&Math.abs(ai.x-best.x)<46&&best.t-best.tj<=1.5)doJump=true;
                   if(!ground&&!ai.hasDoubleJumped&&!ai.isSpinning&&best.h>SR+100&&ai.vy>-2&&best.t<=14&&Math.abs(ai.x-best.x)<50){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}
+                }else if(aiStyleRef.current==='keeper'&&!behind&&!onOurs){
+                  // Keeper style: never goes up the pitch. Waits a short way out from its goal, shading towards the ball,
+                  // and only comes out once the ball is on its side (the interception/clearing code above handles that).
+                  var homeK=(aiLeft?0:GW)-gsd*(GOALW+SR+70),shadeK=(b.x-homeK)*0.12;newT=Math.max(SR,Math.min(GW-SR,homeK+shadeK));spd2=runSpd;doJump=false;
                 }else if(!behind&&!ai.isSpinning&&!(onOurs&&incoming)){
                   // Shooting: find the first point on the ball's path we can reach, and meet it from behind so the hit
                   // flies at the far goal (more loft from long range, flatter and harder up close).
@@ -7007,7 +7012,7 @@ function makePeerRoom(peer,role,code){
                   newT=newT*0.35+home2*0.65;spd2=runSpd;
                 }
                 // Dashes, like Hard but timed off the predicted contact.
-                var tw=aiLeft?1:-1,dxB=(b.x-ai.x)*tw,dyB=ai.y-b.y,inAir=ai.y<GH-GRND-2,danger=onOurs&&incoming&&!best;
+                var tw=aiLeft?1:-1,dxB=(b.x-ai.x)*tw,dyB=ai.y-b.y,inAir=ai.y<GH-GRND-2,danger=(onOurs&&incoming&&!best)||(aiStyleRef.current==='keeper'&&!onOurs);
                 // Air spin dash: in the air with the ball just ahead on the attacking side -> tilt, then fire forward into it.
                 if(inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&dxB>8&&dxB<125&&dyB>-30&&dyB<115){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}
                 if(ai.spinPhase===1&&((dxB>-12&&dxB<70&&Math.abs(dyB)<85)||dxB>170||dxB<-40)){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}
