@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.1.4';
+var GAME_VERSION='v26.1.5';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -6258,7 +6258,7 @@ function makePeerRoom(peer,role,code){
       return[['online_cancel']];
     }
     if(screen==='duration'){var g=[['dur_up'],['dur_down']];if(pmRef.current==='single')g.push(['side_left','side_right','diff_bar']);else g.push(['side_left','side_right']);g.push(['score_none','score_3','score_5','score_10'],['overtime_yes','overtime_no']);if(pmRef.current==='single')g.push(['aistyle_balanced','aistyle_keeper','aistyle_striker']);g.push(['arena_normal','arena_moon','arena_ice','arena_wind']);if(pmRef.current==='single')g.push(['play']);g.push(['back']);return g;}
-    if(screen==='practice_select')return[['prac_regular','prac_air','prac_ground'],['training_open'],['side_left','side_right'],['back']];
+    if(screen==='practice_select')return[['prac_regular','prac_air','prac_ground'],['training_open'],['side_left','side_right'],['arena_normal','arena_moon','arena_ice','arena_wind'],['back']];
     if(screen==='training_select')return[['train_aim','train_jump'],['train_dash','train_save'],['side_left','side_right'],['back']];
     if(screen==='player_select')return[['p1_guest','p2_guest'],['continue','back']];
     if(screen==='guide')return[['back']];
@@ -6493,7 +6493,7 @@ function makePeerRoom(peer,role,code){
   },[tl]);
 
   function startGame(duration,mode,cols,nms,pside,pmode,pid1,pid2,options){
-    matchArenaRef.current=(mode==='single'||mode==='multi')&&arenaRef.current!=='normal'?arenaRef.current:null;
+    matchArenaRef.current=(mode==='single'||mode==='multi'||mode==='practice')&&arenaRef.current!=='normal'?arenaRef.current:null;
     dailyRunRef.current=null;setDailyResult(null);
     var prac=mode==='practice',c=cols||DC,n=nms||{left:'P1',right:'P2'},ps=pside||sideRef.current,pm2=pmode||practModeRef.current;
     jumpHeldRef.current={left:false,right:false};
@@ -6539,6 +6539,7 @@ function makePeerRoom(peer,role,code){
     try{window.localStorage.setItem('slime_tut_seen','1');}catch(e){}setTutPrompt(false);
     setPractMode('regular');practModeRef.current='regular';
     startGame(null,'practice',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);
+    matchArenaRef.current=null; // the tutorial is always on a normal pitch
     tutRef.current={step:0,count:0,l:0,r:0,cool:0,wasGround:true,spinArmed:false,flash:0};setTut({step:0,count:0,flash:false,done:false});
   }
   function tutAdvance(n){var T=tutRef.current;if(!T||T.flash>0||T.done)return;T.count+=n||1;var st=TUT_STEPS[T.step];
@@ -7548,6 +7549,9 @@ function makePeerRoom(peer,role,code){
             React.createElement('button',{disabled:true,title:'Coming soon',style:Object.assign(pill('linear-gradient(135deg,#64748b,#475569)',{fontSize:14,padding:'10px 24px'}),{opacity:0.6,cursor:'not-allowed',boxShadow:'none'},focusSty('training_open'))},'Training Challenges - Unavailable'),
             React.createElement('div',{style:{textAlign:'center'}},label('Your Side'),
             React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center'}},['left','right'].map(function(val){var id='side_'+val,isActive=side===val;return React.createElement('button',{key:val,onClick:function(){setSide(val);},style:Object.assign(pill(isActive?btnPrimary:btnSecondary,{padding:'9px 22px',fontSize:13}),focusSty(id))},val.charAt(0).toUpperCase()+val.slice(1));}))),
+            React.createElement('div',{style:{textAlign:'center'}},label('Arena'),
+            React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}},ARENAS.map(function(a){var id='arena_'+a[0],isActive=arena===a[0];return React.createElement('button',{key:a[0],onClick:function(){setArena(a[0]);},style:Object.assign(pill(isActive?btnPrimary:btnSecondary,{padding:'9px 18px',fontSize:13}),focusSty(id))},a[1]);})),
+            React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.7)',marginTop:6}},(ARENAS.filter(function(a){return a[0]===arena;})[0]||ARENAS[0])[2])),
       React.createElement('button',{onClick:function(){setScreen('menu');},style:ghostBtn('back')},'Back')
     )
   );
