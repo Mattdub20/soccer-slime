@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.4.3';
+var GAME_VERSION='v26.4.6';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -3518,7 +3518,7 @@ function rpSave(meta,frames,goals){
 }
 function rpExport(id){return rpGet(id).then(function(rec){if(!rec)throw new Error('missing');var u8=new Uint8Array(rec.data.buffer),bin='';for(var i=0;i<u8.length;i+=8192)bin+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));
   var blob=new Blob([JSON.stringify({soccerSlimeReplay:1,version:GAME_VERSION,meta:rec.meta,goals:rec.goals||[],data:btoa(bin)})],{type:'application/json'});
-  var a=document.createElement('a'),nm=String((rec.meta&&rec.meta.title)||'replay').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,40)||'replay';a.href=URL.createObjectURL(blob);a.download='soccer-slime-'+nm+'.json';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);});}
+  var a=document.createElement('a'),nm=String((rec.meta&&rec.meta.title)||'replay').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-').slice(0,40)||'replay';a.href=URL.createObjectURL(blob);var tAt=new Date((rec.meta&&rec.meta.at)||Date.now()),p2=function(v){return(v<10?'0':'')+v;};a.download='soccer-slime-'+nm+'-'+p2(tAt.getHours())+p2(tAt.getMinutes())+'.json';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);});}
 function rpImport(file){return file.text().then(function(txt){var o=JSON.parse(txt);if(!o||!o.soccerSlimeReplay||typeof o.data!=='string')throw new Error('not a replay');
   var bin=atob(o.data),u8=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);var frames=rpUnpack(new Float32Array(u8.buffer));
   var m=Object.assign({},o.meta||{});delete m.id;delete m.at;m.title=(m.title||'Replay')+' (imported)';return rpSave(m,frames,Array.isArray(o.goals)?o.goals:[]);});}
@@ -6382,30 +6382,37 @@ function makePeerRoom(peer,role,code){
     startGame('training','training',DC,{left:'YOU',right:'YOU'},sideRef.current,challenge,null,null);
   }
   function openTrainingSelect(){setFocusIdx(0);setScreen('training_select');}
+  // Training balls: placed, held still for a moment so you can get set, then released on a planned path.
+  //  aim    - popped up just in front of you; score past the keeper (10 shots)
+  //  juggle - dropped from above you; keep it up (one drop ends it)
+  //  dash   - rolled along the ground at you; hit it while dashing (10 balls)
+  //  save   - lobbed at your goal so it always drops into the goal mouth; get anything on it (10 shots)
   function launchTrainingBall(challenge,playerSide){
-    var player=playerSide==='right'?gsRef.current.right:gsRef.current.left,ground=GH-GRND,ball;
-    if(challenge==='aim'){
-      var shotDir=playerSide==='right'?-1:1;
-      ball={x:player.x+shotDir*110,y:ground-40-Math.random()*90,vx:shotDir*(3.8+Math.random()*1.8),vy:-1-Math.random()*2,spin:0};
-    }else{
-      var towardPlayer=playerSide==='right'?1:-1,distance,speed,vertical;
-      if(challenge==='juggle'){gsRef.current.ball={x:player.x+(Math.random()-0.5)*30,y:ground-300,vx:0,vy:0,spin:0};return;}
-      if(challenge==='save'){var tn=trainingAttemptRef.current.tries||0;distance=260+Math.random()*120;speed=5+tn*0.45+Math.random()*2.5;vertical=-3+Math.random()*4;}
-      else if(challenge==='dash'){distance=135+Math.random()*125;speed=3.5+Math.random()*4;vertical=-1+Math.random()*3;}
-      else{distance=100+Math.random()*135;speed=2.8+Math.random()*3.8;vertical=-4+Math.random()*6;}
-      var startX=Math.max(BR+2,Math.min(GW-BR-2,player.x-towardPlayer*distance));
-      ball={x:startX,y:ground-(challenge==='save'?75+Math.random()*145:45+Math.random()*150),vx:towardPlayer*speed,vy:vertical,spin:(Math.random()-0.5)*0.16};
+    var player=playerSide==='right'?gsRef.current.right:gsRef.current.left,ground=GH-GRND,shotDir=playerSide==='right'?-1:1,A=trainingAttemptRef.current,n=A.tries||0,x,y,vx=0,vy=0;
+    if(challenge==='aim'){x=player.x+shotDir*75;y=ground-BR-1;vx=shotDir*0.6;vy=-7.2;}
+    else if(challenge==='juggle'){x=player.x+(Math.random()-0.5)*20;y=ground-220;}
+    else if(challenge==='dash'){x=player.x+shotDir*(260+Math.random()*90);y=ground-BR-1;vx=-shotDir*(3+Math.random()*1.4+n*0.12);}
+    else{ // save: from the far side, aimed to come down inside the goal mouth
+      var og=playerSide==='right'?GW:0,toG=playerSide==='right'?1:-1,h0=70+Math.random()*70,hT=25+Math.random()*65;
+      x=og-toG*(420+Math.random()*80);y=ground-h0;vx=toG*(9+n*0.35+Math.random()*1.5);
+      // solve the launch: simulate the flight (same gravity, drag and ground bounce as the game) and binary-search the
+      // upward speed so the ball crosses the goal line at height hT - always inside the goal mouth
+      var flyH=function(v0){var px=x,py=y,pvx=vx,pvy=v0;for(var t=0;t<400;t++){pvy+=GRAV;pvx*=BDAMP;px+=pvx;py+=pvy;if(py>ground-BR)return -999;if((px-(og-toG*BR))*toG>=0)return ground-py;}return -999;}; // a bounce before the line = too low
+      var lo=-15,hi=2;for(var it=0;it<24;it++){var mid=(lo+hi)/2,hh=flyH(mid);if(hh>hT)lo=mid;else hi=mid;}vy=(lo+hi)/2;
     }
-    gsRef.current.ball=ball;
+    x=Math.max(BR+2,Math.min(GW-BR-2,x));
+    gsRef.current.ball={x:x,y:y,vx:0,vy:0,spin:0};
+    var now=performance.now();A.hold={until:now+(n===0?700:900),x:x,y:y,vx:vx,vy:vy};A.started=now+(n===0?700:900);A.resolved=false;A.lastTouch=0;
   }
+
   function completeTrainingAttempt(success){
     var attempt=trainingAttemptRef.current;
     if(attempt.resolved||pmRef.current!=='training')return;
     attempt.resolved=true;attempt.tries++;
     setTrainingTries(attempt.tries);
     if(success){trainingScoreRef.current++;setTrainingScore(trainingScoreRef.current);}
-    if((trainingChallengeRef.current==='dash'||trainingChallengeRef.current==='save')&&attempt.tries>=10){attempt.resetAt=0;finishTraining();return;}
-    attempt.resetAt=performance.now()+420;
+    if(trainingChallengeRef.current!=='juggle'&&attempt.tries>=10){attempt.resetAt=0;setTimeout(function(){finishTraining();},700);return;}
+    attempt.resetAt=performance.now()+1000;
   }
   function getNavGrid(){
     if(screen==='menu')return themeOpen?[['theme_day','theme_night','theme_japan']]:(function(g){return dailyDoneToday(dailyState)||[].concat.apply([],g).indexOf('daily_play')>=0?g:g.concat([['daily_play']]);})(menuGridRef.current||[['single','multi','practice'],['accounts','settings','online','guide','playerdata','social','shop'],['theme','time']]);
@@ -6585,7 +6592,7 @@ function makePeerRoom(peer,role,code){
   function finishTraining(){
     if(goRef.current)return;
     var challenge=trainingChallengeRef.current||'aim',score=trainingScoreRef.current;
-    var medals={aim:[2,4,6],juggle:[5,12,25],dash:[4,6,8],save:[4,6,8]}[challenge]||[2,4,6];
+    var medals={aim:[3,5,7],juggle:[5,12,25],dash:[4,6,8],save:[4,6,8]}[challenge]||[3,5,7];
     setTrainingResult({challenge:challenge,score:score,attempts:trainingAttemptRef.current.tries,medal:score>=medals[2]?'Gold':score>=medals[1]?'Silver':score>=medals[0]?'Bronze':'No medal'});
     triggerWin('training');
   }
@@ -6620,7 +6627,7 @@ function makePeerRoom(peer,role,code){
     if(practRef.current&&tutRef.current&&TUT_STEPS[tutRef.current.step]&&TUT_STEPS[tutRef.current.step].id==='goal'&&goalSide!==sideRef.current)tutAdvance();
     if(practRef.current){var pb=gsRef.current.ball,pst=statsRef.current;practGoalRef.current={kmh:Math.round(Math.sqrt(pb.vx*pb.vx+pb.vy*pb.vy)*KMH_PER_SPEED),m:Math.round(Math.abs((goalSide==='left'?0:GW)-(pst.shotStartX===undefined?GW/2:pst.shotStartX))*METRES_PER_UNIT),at:performance.now()};var hsd=sideRef.current,pclip=replayBufRef.current.map(function(f){var o={left:f.left,right:f.right,ball:f.ball};o[hsd==='left'?'right':'left']=Object.assign({},f[hsd==='left'?'right':'left'],{x:-999,y:-999});return o;});if(pclip.length>20){practClipRef.current={frames:pclip,goal:{f:pclip.length-1,side:goalSide==='left'?'right':'left',own:false},kmh:practGoalRef.current.kmh,m:practGoalRef.current.m};setPractClip('ready');}resetPosRef.current(false);return;}
     if(goRef.current)return;
-    if(pmRef.current==='training'&&trainingChallengeRef.current!=='aim'){completeTrainingAttempt(false);return;}
+    if(pmRef.current==='training'){var tgc=trainingChallengeRef.current;if(tgc==='aim')completeTrainingAttempt(goalSide!==sideRef.current);else if(tgc!=='juggle')completeTrainingAttempt(false);return;}
     var scoring=goalSide==='left'?'right':'left',st=statsRef.current;haptic(pmRef.current==='multi'||scoring===achievementSideRef.current?[40,60,90]:140);
     if(scoring==='left')st.lG++;else st.rG++;
     st.lBehind=Math.max(st.lBehind||0,st.rG-st.lG);st.rBehind=Math.max(st.rBehind||0,st.lG-st.rG);
@@ -6672,7 +6679,7 @@ function makePeerRoom(peer,role,code){
     jumpHeldRef.current={left:false,right:false};
     if(options&&typeof options.scoreLimit==='number'){setScoreLimit(options.scoreLimit);scoreLimitRef.current=options.scoreLimit;}
     if(options&&typeof options.overtime==='boolean'){setOvertimeEnabled(options.overtime);overtimeEnabledRef.current=options.overtime;}
-    trainingScoreRef.current=0;trainingAttemptRef.current={tries:0,resolved:false,resetAt:0,lastTouch:0,over:false};trainingKeeperCooldownRef.current=0;setTrainingScore(0);setTrainingTries(0);setTrainingResult(null);
+    trainingScoreRef.current=0;trainingAttemptRef.current={tries:0,resolved:false,resetAt:0,lastTouch:0,over:false,hold:null,started:0};trainingKeeperCooldownRef.current=0;setTrainingScore(0);setTrainingTries(0);setTrainingResult(null);
     achievementSideRef.current=mode==='online'?(onRoleRef.current==='host'?'left':'right'):ps;
     if(mode==='multi'){
       var linkedId=linkedLocalPlayerId();
@@ -6694,13 +6701,13 @@ function makePeerRoom(peer,role,code){
     matchRecRef.current=[];matchGoalsRef.current=[];setFullSaved('');practClipRef.current=null;setPractClip('');matchRecActiveRef.current=!prac&&mode!=='online'&&mode!=='training';particlesRef.current=[];ballTrailRef.current=[];practModeRef.current=pm2;
     qHistRef.current=[];qGoalsRef.current=0;humanBufRef.current=[];shakeRef.current=0;aiAlertRef.current=0;
     var pool=aiStylePool((diffRef.current==='easy'||diffRef.current==='supereasy')?EP:diffRef.current==='impossible'?(CHAOS_AS_HARD?HXP:IP):HP,aiStyleRef.current);stratRef.current=pool[Math.floor(Math.random()*pool.length)];stratTimRef.current=150+Math.floor(Math.random()*200);
-    if(mode==='training')tlRef.current=trainingChallengeRef.current==='aim'?45:-1;else if(!prac)tlRef.current=matchDurationSeconds(duration);else tlRef.current=0;
+    if(mode==='training')tlRef.current=-1;else if(!prac)tlRef.current=matchDurationSeconds(duration);else tlRef.current=0;
     lastGM.current=duration;lastPM.current=mode;lastCol.current=c;lastNm.current=n;lastSide.current=ps;
     lastGameOptionsRef.current={scoreLimit:scoreLimitRef.current,overtime:overtimeEnabledRef.current,skins:Object.assign({},multiSkinsRef.current)};
     setColors(c);setNames(n);setSc({left:0,right:0});setWinner(null);setLCD(0);setRCD(0);setEndStats(null);bucksDoneRef.current=false;setBucksResult(null);setXpResult(null);xpDoneRef.current=false;
     setOt(false);setGoalFlash(false);setReplayActive(false);setMatchFrames([]);setShowMatchReplay(false);
     setPaused(false);setIsPractice(prac);setGmode(mode);setActiveSide(ps);
-    if(mode==='training')setTl(trainingChallengeRef.current==='aim'?45:-1);else if(!prac)setTl(matchDurationSeconds(duration));else setTl(0);
+    if(mode==='training')setTl(-1);else if(!prac)setTl(matchDurationSeconds(duration));else setTl(0);
     if(mode==='training'){launchTrainingBall(trainingChallengeRef.current,ps);}
     else if(prac&&pm2==='ground'){gsRef.current.ball={x:GW/2,y:GH-GRND-BR-1,vx:0,vy:0};}
     else if(prac&&pm2==='air'){var airVx=ps==='right'?5:-5;gsRef.current.ball={x:ps==='right'?GW/2-100:GW/2+100,y:GH-GRND-160,vx:airVx,vy:-9};}
@@ -6948,18 +6955,18 @@ function makePeerRoom(peer,role,code){
             dash:function(sl,isL){if(mode==='multi'||(isL?'left':'right')===achievementSideRef.current)haptic(15);fx0=fxP.length;emitDash(fxP,sl.x,sl.y,sl.dashDir,isL?cols.left.body:cols.right.body,mode==='single'&&((hSide==='right'&&isL)||(hSide==='left'&&!isL)));skinFx(fxP,fx0,fxSkins[isL?'left':'right']);},
             pose:function(sl,isL){sl._poseT=(sl._poseT||0)+1;poseStep(sl,fxCos[winRef.current].pose,sl._poseT,isL?1:-1);},
             land:function(sl,isL){fx0=fxP.length;emitLand(fxP,sl.x,GH-GRND,sl.vy);skinFx(fxP,fx0,fxSkins[isL?'left':'right']);},
-            goal:function(side){scoreGoalRef.current(side);},
+            goal:function(side,camp){if(camp&&mode==='training')return;scoreGoalRef.current(side);},
             spin:function(sl,isL){fx0=fxP.length;emitSpin(fxP,sl.x,sl.y,isL?cols.left.body:cols.right.body);skinFx(fxP,fx0,fxSkins[isL?'left':'right']);},
             sonic:function(b,dx,dy,dd){for(var sti=0;sti<3;sti++)particlesRef.current.push(mkP(b.x-dx/dd*sti*14,b.y-dy/dd*sti*14,(Math.random()-0.5),(Math.random()-0.5),'rgba(224,242,254,0.85)',14,3));},
             trail:function(b,bspd){if(bspd>2.5){var trailStyle=lastTouchRef.current?fxCos[lastTouchRef.current].trail:'none';ballTrailRef.current.push({x:b.x,y:b.y,life:1.0,r:BR*(PERF_LOW?0.55:1)*(0.3+bspd/MAXBS*0.55)*(trailStyle==='none'?1:1.15),c:trailColor(trailStyle,thJ(tm),now)});}var bt=ballTrailRef.current;for(var bti=bt.length-1;bti>=0;bti--){bt[bti].life-=BALL_TRAIL_DECAY;if(bt[bti].life<=0)bt.splice(bti,1);}},
             wall:function(x,y,spd){emitWall(particlesRef.current,x,y,spd);},
             bounce:function(x,y,vy){emitBounce(particlesRef.current,x,y,vy);},
-            ground:function(){if(mode==='training'&&trainingChallengeRef.current==='juggle'){if(!trainingAttemptRef.current.over){trainingAttemptRef.current.over=true;finishTraining();}}else if(mode==='training'&&trainingChallengeRef.current!=='aim')completeTrainingAttempt(false);if(otRef.current&&!otReadyRef.current&&!goalFlashRef.current&&!frozenRef.current){otReadyRef.current=true;setOtLive(true);var curL=statsRef.current.lG,curR=statsRef.current.rG;if(curL!==curR){triggerWin(curL>curR?'left':'right');}else{resetPosRef.current(pmRef.current!=='online');if(pmRef.current==='multi'||pmRef.current==='online'||pmRef.current==='single')startReady(true);}}},
+            ground:function(){if(mode==='training'&&trainingChallengeRef.current==='juggle'){if(!trainingAttemptRef.current.over){trainingAttemptRef.current.over=true;finishTraining();}}if(otRef.current&&!otReadyRef.current&&!goalFlashRef.current&&!frozenRef.current){otReadyRef.current=true;setOtLive(true);var curL=statsRef.current.lG,curR=statsRef.current.rG;if(curL!==curR){triggerWin(curL>curR?'left':'right');}else{resetPosRef.current(pmRef.current!=='online');if(pmRef.current==='multi'||pmRef.current==='online'||pmRef.current==='single')startReady(true);}}},
             hit:function(csl,isLeftSlime,incomingVx,bx){
               var trainingHit=mode==='training',trainingPlayer=csl===(hSide==='right'?rs:ls);
               if(trainingHit&&trainingPlayer&&trainingChallengeRef.current==='juggle'){if(trainingAttemptRef.current.over)return;var jn=performance.now();if(jn-(trainingAttemptRef.current.lastTouch||0)>180){trainingAttemptRef.current.lastTouch=jn;trainingScoreRef.current++;setTrainingScore(trainingScoreRef.current);}}
               else if(trainingHit&&trainingPlayer&&trainingChallengeRef.current!=='aim'){
-                var challenge=trainingChallengeRef.current,actionScore=challenge==='jump'&&csl.y<GH-GRND-1||challenge==='dash'&&(csl.dashFrames>0||csl.isSpinning)||challenge==='save'&&(hSide==='right'?incomingVx>0:incomingVx<0);
+                var challenge=trainingChallengeRef.current,actionScore=challenge==='dash'?(csl.dashFrames>0||csl.isSpinning):challenge==='save';if(trainingAttemptRef.current.hold)return;
                 completeTrainingAttempt(actionScore);
               }
               var nearGoal=isLeftSlime?bx<GW*0.35:bx>GW*0.65;
@@ -6968,11 +6975,15 @@ function makePeerRoom(peer,role,code){
             },
             kick:function(csl,isLk,b){lastTouchRef.current=isLk?'left':'right';fx0=fxP.length;emitKick(fxP,b.x,b.y,b.vx,b.vy,isLk?colRef.current.left.body:colRef.current.right.body);skinFx(fxP,fx0,fxSkins[isLk?'left':'right']);if(soundEnabledRef.current&&performance.now()-lastSoundAtRef.current>100){playGameSound('kick');lastSoundAtRef.current=performance.now();}statsRef.current.shotStartX=b.x;statsRef.current.fastestShot=Math.max(statsRef.current.fastestShot,Math.sqrt(b.vx*b.vx+b.vy*b.vy));}
           };
-          if(mode==='training'&&trainingChallengeRef.current!=='aim'&&trainingAttemptRef.current.resetAt&&now>=trainingAttemptRef.current.resetAt){
-            launchTrainingBall(trainingChallengeRef.current,hSide);
-            trainingAttemptRef.current.resolved=false;
-            trainingAttemptRef.current.resetAt=0;
-          }
+          if(mode==='training'){var TA=trainingAttemptRef.current,tch=trainingChallengeRef.current;
+            if(TA.resetAt&&now>=TA.resetAt){TA.resetAt=0;launchTrainingBall(tch,hSide);}
+            if(TA.hold){if(now<TA.hold.until){ball.x=TA.hold.x;ball.y=TA.hold.y;ball.vx=0;ball.vy=-GRAV;ball.spin=0;}else{ball.vx=TA.hold.vx;ball.vy=TA.hold.vy;TA.hold=null;}}
+            else if(!TA.resolved&&!TA.resetAt&&tch!=='juggle'){
+              var tpl=hSide==='right'?rs:ls,tdir=hSide==='right'?-1:1,tage=now-TA.started;
+              if(tch==='dash'&&((ball.x-tpl.x)*tdir<-SR-30||tage>6000))completeTrainingAttempt(false);       // rolled past you / never reached
+              else if(tch==='aim'&&tage>4500)completeTrainingAttempt(false);                                    // no goal in time
+              else if(tch==='save'&&tage>5500)completeTrainingAttempt(true);                                    // it never went in
+            }}
           if(!gameOver){
             var liveStats=statsRef.current,ballSpeed=Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy);
             liveStats.rallyFrames++;liveStats.fastestShot=Math.max(liveStats.fastestShot||0,ballSpeed);
@@ -7243,7 +7254,10 @@ function makePeerRoom(peer,role,code){
               if(airP&&!aiC.hasDoubleJumped&&!aiC.isSpinning&&aiC.vy>-2&&fC>20&&fC<130&&dyP>90&&dyP<175&&ball.vx*twC<3&&ball.vy>-3){aiC.vy=JUMP*0.85;aiC.hasDoubleJumped=true;}
               if(!aiDJ0&&aiC.hasDoubleJumped&&aiC.y<GH-GRND-2){var dyDJ=aiC.y-ball.y,useless=gap>170||dyDJ<30||dyDJ>230||(ball.vy<-4&&dyDJ>120)||(Math.abs(ball.vx)>8&&ball.vx*(aiC.x-ball.x)<0&&gap>90);
                 if(useless){aiC.hasDoubleJumped=false;aiC.vy=aiVy0;}}
-              if(toOwn&&grC&&aiC.vy<0&&hC<SR*2&&ball.vy>-2&&gap<240)aiC.vy=0;
+              var peakC=hC+(ball.vy<0?ball.vy*ball.vy/(2*GRAV):0);
+              if(toOwn&&grC&&aiC.vy<0&&peakC<SR*2.2&&gap<260)aiC.vy=0;                                   // low/bouncing ball at its goal: block it standing, don't jump over it
+              // right behind a low ball rolling at its own goal: don't run into it (that pokes it in) - pace it instead
+              if(toOwn&&behindC&&peakC<SR*2.2&&gap<SR+BR+45&&!aiC.isSpinning){var capV=Math.abs(ball.vx)*0.75;if(aiC.vx*(-twC)>capV)aiC.vx=-twC*capV;if(aiC.groundDash&&aiC.dashDir===-twC){aiC.dashFrames=0;aiC.groundDash=false;}}
               // Recovery (from replays): when the ball is running at its own goal and Chaos is upfield of it, dash back.
               // It never cancels a jump here, so it can still leap to block a ball dropping into the goal. The only thing it
               // avoids is dashing straight into a low ball from right behind (that pokes it in).
@@ -7781,7 +7795,7 @@ function makePeerRoom(peer,role,code){
 
   if(screen==='training_select'){
     var trainingOptions=[
-      {id:'train_aim',title:'\uD83C\uDFAF Sharpshooter',detail:'45 seconds. Score past a keeper who jumps to block. Aim low, high, or bank it off the wall.',medal:'2 / 4 / 6 goals',color:'linear-gradient(135deg,#0ea5e9,#0369a1)',key:'1'},
+      {id:'train_aim',title:'\uD83C\uDFAF Sharpshooter',detail:'10 shots. The ball pops up in front of you; score past a keeper who jumps to block.',medal:'3 / 5 / 7 goals',color:'linear-gradient(135deg,#0ea5e9,#0369a1)',key:'1'},
       {id:'train_juggle',title:'\uD83E\uDD39 Juggle',detail:'The ball drops on you. Keep it up with your head, jumps and dashes. One drop and it\u2019s over.',medal:'5 / 12 / 25 touches',color:'linear-gradient(135deg,#8b5cf6,#6d28d9)',key:'2'},
       {id:'train_dash',title:'\uD83D\uDCA8 Dash Drill',detail:'10 balls. Only hits made while dashing or air-spinning count.',medal:'4 / 6 / 8 dash hits',color:'linear-gradient(135deg,#f97316,#c2410c)',key:'3'},
       {id:'train_save',title:'\uD83E\uDDE4 Goalkeeper',detail:'10 shots at your goal, getting faster. Get any part of you on it to save it.',medal:'4 / 6 / 8 saves',color:'linear-gradient(135deg,#10b981,#047857)',key:'4'}
@@ -8027,7 +8041,7 @@ function makePeerRoom(peer,role,code){
                     ?React.createElement(React.Fragment,null,
                       React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:4,fontWeight:800}},'Training complete'),
                       React.createElement('h2',{style:{fontFamily:DISP,fontSize:28,fontWeight:700,color:'#ffffff',margin:0,textShadow:'0 0 20px '+accentColor}},trainingResult.medal==='No medal'?'Keep practicing!':trainingResult.medal+' medal'),
-                      React.createElement('div',{style:{fontSize:13,color:'#fde68a',fontWeight:900,marginTop:5}},({aim:'Sharpshooter',juggle:'Juggle',dash:'Dash Drill',save:'Goalkeeper'}[trainingResult.challenge]||'Training')+' · '+trainingResult.score+' '+(trainingResult.challenge==='aim'?(trainingResult.score===1?'goal':'goals'):trainingResult.challenge==='save'?(trainingResult.score===1?'save':'saves'):trainingResult.challenge==='juggle'?(trainingResult.score===1?'touch':'touches'):(trainingResult.score===1?'dash hit':'dash hits'))+(trainingResult.challenge==='dash'||trainingResult.challenge==='save'?' / 10':'')))
+                      React.createElement('div',{style:{fontSize:13,color:'#fde68a',fontWeight:900,marginTop:5}},({aim:'Sharpshooter',juggle:'Juggle',dash:'Dash Drill',save:'Goalkeeper'}[trainingResult.challenge]||'Training')+' · '+trainingResult.score+' '+(trainingResult.challenge==='aim'?(trainingResult.score===1?'goal':'goals'):trainingResult.challenge==='save'?(trainingResult.score===1?'save':'saves'):trainingResult.challenge==='juggle'?(trainingResult.score===1?'touch':'touches'):(trainingResult.score===1?'dash hit':'dash hits'))+(trainingResult.challenge!=='juggle'?' / 10':'')))
                     :React.createElement(React.Fragment,null,
                       React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.55)',letterSpacing:'0.16em',textTransform:'uppercase',marginBottom:4,fontWeight:800}},winner==='draw'?'Match tied':'Winner'),
                       React.createElement('h2',{style:{fontFamily:DISP,fontSize:28,fontWeight:700,color:'#ffffff',margin:0,textShadow:'0 0 20px '+accentColor}},winner==='draw'?'Draw!':(function(wn){return wn==='YOU'?'You Win!':wn+' Wins!';})(winner==='left'?(gmode==='single'&&activeSide==='right'?'AI':names.left):(gmode==='single'&&activeSide==='left'?'AI':names.right))),endStats.combusted&&React.createElement('div',{style:{marginTop:8,padding:'8px 10px',borderRadius:12,background:'rgba(249,115,22,0.15)',border:'1px solid rgba(251,146,60,0.55)',fontSize:13,fontWeight:800,color:'#fed7aa',lineHeight:1.35}},'🔥 '+(function(side){var nm=side==='left'?(gmode==='single'&&activeSide==='right'?'The AI':names.left):(gmode==='single'&&activeSide==='left'?'The AI':names.right);return (nm==='YOU'?'You':nm)+' spontaneously combusted and forfeited the match!';})(endStats.combusted)))),
@@ -8163,7 +8177,7 @@ function makePeerRoom(peer,role,code){
             rRight&&React.createElement('span',null,keys([keyLabel(gameSettings.keybinds.p2.left),keyLabel(gameSettings.keybinds.p2.right)]),'move ',keys([keyLabel(gameSettings.keybinds.p2.jump)]),'jump ',keys([keyLabel(gameSettings.keybinds.p2.dash)]),'dash')),
           isOnG&&React.createElement('div',{style:{opacity:0.85}},(onRoleRef.current==='host'?'You are the blue slime':'You are the red slime')+' · arrow keys work too · 1–5 stickers'),
           AI_LEARNING&&isImpG&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(239,68,68,0.2)',border:'1px solid rgba(248,113,113,0.45)',color:'#fecaca',fontWeight:800,fontSize:11,letterSpacing:'0.06em',textTransform:'uppercase'}},'Chaos AI · has studied '+memCount+' of your goals'),
-          gmode==='training'&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(245,158,11,0.2)',border:'1px solid rgba(252,211,77,0.35)',color:'#fde68a',fontWeight:800,fontSize:11}},(function(c){return c==='aim'?'Sharpshooter · '+trainingScore+(trainingScore===1?' goal':' goals')+' · '+fmt(tl)+' left':c==='juggle'?'Juggle · '+trainingScore+(trainingScore===1?' touch':' touches')+' · don\u2019t let it drop!':c==='dash'?'Dash Drill · '+trainingScore+' dash '+(trainingScore===1?'hit':'hits')+' · ball '+Math.min(10,trainingTries+1)+'/10':'Goalkeeper · '+trainingScore+(trainingScore===1?' save':' saves')+' · shot '+Math.min(10,trainingTries+1)+'/10';})(trainingChallengeRef.current))),
+          gmode==='training'&&React.createElement('div',{style:{marginTop:2,padding:'4px 12px',borderRadius:50,background:'rgba(245,158,11,0.2)',border:'1px solid rgba(252,211,77,0.35)',color:'#fde68a',fontWeight:800,fontSize:11}},(function(c){return c==='aim'?'Sharpshooter · '+trainingScore+(trainingScore===1?' goal':' goals')+' · shot '+Math.min(10,trainingTries+1)+'/10':c==='juggle'?'Juggle · '+trainingScore+(trainingScore===1?' touch':' touches')+' · don\u2019t let it drop!':c==='dash'?'Dash Drill · '+trainingScore+' dash '+(trainingScore===1?'hit':'hits')+' · ball '+Math.min(10,trainingTries+1)+'/10':'Goalkeeper · '+trainingScore+(trainingScore===1?' save':' saves')+' · shot '+Math.min(10,trainingTries+1)+'/10';})(trainingChallengeRef.current))),
         isOnG&&React.createElement('div',{style:{position:'absolute',zIndex:2,left:(boxW+chatGap)*fit,top:0,bottom:0,width:chatW*fit,boxSizing:'border-box',display:'flex',flexDirection:'column',padding:12,borderRadius:16,background:'rgba(5,12,35,0.9)',border:'1px solid rgba(255,255,255,0.18)',boxShadow:'0 18px 50px rgba(0,0,0,0.42)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}},
         React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
           React.createElement('span',{style:{fontFamily:DISP,fontSize:18,letterSpacing:'0.04em'}},'Match Chat'),
