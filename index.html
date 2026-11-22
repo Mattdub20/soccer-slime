@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.5.0';
+var GAME_VERSION='v26.5.2';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -7252,8 +7252,9 @@ function makePeerRoom(peer,role,code){
               var dyP=aiC.y-ball.y,airP=aiC.y<GH-GRND-30;
               if(airP&&aiC.spinPhase===0&&!aiC.isSpinning&&aiC.dashCooldown===0&&fC>45&&fC<175&&dyP>-25&&dyP<85&&!toOwn){aiC.isSpinning=true;aiC.spinAngle=0;aiC.spinTarget=twC>0?-(3*Math.PI/4):(3*Math.PI/4);aiC.dashFrames=0;aiC.spinPhase=1;aiC.spinDipY=0;aiC._psT=0;}
               if(aiC.spinPhase===1){aiC._psT=(aiC._psT||0)+1;
-                var sweet=fC>34&&fC<72&&dyP>-12&&dyP<28&&Math.abs(aiC.spinAngle||0)>=0.7&&aiC.vy>-4,lost=fC<8||fC>190||aiC._psT>24||(toOwn&&behindC);
-                if(sweet||lost){aiC.isSpinning=true;aiC.spinTarget=0;aiC.dashFrames=DASH_F;aiC.dashDir=(toOwn&&behindC&&!sweet)?-twC:twC;if(!unlimRef.current)aiC.dashCooldown=CD_F;aiC.spinPhase=0;aiC.spinDipY=0;}}
+                var fN=fC+(ball.vx-aiC.vx)*twC,dyN=dyP+(aiC.vy-ball.vy),sweet=fN>36&&fN<66&&dyN>-8&&dyN<24&&Math.abs(aiC.spinAngle||0)>=0.7&&aiC.vy>-4,lost=fC<8||fC>190||aiC._psT>24||(toOwn&&behindC);
+                if(lost&&!sweet&&!(toOwn&&behindC)&&(fC<8||fC>190||dyN<-30||dyN>70)){aiC.isSpinning=true;aiC.spinTarget=0;aiC.spinPhase=0;aiC.spinDipY=0;}
+                else if(sweet||lost){aiC.isSpinning=true;aiC.spinTarget=0;aiC.dashFrames=DASH_F;aiC.dashDir=(toOwn&&behindC&&!sweet)?-twC:twC;if(!unlimRef.current)aiC.dashCooldown=CD_F;aiC.spinPhase=0;aiC.spinDipY=0;}}
               // get up to it: a second jump near the top of the first when the ball is ahead and still above
               if(airP&&!aiC.hasDoubleJumped&&!aiC.isSpinning&&aiC.vy>-2&&fC>20&&fC<130&&dyP>90&&dyP<175&&ball.vx*twC<3&&ball.vy>-3){aiC.vy=JUMP*0.85;aiC.hasDoubleJumped=true;}
               if(!aiDJ0&&aiC.hasDoubleJumped&&aiC.y<GH-GRND-2){var dyDJ=aiC.y-ball.y,useless=gap>170||dyDJ<30||dyDJ>230||(ball.vy<-4&&dyDJ>120)||(Math.abs(ball.vx)>8&&ball.vx*(aiC.x-ball.x)<0&&gap>90);
@@ -7261,11 +7262,11 @@ function makePeerRoom(peer,role,code){
               var peakC=hC+(ball.vy<0?ball.vy*ball.vy/(2*GRAV):0);
               if(toOwn&&grC&&aiC.vy<0&&peakC<SR*2.2&&gap<260)aiC.vy=0;                                   // low/bouncing ball at its goal: block it standing, don't jump over it
               // right behind a low ball rolling at its own goal: don't run into it (that pokes it in) - pace it instead
-              if(toOwn&&behindC&&peakC<SR*2.2&&gap<SR+BR+190&&!aiC.isSpinning){var capV=Math.abs(ball.vx)*0.75;if(gap<SR+BR+45&&aiC.vx*(-twC)>capV)aiC.vx=-twC*capV;if(aiC.groundDash&&aiC.dashDir===-twC){aiC.dashFrames=0;aiC.groundDash=false;}}
+              if(toOwn&&behindC&&peakC<SR*2.2&&gap<SR+BR+190&&!aiC.isSpinning){var capV=Math.abs(ball.vx)*0.75;if(aiC.groundDash&&aiC.dashDir===-twC&&(aiC._recD?gap<SR+BR+8:(aiC.dashFrames===DASH_F||gap<SR+BR+45))){aiC.dashFrames=0;aiC.groundDash=false;aiC._recD=false;}if(gap<SR+BR+45&&!(aiC.groundDash&&aiC._recD)&&aiC.vx*(-twC)>capV)aiC.vx=-twC*capV;}if(!aiC.groundDash)aiC._recD=false;
               // Recovery (from replays): when the ball is running at its own goal and Chaos is upfield of it, dash back.
               // It never cancels a jump here, so it can still leap to block a ball dropping into the goal. The only thing it
               // avoids is dashing straight into a low ball from right behind (that pokes it in).
-              if(toOwn&&behindC&&goalD<520&&grC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&(hC>SR*1.6||gap>SR+BR+190)){aiC.dashFrames=DASH_F;aiC.dashDir=-twC;aiC.groundDash=true;}
+              if(toOwn&&behindC&&goalD<520&&grC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&(hC>SR*1.6||gap>SR+BR+110)){aiC.dashFrames=DASH_F;aiC.dashDir=-twC;aiC.groundDash=true;aiC._recD=true;}
               if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&hC<SR*0.85&&fC>12&&fC<115&&ball.vy>-3){aiC.dashFrames=DASH_F;aiC.dashDir=twC;aiC.groundDash=true;}}
             var pinAi=hSide==='right'?ls:rs,pinHum=hSide==='right'?rs:ls,pinLeft=hSide==='right',PIN={supereasy:0.12,easy:0.15,medium:0.2,hard:0.25,impossible:0.3}[diffRef.current]||0.25;
             var pdx=pinHum.x-pinAi.x,pdy=pinHum.y-pinAi.y,inBox=pinLeft?pinAi.x<GOALW+6:pinAi.x>GW-GOALW-6,pinned=inBox&&(pinLeft?pdx>0:pdx<0)&&Math.abs(pdx)<SR*2+8&&Math.abs(pdy)<SR*4;
