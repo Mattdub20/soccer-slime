@@ -10,7 +10,7 @@ body{font-synthesis:none;letter-spacing:.01em;margin:0;background:#07122b;color:
 button{font-family:inherit}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .screen-in{animation:screenIn .28s ease-out both}
-.rise{animation:rise .42s cubic-bezier(.2,.8,.2,1) both}
+.rise{animation:rise .42s cubic-bezier(.2,.8,.2,1) backwards}
 @keyframes screenIn{from{opacity:0}to{opacity:1}}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes introTitle{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -60,6 +60,8 @@ input,textarea,[contenteditable=true],input *,textarea *{-webkit-user-select:tex
 canvas,img{-webkit-user-drag:none}
 .touch-controls,.rotate-hint{display:none}.rot-view .rotate-hint{display:none!important}
 @media (pointer:coarse){
+  [data-results-card]>*{break-inside:avoid}
+  :root{padding-top:0!important;padding-bottom:0!important}
   .touch-controls{display:flex}
   .kbd-hints{display:none!important}
   /* comfortable finger-sized targets */
@@ -134,6 +136,8 @@ var REAL_VW=(function(){function g(n){var d=Object.getOwnPropertyDescriptor(wind
 function realInsets(){try{var d=document.createElement('div');d.style.cssText='position:fixed;visibility:hidden;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';document.body.appendChild(d);var c=getComputedStyle(d),o={t:parseFloat(c.paddingTop)||0,r:parseFloat(c.paddingRight)||0,b:parseFloat(c.paddingBottom)||0,l:parseFloat(c.paddingLeft)||0};d.remove();return o;}catch(e){return{t:0,r:0,b:0,l:0};}}
 // In the turned match the game's left edge is the phone's top (status bar), its right edge the phone's bottom (home bar).
 function rotEdge(){var i=realInsets();return{l:Math.max(i.t,44),r:i.b,t:i.r,b:i.l};}
+// Sideways phone: the pitch sits at the top and the touch buttons get their own strip below it, so they never cover play.
+var TOUCH_BAND=true;function TOUCH_BAND_H(){return TOUCH_BAND&&IS_PHONE?104:0;}
 function setRotView(on){if(ROT_VIEW===on)return;ROT_VIEW=on;try{document.body.classList.toggle('rot-view',on);}catch(e){}try{window.dispatchEvent(new Event('resize'));}catch(e){}}
 var GAME_VERSION='v26.6.4';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
@@ -6292,7 +6296,7 @@ function makePeerRoom(peer,role,code){
   useEffect(function(){function calc(){var online=pmRef.current==='online',availableWidth=online?VW+8+18+300:VW+8,minFit=online?0.25:0.4,f=touchUI
   // Touch: no keyboard-hint strip to make room for. Sideways = fill the height (thumb controls overlay the corners,
   // corner buttons sit in the side gutter); upright = fill the width.
-  ?(window.innerWidth>window.innerHeight?Math.max(minFit,Math.min((window.innerWidth-2*(safeSide()+12+46*touchZoom()))/availableWidth,(window.innerHeight-8)/(GH+50))):Math.max(minFit,(window.innerWidth-12)/availableWidth))
+  ?(window.innerWidth>window.innerHeight?Math.max(minFit,Math.min((window.innerWidth-2*(safeSide()+12+46*touchZoom()))/availableWidth,(window.innerHeight-8-(TOUCH_BAND_H()))/(GH+50))):Math.max(minFit,(window.innerWidth-12)/availableWidth))
   :Math.max(minFit,Math.min(2.4,(window.innerWidth-32)/availableWidth,(window.innerHeight-48)/(GH+50+110))),d=window.devicePixelRatio||1,z=(IS_PHONE?1:touchUI?Math.max(0.9,Math.min(1.2,window.innerWidth/400,window.innerHeight/420)):Math.max(0.7,Math.min(6,window.innerWidth/900,window.innerHeight/720)))*gameSettings.uiScale;if(IS_PHONE)z=1;z=Math.round(z*100)/100;setFit(f);setRs(PERF_LOW?Math.min(1.25,Math.max(1,Math.ceil(f*d*0.6*4)/4)):Math.min(3,Math.max(1,Math.ceil(f*d*4)/4)));/* performance mode: draw the match at ~60% sharpness (far fewer pixels each frame) */setUiZ(z);setUiK(Math.min(PERF_LOW?2:4,Math.max(1,Math.ceil(z*d),Math.ceil(d))));}calc();window.addEventListener('resize',calc);return function(){window.removeEventListener('resize',calc);};},[gmode,gameSettings.uiScale,touchUI,gameSettings.perfMode]);
   useEffect(function(){try{var qs=window.localStorage.getItem('slime_qtv3');if(qs)qTableRef.current=JSON.parse(qs)||{};}catch(e){}hPatternsRef.current=hpLoad();},[]);
 
@@ -7464,7 +7468,7 @@ function makePeerRoom(peer,role,code){
   // Screens that are locked to the window on desktop scroll on touch screens instead, so nothing gets cut off
   // (e.g. a phone held sideways). 'safe center' keeps content centred unless it is taller than the screen.
   function lockedScreen(extra){return touchUI?Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:0,overflowY:'auto',overflowX:'hidden',justifyContent:'safe center',WebkitOverflowScrolling:'touch'}):Object.assign({},baseStyle,{position:'fixed',inset:0,height:'100dvh',minHeight:'100dvh',overflow:'hidden'},extra);}
-  var baseStyle={position:'relative',minHeight:'100%',width:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflowX:'hidden',color:'#ffffff',boxSizing:'border-box',background:bgGrad,fontFamily:'var(--font-body)',padding:'20px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px))'};
+  var baseStyle={position:'relative',minHeight:'100%',width:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',overflowX:'hidden',color:'#ffffff',boxSizing:'border-box',background:bgGrad,fontFamily:'var(--font-body)',padding:IS_PHONE?'calc(env(safe-area-inset-top, 0px) + 6px) max(10px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 10px) max(10px, env(safe-area-inset-left, 0px))':'20px max(16px, env(safe-area-inset-right, 0px)) 20px max(16px, env(safe-area-inset-left, 0px))'};
   var wrapStyle={zoom:uiZ,position:'relative',zIndex:1,display:'flex',flexDirection:'column',alignItems:'center',maxWidth:(100/(uiZ||1))+'%'};
   function bgLayer(){return React.createElement(React.Fragment,null,React.createElement(ThemeBg,{theme:themeMode}),zoomNotice);}
 
@@ -7969,12 +7973,12 @@ function makePeerRoom(peer,role,code){
           var lenTxt=pendDur==='custom'?customMinuteValue(customMinutes,10)+' min':pendDur.replace('min',' min');
           // left: a live look at the match you're about to play, with a summary of the settings and the Play button
           var left=React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:14,minWidth:0}},
-            React.createElement('div',{style:{position:'relative',borderRadius:20,overflow:'hidden',border:'2px solid '+(isS?dcS+'99':'rgba(255,255,255,0.15)'),boxShadow:'0 10px 30px rgba(0,0,0,0.4)',height:narrowS?200:290}},
-              React.createElement(SlimePreviewCanvas,{type:isS?'single':'multi',k:uiK,theme:themeMode,hot:false,h:narrowS?200:290,w:narrowS?Math.min(520,window.innerWidth-80):440,label:' ',sub:' ',noTitle:true}),
+            React.createElement('div',{style:{position:'relative',borderRadius:20,overflow:'hidden',border:'2px solid '+(isS?dcS+'99':'rgba(255,255,255,0.15)'),boxShadow:'0 10px 30px rgba(0,0,0,0.4)',height:IS_PHONE?120:narrowS?200:290}},
+              React.createElement(SlimePreviewCanvas,{type:isS?'single':'multi',k:uiK,theme:themeMode,hot:false,h:IS_PHONE?120:narrowS?200:290,w:IS_PHONE?window.innerWidth-24:narrowS?Math.min(520,window.innerWidth-80):440,label:' ',sub:' ',noTitle:true}),
               React.createElement('div',{style:{position:'absolute',left:0,right:0,top:0,display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 14px',gap:8,flexWrap:'wrap'}},
                 React.createElement('span',{style:{fontFamily:'var(--font-display)',fontSize:20,WebkitTextStroke:'4px rgba(4,10,34,0.9)',paintOrder:'stroke fill'}},isS?'vs '+DIFF_LABEL[DIFF_ORDER[lvlS]]+' AI':'2 players'),
                 React.createElement('span',{style:{display:'flex',gap:6}},[lenTxt,side==='left'?'You: left':'You: right',scoreLimit?'First to '+scoreLimit:null,overtimeEnabled?'Overtime':null].filter(Boolean).map(function(t,i){return React.createElement('span',{key:i,style:{padding:'3px 9px',borderRadius:50,background:'rgba(5,12,35,0.75)',border:'1px solid rgba(255,255,255,0.18)',fontSize:11,fontWeight:800}},t);})))),
-          isS&&React.createElement('button',{onClick:function(){startGame(selectedDuration,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill(playButton,{fontSize:18,padding:'15px 60px',letterSpacing:'0.08em',border:'2px solid rgba(255,255,255,0.7)',boxShadow:isDay?'0 6px 28px rgba(22,163,74,0.7)':isJapanT?'0 6px 28px rgba(225,29,114,0.7)':'0 6px 28px rgba(129,140,248,0.7)'}),focusSty('play'))},'Play'),isS&&devHourCard());
+          isS&&React.createElement('button',{onClick:function(){startGame(selectedDuration,'single',DC,{left:'P1',right:'P2'},sideRef.current,'regular',null,null);},style:Object.assign(pill(playButton,IS_PHONE?{position:'fixed',left:'max(12px, env(safe-area-inset-left, 0px))',right:'max(12px, env(safe-area-inset-right, 0px))',bottom:'calc(env(safe-area-inset-bottom, 0px) + 10px)',zIndex:30,fontSize:20,padding:'16px 0',letterSpacing:'0.08em',border:'2px solid rgba(255,255,255,0.7)'}:{fontSize:18,padding:'15px 60px',letterSpacing:'0.08em',border:'2px solid rgba(255,255,255,0.7)',boxShadow:isDay?'0 6px 28px rgba(22,163,74,0.7)':isJapanT?'0 6px 28px rgba(225,29,114,0.7)':'0 6px 28px rgba(129,140,248,0.7)'}),focusSty('play'))},'Play'),isS&&!IS_PHONE&&devHourCard());
           // right: the settings, each in its own section
           var right=React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:12,minWidth:0,alignItems:'stretch'}},
             React.createElement('div',{style:{width:'100%',boxSizing:'border-box',padding:'12px 14px',borderRadius:16,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)',display:'flex',flexDirection:'column',alignItems:'center',gap:8}},React.createElement('div',{style:{fontSize:11,fontWeight:900,color:'rgba(255,255,255,0.68)',letterSpacing:'0.12em',textTransform:'uppercase'}},'Match length'),
@@ -8018,7 +8022,7 @@ function makePeerRoom(peer,role,code){
             React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',justifyContent:'center'}},React.createElement('span',{style:{fontSize:12,fontWeight:800,marginRight:4}},'AI style'),
               AI_STYLES.map(function(st){return settingPill('aistyle_'+st[0],st[1],aiStyle===st[0],function(){setAiStyle(st[0]);});})),
             React.createElement('div',{style:{fontSize:11,color:'rgba(255,255,255,0.7)'}},(AI_STYLES.filter(function(st){return st[0]===aiStyle;})[0]||AI_STYLES[0])[2]))));
-          return React.createElement('div',{style:{display:'grid',gridTemplateColumns:narrowS?'1fr':'minmax(0,1.05fr) minmax(0,1fr)',gap:22,width:'100%',alignItems:'start'}},left,right);
+          return React.createElement('div',{style:{display:'grid',gridTemplateColumns:narrowS?'minmax(0,1fr)':'minmax(0,1.05fr) minmax(0,1fr)',gap:IS_PHONE?12:22,width:'100%',alignItems:'start'}},left,right,IS_PHONE&&isS&&devHourCard(),IS_PHONE&&isS&&React.createElement('div',{key:'playspace',style:{height:76}}));
         })(),
         !EMBED_AI&&React.createElement('button',{onClick:function(){setScreen(pmRef.current==='multi'?'player_select':'menu');},style:ghostBtn('back')},'Back')
       )
@@ -8159,8 +8163,8 @@ function makePeerRoom(peer,role,code){
                 React.createElement('div',{style:{fontFamily:DISP,fontSize:24,color:'#fff',marginBottom:6}},netMsg),
                 React.createElement('div',{style:{fontSize:12,color:'rgba(255,255,255,0.65)',marginBottom:14}},'Waiting a few seconds in case they come back…'),
                 React.createElement('button',{onClick:exitToMenu,style:pill('rgba(255,255,255,0.14)',{fontSize:13,padding:'9px 22px',textTransform:'none',letterSpacing:0})},'Back to menu'))),
-            winner&&endStats&&React.createElement('div',{'data-results':true,style:{position:'absolute',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.74)',display:'flex',alignItems:'flex-start',justifyContent:'center',paddingTop:18,borderRadius:'0 0 14px 14px'}},
-              React.createElement('div',{className:'rise',style:{background:'rgba(5,12,35,0.97)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:20,padding:'18px 22px',width:340,maxWidth:'94%',maxHeight:'92%',overflowY:'auto',boxSizing:'border-box',boxShadow:'0 20px 60px rgba(0,0,0,0.6),0 0 40px rgba(56,189,248,0.18)'}},
+            winner&&endStats&&React.createElement('div',{'data-results':true,style:{position:'absolute',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.74)',display:'flex',alignItems:IS_PHONE?'center':'flex-start',justifyContent:'center',paddingTop:IS_PHONE?'env(safe-area-inset-top,0px)':18,paddingBottom:IS_PHONE?'env(safe-area-inset-bottom,0px)':0,boxSizing:'border-box',borderRadius:'0 0 14px 14px'}},
+              React.createElement('div',{className:'rise','data-results-card':true,style:{background:'rgba(5,12,35,0.97)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:20,padding:IS_PHONE?'14px 16px':'18px 22px',width:IS_PHONE&&landscape?'min(680px,94%)':340,maxWidth:'94%',maxHeight:IS_PHONE?'94%':'92%',overflowY:'auto',columnCount:IS_PHONE&&landscape?2:undefined,columnGap:18,boxSizing:'border-box',boxShadow:'0 20px 60px rgba(0,0,0,0.6),0 0 40px rgba(56,189,248,0.18)'}},
                 React.createElement('div',{style:{textAlign:'center',marginBottom:14}},
                   trainingResult&&gmode==='training'
                     ?React.createElement(React.Fragment,null,
@@ -8259,7 +8263,7 @@ function makePeerRoom(peer,role,code){
           :{position:'fixed',top:'calc(env(safe-area-inset-top,0px) + 8px)',right:'calc(env(safe-area-inset-right,0px) + 8px)',left:'calc(env(safe-area-inset-left,0px) + 8px)',zIndex:62,display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end',pointerEvents:'none'}},
         btns.filter(Boolean).map(function(b){return React.cloneElement(b,{style:Object.assign({},b.props.style,{pointerEvents:'auto'})});}));
     }
-    return React.createElement('div',{key:'game',className:ROT_VIEW?undefined:'screen-in',style:EMBED_AI?Object.assign({},baseStyle,{background:'transparent'}):ROT_VIEW?Object.assign({},baseStyle,{position:'fixed',top:0,left:0,width:REAL_VW.h(),height:REAL_VW.w(),minHeight:0,transform:'translateX('+REAL_VW.w()+'px) rotate(90deg)',transformOrigin:'top left',overflow:'hidden',zIndex:5,background:'#050c23'}):baseStyle},EMBED_AI||ROT_VIEW?null:React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
+    return React.createElement('div',{key:'game',className:ROT_VIEW?undefined:'screen-in',style:EMBED_AI?Object.assign({},baseStyle,{background:'transparent'}):(IS_PHONE&&landscape&&!ROT_VIEW)?Object.assign({},baseStyle,{justifyContent:'flex-start',paddingTop:'calc(env(safe-area-inset-top,0px) + 4px)'}):ROT_VIEW?Object.assign({},baseStyle,{justifyContent:'flex-start',paddingTop:4,position:'fixed',top:0,left:0,width:REAL_VW.h(),height:REAL_VW.w(),minHeight:0,transform:'translateX('+REAL_VW.w()+'px) rotate(90deg)',transformOrigin:'top left',overflow:'hidden',zIndex:5,background:'#050c23'}):baseStyle},EMBED_AI||ROT_VIEW?null:React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
       touchControls(),achievementToasts(),tutPanel(),
       touchUI&&touchHud(),
       touchUI&&overlayOpen&&React.createElement('div',{style:{position:'fixed',inset:0,zIndex:65,overflowY:'auto'}},gameOverlays()),
