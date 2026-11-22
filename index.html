@@ -129,6 +129,9 @@ var REAL_VW=(function(){function g(n){var d=Object.getOwnPropertyDescriptor(wind
   var W=g('innerWidth'),H=g('innerHeight');
   try{Object.defineProperty(window,'innerWidth',{configurable:true,get:function(){return ROT_VIEW?H():W();}});Object.defineProperty(window,'innerHeight',{configurable:true,get:function(){return ROT_VIEW?W():H();}});}catch(e){}
   return {w:W,h:H};})();
+function realInsets(){try{var d=document.createElement('div');d.style.cssText='position:fixed;visibility:hidden;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';document.body.appendChild(d);var c=getComputedStyle(d),o={t:parseFloat(c.paddingTop)||0,r:parseFloat(c.paddingRight)||0,b:parseFloat(c.paddingBottom)||0,l:parseFloat(c.paddingLeft)||0};d.remove();return o;}catch(e){return{t:0,r:0,b:0,l:0};}}
+// In the turned match the game's left edge is the phone's top (status bar), its right edge the phone's bottom (home bar).
+function rotEdge(){var i=realInsets();return{l:Math.max(i.t,44),r:i.b,t:i.r,b:i.l};}
 function setRotView(on){if(ROT_VIEW===on)return;ROT_VIEW=on;try{document.body.classList.toggle('rot-view',on);}catch(e){}try{window.dispatchEvent(new Event('resize'));}catch(e){}}
 var GAME_VERSION='v26.6.4';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
@@ -8088,14 +8091,14 @@ function makePeerRoom(peer,role,code){
       var tlay=!twoPlayers&&tlLoad()[landscape?'landscape':'portrait'];
       if(tlay&&tlay.pad&&tlay.jump&&tlay.dash){
         var tb0=tlBase(landscape);
-        function at(key,w,h,el){var vw=window.innerWidth,vh=window.innerHeight;return React.createElement('div',{key:'at'+key,style:{position:'fixed',left:tlClamp(tlay[key].x*vw-w/2,0,vw-w),top:tlClamp(tlay[key].y*vh-h/2,0,vh-h),pointerEvents:'none'}},el);}
+        function at(key,w,h,el){var vw=window.innerWidth,vh=window.innerHeight,re=ROT_VIEW?rotEdge():null,lo=re?re.l+6:0,hi=vw-w-(re?re.r:0);return React.createElement('div',{key:'at'+key,style:{position:'fixed',left:tlClamp(tlay[key].x*vw-w/2,lo,hi),top:tlClamp(tlay[key].y*vh-h/2,0,vh-h),pointerEvents:'none'}},el);}
         var ps=tlay.pad.s,js=tb0.jump*tlay.jump.s,ds=tb0.dash*tlay.dash.s;
         return React.createElement('div',{className:'touch-controls','aria-label':'Touch game controls',style:{position:'fixed',inset:0,pointerEvents:'none',zIndex:60}},
           at('pad',tb0.pad[0]*ps,tb0.pad[1]*ps,movePad(null,tb0.pad[0]*ps,tb0.pad[1]*ps)),
           at('dash',ds,ds,touchButton('dash','\u25BC','Dash',null,ds)),
           at('jump',js,js,touchButton('jump','\u25B2','Jump',null,js)));
       }
-      var inset='calc(env(safe-area-inset-left,0px) + 14px)',insetR=landscape?'calc(env(safe-area-inset-right,0px) + 62px)':'calc(env(safe-area-inset-right,0px) + 14px)'; // sideways: stay clear of the round button column
+      var reT=ROT_VIEW?rotEdge():null,inset=reT?(reT.l+14)+'px':'calc(env(safe-area-inset-left,0px) + 14px)',insetR=reT?(reT.r+62)+'px':landscape?'calc(env(safe-area-inset-right,0px) + 62px)':'calc(env(safe-area-inset-right,0px) + 14px)'; // sideways: stay clear of the round button column
       return React.createElement('div',{className:'touch-controls','aria-label':'Touch game controls',style:{position:'fixed',left:0,right:0,bottom:'calc(env(safe-area-inset-bottom,0px) + 14px)',paddingLeft:inset,paddingRight:insetR,justifyContent:'space-between',alignItems:'flex-end',boxSizing:'border-box',pointerEvents:'none',zIndex:60}},
         React.createElement('div',{className:'rotate-hint',style:{position:'absolute',left:'50%',bottom:'100%',transform:'translate(-50%,-10px)',whiteSpace:'nowrap',fontSize:12,color:'rgba(255,255,255,0.8)',background:'rgba(5,12,35,0.6)',padding:'5px 12px',borderRadius:20}},'Turn your phone sideways for a bigger field'),
         twoPlayers?cluster('p1',false):movePad(null,pad[0],pad[1]),
@@ -8250,11 +8253,11 @@ function makePeerRoom(peer,role,code){
           .concat([tb('∞ Jump',toggleUnlimJump,unlimJump),tb('Exit',exitToMenu,undefined,true)])
         :[!isOnG&&tb(paused?'Resume':'Pause',togglePause),tb(soundEnabled?'Sound on':'Muted',function(){var next=!soundEnabledRef.current;soundEnabledRef.current=next;setSoundEnabled(next);},soundEnabled),(isSingleG||isOnG||gmode==='multi'||gmode==='training')&&tb('Exit',exitToMenu,undefined,true)];
       return React.createElement('div',{style:landscape
-          ?{position:'fixed',top:'calc(env(safe-area-inset-top,0px) + 6px)',right:'calc(env(safe-area-inset-right,0px) + 6px)',zIndex:62,display:'flex',flexDirection:'column',gap:isPractice?4:8,alignItems:'flex-end',pointerEvents:'none'}
+          ?{position:'fixed',top:ROT_VIEW?6:'calc(env(safe-area-inset-top,0px) + 6px)',right:ROT_VIEW?rotEdge().r+6:'calc(env(safe-area-inset-right,0px) + 6px)',zIndex:62,display:'flex',flexDirection:'column',gap:isPractice?4:8,alignItems:'flex-end',pointerEvents:'none'}
           :{position:'fixed',top:'calc(env(safe-area-inset-top,0px) + 8px)',right:'calc(env(safe-area-inset-right,0px) + 8px)',left:'calc(env(safe-area-inset-left,0px) + 8px)',zIndex:62,display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end',pointerEvents:'none'}},
         btns.filter(Boolean).map(function(b){return React.cloneElement(b,{style:Object.assign({},b.props.style,{pointerEvents:'auto'})});}));
     }
-    return React.createElement('div',{key:'game',className:ROT_VIEW?undefined:'screen-in',style:EMBED_AI?Object.assign({},baseStyle,{background:'transparent'}):ROT_VIEW?Object.assign({},baseStyle,{position:'fixed',top:0,left:0,width:REAL_VW.h(),height:REAL_VW.w(),minHeight:0,transform:'translateX('+REAL_VW.w()+'px) rotate(90deg)',transformOrigin:'top left',overflow:'hidden',zIndex:5}):baseStyle},EMBED_AI?null:React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
+    return React.createElement('div',{key:'game',className:ROT_VIEW?undefined:'screen-in',style:EMBED_AI?Object.assign({},baseStyle,{background:'transparent'}):ROT_VIEW?Object.assign({},baseStyle,{position:'fixed',top:0,left:0,width:REAL_VW.h(),height:REAL_VW.w(),minHeight:0,transform:'translateX('+REAL_VW.w()+'px) rotate(90deg)',transformOrigin:'top left',overflow:'hidden',zIndex:5,background:'#050c23'}):baseStyle},EMBED_AI||ROT_VIEW?null:React.createElement(ThemeBg,{theme:themeMode,noSun:true}),
       touchControls(),achievementToasts(),tutPanel(),
       touchUI&&touchHud(),
       touchUI&&overlayOpen&&React.createElement('div',{style:{position:'fixed',inset:0,zIndex:65,overflowY:'auto'}},gameOverlays()),
