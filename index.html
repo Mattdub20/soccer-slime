@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.3.7';
+var GAME_VERSION='v26.4.0';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -349,7 +349,7 @@ var HP=mkPool(HARD),EP=mkPool(EASY),IP=mkPool(chaosBuff(IMPOSSIBLE));
 // CHAOS_AS_HARD: Chaos plays as a souped-up Hard AI (same tactics, but faster, sharper prediction, instant decisions,
 // no coin flips or aim wobble) instead of its own special brain. Set to false to bring the old Chaos back.
 var CHAOS_AS_HARD=true,HARD_X={};
-Object.keys(HARD).forEach(function(k){var o=Object.assign({},HARD[k]);o.sm*=1.2;o.ib*=1.15;o.dr+=25;o.jn=Math.max(o.jn,75);o.jf=1;o.cd=1;o.ad=true;o.dj=true;o.er=true;HARD_X['hx_'+k]=o;});
+Object.keys(HARD).forEach(function(k){var o=Object.assign({},HARD[k]);o.sm*=1.2;o.ib*=1.15;o.dr+=25;o.jn=Math.max(o.jn,75);o.jf=1;o.cd=1;o.ad=false;o.dj=true;o.er=true;HARD_X['hx_'+k]=o;});
 Object.assign(ALL_S,HARD_X);var HXP=mkPool(HARD_X);
 // AI personality (Player vs AI setup): Balanced = any strategy; Keeper = defensive ones (stays home, blocks);
 // Striker = attacking ones (high line, presses). Falls back to the full pool if a level has none of that kind.
@@ -7200,8 +7200,8 @@ function makePeerRoom(peer,role,code){
                 // Dashes, like Hard but timed off the predicted contact.
                 var tw=aiLeft?1:-1,dxB=(b.x-ai.x)*tw,dyB=ai.y-b.y,inAir=ai.y<GH-GRND-2,danger=((onOurs||fastIn)&&incoming&&!best)||(aiStyleRef.current==='keeper'&&!onOurs);
                 // Air spin dash: in the air with the ball just ahead on the attacking side -> tilt, then fire forward into it.
-                if(inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&dxB>8&&dxB<125&&dyB>-30&&dyB<115){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}
-                if(ai.spinPhase===1&&((dxB>-12&&dxB<70&&Math.abs(dyB)<85)||dxB>170||dxB<-40)){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}
+                if(!chaosH&&inAir&&!danger&&ai.spinPhase===0&&!ai.isSpinning&&ai.dashCooldown===0&&dxB>8&&dxB<125&&dyB>-30&&dyB<115){ai.isSpinning=true;ai.spinAngle=0;ai.spinTarget=aiLeft?-(3*Math.PI/4):(3*Math.PI/4);ai.dashFrames=0;ai.spinPhase=1;ai.spinDipY=0;}
+                if(!chaosH&&ai.spinPhase===1&&((dxB>-12&&dxB<70&&Math.abs(dyB)<85)||dxB>170||dxB<-40)){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=tw;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;}
                 // Ground dash: low ball just ahead on the attacking side -> burst through it.
                 if(!inAir&&!danger&&!ai.isSpinning&&ai.dashCooldown===0&&ai.dashFrames===0&&GH-GRND-b.y<45&&dxB>18&&dxB<105&&Math.abs(b.vx)<9){ai.dashFrames=DASH_F;ai.dashDir=tw;ai.groundDash=true;ai.dashCooldown=3;}
               })();
@@ -7231,6 +7231,16 @@ function makePeerRoom(peer,role,code){
               var ownX=twC>0?0:GW,grC=aiC.y>=GH-GRND-1,toOwn=ball.vx*(-twC)>2.5,behindC=(ball.x-aiC.x)*(-twC)>0,goalD=Math.abs(ball.x-ownX),gap=Math.abs(ball.x-aiC.x);
               // no jumping straight up under a slow dropping ball (pops it up) - but only away from its own goal and when it isn't coming at the goal
               if(gC&&!toOwn&&aiC.vy<0&&Math.abs(ball.vx)<3&&gap<SR*0.6&&hC>SR)aiC.vy=0;
+              // POWER SHOT (measured from the player's goals in their replays): in the air, tilt back into an air spin as the
+              // ball comes within reach in front, then fire the spin-dash when the ball is ~40-50px ahead and level with the
+              // lower half of the body (released ~70px out; the dash carries it in). That sends it out at 15-17 speed and nearly flat.
+              var dyP=aiC.y-ball.y,airP=aiC.y<GH-GRND-30;
+              if(airP&&aiC.spinPhase===0&&!aiC.isSpinning&&aiC.dashCooldown===0&&fC>45&&fC<150&&dyP>-25&&dyP<85&&!(toOwn&&behindC)){aiC.isSpinning=true;aiC.spinAngle=0;aiC.spinTarget=twC>0?-(3*Math.PI/4):(3*Math.PI/4);aiC.dashFrames=0;aiC.spinPhase=1;aiC.spinDipY=0;aiC._psT=0;}
+              if(aiC.spinPhase===1){aiC._psT=(aiC._psT||0)+1;
+                var sweet=fC>34&&fC<72&&dyP>-12&&dyP<28,lost=fC<8||fC>190||aiC._psT>40;
+                if(sweet||lost){aiC.isSpinning=true;aiC.spinTarget=0;aiC.dashFrames=DASH_F;aiC.dashDir=twC;if(!unlimRef.current)aiC.dashCooldown=CD_F;aiC.spinPhase=0;aiC.spinDipY=0;}}
+              // get up to it: a second jump near the top of the first when the ball is ahead and still above
+              if(airP&&!aiC.hasDoubleJumped&&!aiC.isSpinning&&aiC.vy>-2&&fC>20&&fC<170&&dyP>90&&dyP<200){aiC.vy=JUMP*0.85;aiC.hasDoubleJumped=true;}
               // Recovery (from replays): when the ball is running at its own goal and Chaos is upfield of it, dash back.
               // It never cancels a jump here, so it can still leap to block a ball dropping into the goal. The only thing it
               // avoids is dashing straight into a low ball from right behind (that pokes it in).
