@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.3.4';
+var GAME_VERSION='v26.3.5';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -132,7 +132,9 @@ function cxTrail(id){var a=cxParts(id);if(!a||a.length<1||a.length>3||!cxHexes(a
 function cxTitleText(t){return String(t||'').replace(/[^A-Za-z0-9 !?'.&\-]/g,'').replace(/\s+/g,' ').slice(0,18);}
 function cxTitle(id){if(typeof id!=='string'||id.indexOf('cx:')!==0||id.length>40)return null;var bar=id.indexOf('|');if(bar<0)return null;var c=id.slice(3,bar),t=id.slice(bar+1);if(!CX_HEX.test(c)||!t||cxTitleText(t)!==t||t.trim()!==t)return null;return{id:id,name:t,color:c,customMade:true};}
 function cxBoom(id){var a=cxParts(id);if(!a||a.length!==5||!cxHexes(a,3)||CX_SHAPES.indexOf(a[3])<0||CX_STYLES.indexOf(a[4])<0)return null;return{id:id,name:'Custom Explosion',icon:'🎆',cols:a.slice(0,3),shape:a[3],style:a[4],customMade:true};}
-function cxDetails(kind,id){return kind==='skin'?cxSkin(id):kind==='frame'?cxFrame(id):kind==='trail'?cxTrail(id):kind==='title'?cxTitle(id):kind==='celebration'?cxBoom(id):null;}
+var CX_BALL_STYLES=['classic','swirl','stripes','solid'];
+function cxBall(id){var a=cxParts(id);if(!a||a.length!==5||!cxHexes(a,3)||CX_BALL_STYLES.indexOf(a[3])<0||(a[4]!=='0'&&a[4]!=='1'))return null;return{id:id,name:'Custom Ball',icon:'\uD83C\uDFA8',b0:a[0],b1:a[0],panel:a[1],edge:a[1],glow:a[4]==='1'?a[2]:null,cols:[a[0],a[1],a[2]],cxStyle:a[3],bstyle:a[3]==='classic'?undefined:'cx',customMade:true};}
+function cxDetails(kind,id){return kind==='ball'?cxBall(id):kind==='skin'?cxSkin(id):kind==='frame'?cxFrame(id):kind==='trail'?cxTrail(id):kind==='title'?cxTitle(id):kind==='celebration'?cxBoom(id):null;}
 // owning the "custom" item of a kind lets you wear any design of that kind
 function ownsId(list,id){return list.indexOf(id)>=0||(typeof id==='string'&&id.indexOf('cx:')===0&&list.indexOf('custom')>=0);}
 // ?embed=ai: the little vs-AI match shown next to the online waiting screen. It is a second copy of the game in a
@@ -2263,7 +2265,7 @@ function drawDashCD(c,sl){if(!CD_F||!sl||!(sl.dashCooldown>0)||sl.x<-100)return;
   var k=Math.min(1,sl.dashCooldown/CD_F),x=sl.x,y=sl.y-SR-14+(sl.spinDipY||0);c.save();c.lineCap='round';c.lineWidth=4;c.strokeStyle='rgba(0,0,0,0.45)';c.beginPath();c.arc(x,y,7,0,Math.PI*2);c.stroke();c.strokeStyle='#fbbf24';c.beginPath();c.arc(x,y,7,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-k));c.stroke();c.restore();}
 // ─── Ball (v2: proper panelled football, rotates with spin) ──────────────
 var BALL_SKIN='none';
-function ballSkinDetails(id){if(!id||id==='none')return null;var it=COSMETICS.ball&&COSMETICS.ball.items.filter(function(x){return x.id===id;})[0];return it||null;}
+function ballSkinDetails(id){if(!id||id==='none')return null;return cosmeticDetails('ball',id);}
 function drawBall(ctx,ball,isNight,isJapan){
   var bsk=ballSkinDetails(BALL_SKIN);
   if(bsk&&bsk.bstyle){drawStyledBall(ctx,ball,bsk);return;}
@@ -2308,6 +2310,10 @@ function drawStyledBall(ctx,ball,bsk){
   ctx.save();ctx.beginPath();ctx.arc(x,y,BR,0,Math.PI*2);ctx.clip();ctx.translate(x,y);ctx.rotate(a);
   if(bsk.bstyle==='beach'){var cs=['#ef4444','#ffffff','#facc15','#ffffff','#3b82f6','#ffffff'];for(i=0;i<6;i++){ctx.fillStyle=cs[i];ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,BR+1,i*Math.PI/3,(i+1)*Math.PI/3);ctx.closePath();ctx.fill();}ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,BR*0.2,0,Math.PI*2);ctx.fill();}
   else if(bsk.bstyle==='eight'){ctx.fillStyle='#111827';ctx.fillRect(-BR,-BR,BR*2,BR*2);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-BR*0.05,BR*0.46,0,Math.PI*2);ctx.fill();ctx.fillStyle='#111827';ctx.font='bold '+Math.round(BR*0.7)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('8',0,-BR*0.02);}
+  else if(bsk.bstyle==='cx'){var c=bsk.cols;
+    if(bsk.cxStyle==='swirl'){for(i=0;i<6;i++){ctx.fillStyle=i%2?c[1]:c[0];ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,BR+1,i*Math.PI/3,(i+1)*Math.PI/3);ctx.closePath();ctx.fill();}ctx.fillStyle=c[2];ctx.beginPath();ctx.arc(0,0,BR*0.22,0,Math.PI*2);ctx.fill();}
+    else if(bsk.cxStyle==='stripes'){ctx.fillStyle=c[0];ctx.fillRect(-BR,-BR,BR*2,BR*2);ctx.fillStyle=c[1];ctx.fillRect(-BR,-BR*0.55,BR*2,BR*0.36);ctx.fillRect(-BR,BR*0.2,BR*2,BR*0.36);ctx.fillStyle=c[2];ctx.fillRect(-BR,-BR*0.12,BR*2,BR*0.24);}
+    else{var sg=ctx.createRadialGradient(-BR*0.3,-BR*0.3,1,0,0,BR);sg.addColorStop(0,c[2]);sg.addColorStop(0.5,c[0]);sg.addColorStop(1,c[1]);ctx.fillStyle=sg;ctx.fillRect(-BR,-BR,BR*2,BR*2);}}
   else if(bsk.bstyle==='gold'){
     // solid polished gold: bright metal gradient, raised star in the middle, a glint that sweeps across
     var gg=ctx.createLinearGradient(-BR,-BR,BR,BR);gg.addColorStop(0,'#fff7cc');gg.addColorStop(0.3,'#facc15');gg.addColorStop(0.55,'#a16207');gg.addColorStop(0.8,'#fde047');gg.addColorStop(1,'#854d0e');ctx.fillStyle=gg;ctx.fillRect(-BR,-BR,BR*2,BR*2);
@@ -2320,7 +2326,7 @@ function drawStyledBall(ctx,ball,bsk){
     for(i=0;i<5;i++){var sa2=st+i*1.26,sr2=BR*0.72;ctx.fillStyle='rgba(255,255,255,'+(0.4+0.6*Math.abs(Math.sin(st*2+i)))+')';ctx.beginPath();ctx.arc(Math.cos(sa2)*sr2,Math.sin(sa2)*sr2,1.4,0,Math.PI*2);ctx.fill();}}
   else if(bsk.bstyle==='galaxy'){var g=ctx.createRadialGradient(-BR*0.3,-BR*0.3,1,0,0,BR);g.addColorStop(0,'#a855f7');g.addColorStop(0.6,'#312e81');g.addColorStop(1,'#0f0a2a');ctx.fillStyle=g;ctx.fillRect(-BR,-BR,BR*2,BR*2);var t=performance.now()*0.002;for(i=0;i<9;i++){var sa=i*2.39,sr=BR*(0.2+((i*37)%70)/100);ctx.fillStyle='rgba(255,255,255,'+(0.5+0.5*Math.abs(Math.sin(t+i)))+')';ctx.beginPath();ctx.arc(Math.cos(sa)*sr,Math.sin(sa)*sr,0.8+(i%3)*0.5,0,Math.PI*2);ctx.fill();}}
   ctx.restore();
-  ctx.save();if(bsk.bstyle==='galaxy'){ctx.shadowColor='#a855f7';ctx.shadowBlur=16;ctx.strokeStyle='rgba(216,180,254,0.9)';}else if(bsk.bstyle==='gold'){ctx.shadowColor='#facc15';ctx.shadowBlur=20;ctx.strokeStyle='#713f12';}else if(bsk.bstyle==='slimeate'){ctx.shadowColor='#4ade80';ctx.shadowBlur=24;ctx.strokeStyle='#fde047';}else ctx.strokeStyle='rgba(0,0,0,0.6)';
+  ctx.save();if(bsk.bstyle==='galaxy'){ctx.shadowColor='#a855f7';ctx.shadowBlur=16;ctx.strokeStyle='rgba(216,180,254,0.9)';}else if(bsk.bstyle==='gold'){ctx.shadowColor='#facc15';ctx.shadowBlur=20;ctx.strokeStyle='#713f12';}else if(bsk.bstyle==='slimeate'){ctx.shadowColor='#4ade80';ctx.shadowBlur=24;ctx.strokeStyle='#fde047';}else if(bsk.bstyle==='cx'){if(bsk.glow){ctx.shadowColor=bsk.glow;ctx.shadowBlur=18;}ctx.strokeStyle=bsk.cols[1];}else ctx.strokeStyle='rgba(0,0,0,0.6)';
   var sh=ctx.createRadialGradient(x-BR*0.3,y-BR*0.35,BR*0.2,x,y,BR);sh.addColorStop(0,'rgba(0,0,0,0)');sh.addColorStop(1,'rgba(0,0,0,0.25)');ctx.fillStyle=sh;ctx.beginPath();ctx.arc(x,y,BR,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(255,255,255,0.75)';ctx.beginPath();ctx.ellipse(x-BR*0.38,y-BR*0.45,BR*0.22,BR*0.14,-0.5,0,Math.PI*2);ctx.fill();
   ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(x,y,BR-0.6,0,Math.PI*2);ctx.stroke();ctx.restore();
@@ -3944,6 +3950,7 @@ PREMIUM_STOCK.forEach(function(it){it.premium=true;SHOP_STOCK.push(it);});
 [
   {kind:'frame',id:'custom',name:'Custom Frame',color:'#ffffff',color2:'#f472b6',price:10000},
   {kind:'trail',id:'custom',name:'Custom Trail',icon:'🎨',price:15000},
+  {kind:'ball',id:'custom',name:'Custom Ball',icon:'🎨',price:12000},
   {kind:'title',id:'custom',name:'Custom Title',color:'#f9a8d4',grad:'linear-gradient(90deg,#db2777,#7c3aed,#0891b2)',ink:'#ffffff',price:20000},
   {kind:'skin',id:'custom',name:'Custom Skin',price:25000,color:'#f472b6',accent:'#22d3ee',detail:'#ffffff',pattern:'stars',sheen:'#ffffff'},
   {kind:'celebration',id:'custom',name:'Custom Explosion',icon:'🎆',price:35000}
@@ -4574,6 +4581,7 @@ function ShopScreen(props){
   function cxEncode(e){
     if(e.kind==='skin')return'cx:'+[e.c1,e.c2,e.c3,e.pattern,e.sheen?'1':'0'].concat((e.fxShape&&e.fxShape!=='auto')||(e.fxCol&&e.fxCol!=='skin')?[e.fxShape||'auto',e.fxCol||'skin']:[]).join(',');
     if(e.kind==='trail')return'cx:'+[e.c1,e.c2,e.c3].join(',');
+    if(e.kind==='ball')return'cx:'+[e.c1,e.c2,e.c3,e.bstyle,e.glow?'1':'0'].join(',');
     if(e.kind==='title')return'cx:'+e.c1+'|'+cxTitleText(e.text).trim();
     if(e.kind==='celebration')return'cx:'+[e.c1,e.c2,e.c3,e.shape,e.style].join(',');
     return'cx:'+[e.c1,e.c2].join(',');
@@ -4581,6 +4589,7 @@ function ShopScreen(props){
   function cxStart(kind){
     var d=cxDetails(kind,current(kind)),e={kind:kind};
     if(kind==='skin')Object.assign(e,d?{c1:d.color,c2:d.accent,c3:d.detail,pattern:d.pattern==='none'?'plain':d.pattern,sheen:!!d.sheen,fxShape:d.fxShape||'auto',fxCol:d.fxCol||'skin'}:{c1:'#f472b6',c2:'#22d3ee',c3:'#ffffff',pattern:'stars',sheen:true,fxShape:'auto',fxCol:'skin'});
+    else if(kind==='ball')Object.assign(e,d&&d.cols?{c1:d.cols[0],c2:d.cols[1],c3:d.cols[2],bstyle:d.cxStyle,glow:!!d.glow}:{c1:'#ffffff',c2:'#7c3aed',c3:'#22d3ee',bstyle:'classic',glow:true});
     else if(kind==='trail'){var tc=d?d.colors:['#f472b6','#22d3ee','#facc15'];e.c1=tc[0];e.c2=tc[1]||tc[0];e.c3=tc[2]||tc[0];}
     else if(kind==='title')Object.assign(e,d?{c1:d.color,text:d.name}:{c1:'#f9a8d4',text:''});
     else if(kind==='celebration')Object.assign(e,d?{c1:d.cols[0],c2:d.cols[1],c3:d.cols[2],shape:d.shape,style:d.style}:{c1:'#f472b6',c2:'#22d3ee',c3:'#facc15',shape:'star',style:'burst'});
@@ -4598,6 +4607,7 @@ function ShopScreen(props){
       cxSelect('Particles','fxShape',[['auto','Auto'],['dot','Dots'],['star','Stars'],['flake','Snowflakes'],['bubble','Bubbles'],['pixel','Pixels']]),
       cxSelect('Particle colours','fxCol',[['skin','Skin colours'],['rainbow','Rainbow'],['fire','Fire'],['ice','Ice'],['gold','Gold'],['white','White']])];
     else if(tab==='trail')f=[cxColor('Colour 1','c1'),cxColor('Colour 2','c2'),cxColor('Colour 3','c3')];
+    else if(tab==='ball')f=[cxColor('Ball','c1'),cxColor('Panels','c2'),cxColor('Accent / glow','c3'),cxSelect('Look','bstyle',[['classic','Classic panels'],['swirl','Swirl'],['stripes','Stripes'],['solid','Shiny solid']]),React.createElement('label',{key:'gl',style:{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:800}},React.createElement('input',{type:'checkbox',checked:!!ed.glow,onChange:function(e){cxSet({glow:e.target.checked});}}),'Glow')];
     else if(tab==='title')f=[React.createElement('input',{key:'t',type:'text',value:ed.text,maxLength:18,placeholder:'Your title','aria-label':'Title text',onChange:function(e){cxSet({text:cxTitleText(e.target.value)});},onKeyDown:function(e){e.stopPropagation();if(e.key==='Enter')cxSave();},style:{flex:'1 1 160px',minWidth:0,padding:'7px 10px',borderRadius:10,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:13,fontFamily:'inherit',outline:'none'}}),cxColor('Colour','c1')];
     else if(tab==='celebration')f=[cxColor('Colour 1','c1'),cxColor('Colour 2','c2'),cxColor('Colour 3','c3'),cxSelect('Particles','shape',[['star','Stars'],['coin','Coins'],['pixel','Pixels'],['strand','Ribbons'],['bubble','Bubbles'],['dot','Sparks']]),cxSelect('Style','style',[['burst','Burst'],['rings','Shockwave rings'],['fountain','Fountain'],['rain','Rain from the sky'],['spiral','Spiral']])];
     else f=[cxColor('Ring','c1'),cxColor('Glow','c2')];
@@ -7114,7 +7124,7 @@ function makePeerRoom(peer,role,code){
                   }
                 }
                 if(mem.retreat>0){mem.retreat--;if(fromWall<GOALW+90){newT=fieldX(GOALW+SR+70);spd2=SPD*1.15;doJump=false;return;}}
-                if(fromWall<GOALW+70&&b.y<barY-BR*0.5){
+                if(fromWall<GOALW+70&&b.y<barY-BR*2.2){
                   var h2=GH-GRND-b.y,dx2=Math.abs(ai.x-b.x),grd3=ai.y>=GH-GRND-1;
                   newT=Math.max(GOALW-SR*0.4,Math.min(GW-GOALW+SR*0.4,fieldX(fromWall+26)));spd2=SPD*1.15;doJump=false;
                   if(grd3&&dx2<70&&h2>40&&h2<SR+150&&b.vy>-4)doJump=true;
@@ -7220,6 +7230,17 @@ function makePeerRoom(peer,role,code){
               if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&ball.vy>0&&Math.abs(ball.vx)<3&&hC>SR*0.9&&hC<260&&fC>-SR*0.7&&fC<SR*0.7){aiC.vx=-twC*SPD*1.2;if(aiC.vy<0)aiC.vy=0;}
               // no jumping straight up under the ball either
               if(gC&&aiC.vy<0&&Math.abs(ball.vx)<3&&Math.abs(ball.x-aiC.x)<SR*0.6&&hC>SR)aiC.vy=0;
+              // From a replay: most goals against Chaos were long clears over it while it stood deep in the opponent's half,
+              // then it chased the ball from behind and knocked it into its own net.
+              var humC=hSide==='right'?rs:ls,ownX=twC>0?0:GW,grC=aiC.y>=GH-GRND-1,toOwn=ball.vx*(-twC)>2.5,behindC=(ball.x-aiC.x)*(-twC)>0,goalD=Math.abs(ball.x-ownX);
+              // 1. don't get caught upfield: when they're about to hit it in their half, drop back to just past halfway
+              var dHum=Math.hypot(ball.x-humC.x,ball.y-humC.y),dAi=Math.hypot(ball.x-aiC.x,ball.y-aiC.y),upfield=(aiC.x-ownX)*twC>GW*0.56;
+              if(upfield&&(ball.x-GW/2)*twC>0&&dHum<dAi-30&&dAi>110&&!aiC.isSpinning&&aiC.dashFrames===0){aiC.vx=-twC*SPD*1.15;if(grC&&aiC.vy<0)aiC.vy=0;}
+              // 2. ball running at its own goal with Chaos behind it: never poke it on from behind
+              if(toOwn&&behindC&&goalD<430){
+                if(hC>SR*1.7){if(!aiC.isSpinning&&aiC.dashFrames===0)aiC.vx=-twC*SPD*1.35;if(grC&&aiC.vy<0)aiC.vy=0;}   // high ball: sprint underneath to get goal-side of it
+                else if(Math.abs(ball.x-aiC.x)<SR+BR+34){aiC.vx=0;if(grC&&aiC.vy<0)aiC.vy=0;if(aiC.groundDash&&aiC.dashDir===-twC){aiC.dashFrames=0;aiC.groundDash=false;}} // low ball: hold off, a touch from behind only helps it in
+              }
               if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&hC<SR*0.85&&fC>12&&fC<115&&ball.vy>-3){aiC.dashFrames=DASH_F;aiC.dashDir=twC;aiC.groundDash=true;}}
             var pinAi=hSide==='right'?ls:rs,pinHum=hSide==='right'?rs:ls,pinLeft=hSide==='right',PIN={supereasy:0.12,easy:0.15,medium:0.2,hard:0.25,impossible:0.3}[diffRef.current]||0.25;
             var pdx=pinHum.x-pinAi.x,pdy=pinHum.y-pinAi.y,inBox=pinLeft?pinAi.x<GOALW+6:pinAi.x>GW-GOALW-6,pinned=inBox&&(pinLeft?pdx>0:pdx<0)&&Math.abs(pdx)<SR*2+8&&Math.abs(pdy)<SR*4;
