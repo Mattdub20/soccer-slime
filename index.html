@@ -119,7 +119,7 @@ var DIFF_LABEL={supereasy:'Super Easy',easy:'Easy',medium:'Medium',hard:'Hard',i
 var AI_LEARNING=false;
 var RARE_P={fire:0.000001,boom:0.0000001};
 var NET_DIAG={sent:0,recv:0,fail:0,err:''};
-var GAME_VERSION='v26.4.9';
+var GAME_VERSION='v26.5.0';
 // ─── Custom Studio: designs are stored right in the equipped id as "cx:..." so they travel with the save, loadouts and online ───
 var CX_HEX=/^#[0-9a-f]{6}$/i,CX_PATTERNS=['plain','stripes','stars','waves','spots','checker','bands','crown','facets','flames','circuit'],CX_SHAPES=['star','coin','pixel','strand','bubble','dot'],CX_STYLES=['burst','rings','fountain','rain','spiral'],CX_CACHE={};
 function cxParts(id){return typeof id==='string'&&id.indexOf('cx:')===0&&id.length<90?id.slice(3).split(','):null;}
@@ -7229,7 +7229,7 @@ function makePeerRoom(peer,role,code){
               if(ai.goalLineTime>0.6)newT=aiLeft?Math.max(newT,GOALW+SR*0.6):Math.min(newT,GW-GOALW-SR*0.6);
               newT=isImp&&!aiLeft?Math.max(GW/2-reach,Math.min(GW-SR,newT)):Math.max(SR,Math.min(aiLeft?GW/2+reach:GW-SR,newT));
               // Never float around in an air-dash tilt: fire it at the ball after half a second at most.
-              if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=(isImp||chaosH)?1:s2.cd+(medium?3:0);}var dd2=ai.targetX-ai.x;if(medium){spd2*=0.86;if(Math.random()<0.3)doJump=false;if(ai.groundDash&&ai.dashFrames===DASH_F&&Math.random()<0.45){ai.dashFrames=0;ai.groundDash=false;ai.dashCooldown=Math.max(ai.dashCooldown,30);}}if(superEasy){spd2*=0.5;if(Math.random()<0.75)doJump=false;if(behind&&ai.groundDash&&ai.dashFrames===DASH_F){if(Math.random()<0.5){ai.dashFrames=0;ai.groundDash=false;}ai.dashCooldown=Math.max(ai.dashCooldown,40);}}ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*((isImp||chaosH)?1.18:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;else if(s2.dj&&doJump&&ai.y<GH-GRND-25&&ai.vy>-2.5&&b.y<ai.y-SR*0.3&&!ai.hasDoubleJumped&&!ai.isSpinning){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
+              if(isImp){if(ai.spinPhase===1){ai._tiltT=(ai._tiltT||0)+1;if(ai._tiltT>26){ai.isSpinning=true;ai.spinTarget=0;ai.dashFrames=DASH_F;ai.dashDir=b.x>ai.x?1:-1;if(!unlimRef.current)ai.dashCooldown=CD_F;ai.spinPhase=0;ai.spinDipY=0;ai._tiltT=0;}}else ai._tiltT=0;}if(Math.abs(newT-ai.targetX)>6){ai.targetX=newT;ai.decisionCooldown=(isImp||chaosH)?1:s2.cd+(medium?3:0);}var dd2=ai.targetX-ai.x;if(medium){spd2*=0.86;if(Math.random()<0.3)doJump=false;if(ai.groundDash&&ai.dashFrames===DASH_F&&Math.random()<0.45){ai.dashFrames=0;ai.groundDash=false;ai.dashCooldown=Math.max(ai.dashCooldown,30);}}if(superEasy){spd2*=0.5;if(Math.random()<0.75)doJump=false;if(behind&&ai.groundDash&&ai.dashFrames===DASH_F){if(Math.random()<0.5){ai.dashFrames=0;ai.groundDash=false;}ai.dashCooldown=Math.max(ai.dashCooldown,40);}}ai.vx=Math.abs(dd2)>5?Math.sign(dd2)*spd2*((isImp||chaosH)?1.18:1)*Math.min(Math.abs(dd2)/28,1):0;if(isImp&&ai.dashCooldown>0)ai.dashCooldown--;if(doJump&&ai.vy===0&&!ai.isSpinning)ai.vy=JUMP;else if(s2.dj&&doJump&&ai.y<GH-GRND-25&&ai.vy>-2.5&&b.y<ai.y-SR*0.3&&!ai.hasDoubleJumped&&!ai.isSpinning&&!(chaosH&&(b.vy<-4||b.y<ai.y-SR*4.5))){ai.vy=JUMP*0.85;ai.hasDoubleJumped=true;}}}}
           }
           // Players were shoving the AI into its own goal box and holding it there until the 1-second camping
           // rule gave them a goal. The clock still runs (no free passes), but a pinned AI now jumps out over the
@@ -7261,11 +7261,11 @@ function makePeerRoom(peer,role,code){
               var peakC=hC+(ball.vy<0?ball.vy*ball.vy/(2*GRAV):0);
               if(toOwn&&grC&&aiC.vy<0&&peakC<SR*2.2&&gap<260)aiC.vy=0;                                   // low/bouncing ball at its goal: block it standing, don't jump over it
               // right behind a low ball rolling at its own goal: don't run into it (that pokes it in) - pace it instead
-              if(toOwn&&behindC&&peakC<SR*2.2&&gap<SR+BR+45&&!aiC.isSpinning){var capV=Math.abs(ball.vx)*0.75;if(aiC.vx*(-twC)>capV)aiC.vx=-twC*capV;if(aiC.groundDash&&aiC.dashDir===-twC){aiC.dashFrames=0;aiC.groundDash=false;}}
+              if(toOwn&&behindC&&peakC<SR*2.2&&gap<SR+BR+190&&!aiC.isSpinning){var capV=Math.abs(ball.vx)*0.75;if(gap<SR+BR+45&&aiC.vx*(-twC)>capV)aiC.vx=-twC*capV;if(aiC.groundDash&&aiC.dashDir===-twC){aiC.dashFrames=0;aiC.groundDash=false;}}
               // Recovery (from replays): when the ball is running at its own goal and Chaos is upfield of it, dash back.
               // It never cancels a jump here, so it can still leap to block a ball dropping into the goal. The only thing it
               // avoids is dashing straight into a low ball from right behind (that pokes it in).
-              if(toOwn&&behindC&&goalD<520&&grC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&(hC>SR*1.6||gap>130)){aiC.dashFrames=DASH_F;aiC.dashDir=-twC;aiC.groundDash=true;}
+              if(toOwn&&behindC&&goalD<520&&grC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&(hC>SR*1.6||gap>SR+BR+190)){aiC.dashFrames=DASH_F;aiC.dashDir=-twC;aiC.groundDash=true;}
               if(gC&&!aiC.isSpinning&&aiC.dashFrames===0&&aiC.dashCooldown===0&&hC<SR*0.85&&fC>12&&fC<115&&ball.vy>-3){aiC.dashFrames=DASH_F;aiC.dashDir=twC;aiC.groundDash=true;}}
             var pinAi=hSide==='right'?ls:rs,pinHum=hSide==='right'?rs:ls,pinLeft=hSide==='right',PIN={supereasy:0.12,easy:0.15,medium:0.2,hard:0.25,impossible:0.3}[diffRef.current]||0.25;
             var pdx=pinHum.x-pinAi.x,pdy=pinHum.y-pinAi.y,inBox=pinLeft?pinAi.x<GOALW+6:pinAi.x>GW-GOALW-6,pinned=inBox&&(pinLeft?pdx>0:pdx<0)&&Math.abs(pdx)<SR*2+8&&Math.abs(pdy)<SR*4;
